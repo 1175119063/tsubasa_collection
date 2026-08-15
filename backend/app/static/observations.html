@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>观察记录 · 羽迹</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="paper-noise"></div>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">羽</span>
+        <span><strong>羽迹</strong><small>观察记录</small></span>
+      </a>
+      <div class="top-actions">
+        <a class="nav-link" href="/">首页</a>
+        <a class="nav-link" href="/dex">个人图鉴</a>
+        <button id="new-record-button" class="primary-button">＋ 新增观察</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-intro">
+        <p class="eyebrow">FIELD RECORDS</p>
+        <div><h1>观察记录</h1><span id="record-total" class="section-count">0 笔记录</span></div>
+        <p>按照拍摄月份回顾每一次观察。点击记录可预览完整的时间、地点与个体信息。</p>
+      </section>
+      <section class="records-page-section">
+        <div class="filter-panel observation-filters" aria-label="观察记录筛选">
+          <label>年份
+            <select id="observation-year-filter"><option value="">全部年份</option></select>
+          </label>
+          <label>月份
+            <select id="observation-month-filter"><option value="">全部月份</option></select>
+          </label>
+          <label>排列顺序
+            <select id="observation-sort-order">
+              <option value="asc">从早到晚</option>
+              <option value="desc">从晚到早</option>
+            </select>
+          </label>
+          <label>观鸟地点
+            <select id="observation-location-filter"><option value="">全部地点</option></select>
+          </label>
+          <button id="observation-filter-reset" type="button" class="secondary-button filter-reset">清除筛选</button>
+        </div>
+        <div id="observation-empty" class="compact-empty" hidden>尚无观察记录。</div>
+        <div id="observation-groups" class="observation-groups"></div>
+      </section>
+    </main>
+
+    <dialog id="observation-detail-dialog" class="observation-preview-dialog">
+      <button type="button" class="detail-close" data-close-observation-detail aria-label="关闭">×</button>
+      <div id="observation-detail-content"></div>
+    </dialog>
+
+    <dialog id="record-dialog" class="record-dialog">
+      <form id="record-form">
+        <header class="dialog-header">
+          <div><p class="eyebrow">NEW OBSERVATION</p><h2>新增单笔观察</h2></div>
+          <button type="button" class="icon-button" data-close-dialog aria-label="关闭">×</button>
+        </header>
+
+        <div class="form-scroll">
+          <fieldset>
+            <legend><span>01</span> 目标物种</legend>
+            <label class="full-field">选择图鉴物种
+              <select id="species-select" name="species-select"></select>
+            </label>
+            <div id="new-species-fields" class="form-grid taxonomy-fields">
+              <div class="taxonomy-node full-field">
+                <label><span class="step-label">1 · 目</span><select id="order-node-select" name="order_node"></select></label>
+                <div id="order-new-fields" class="node-new-grid">
+                  <label>目中文名<input name="order_chinese" autocomplete="off" /></label>
+                  <label>目拉丁学名<input name="order_scientific" autocomplete="off" /></label>
+                </div>
+              </div>
+              <div class="taxonomy-node full-field">
+                <label><span class="step-label">2 · 科</span><select id="family-node-select" name="family_node"></select></label>
+                <div id="family-new-fields" class="node-new-grid">
+                  <label>科中文名<input name="family_chinese" autocomplete="off" /></label>
+                  <label>科拉丁学名<input name="family_scientific" autocomplete="off" /></label>
+                </div>
+              </div>
+              <div class="taxonomy-node full-field">
+                <label><span class="step-label">3 · 属</span><select id="genus-node-select" name="genus_node"></select></label>
+                <div id="genus-new-fields" class="node-new-grid">
+                  <label>属中文名<input name="genus_chinese" autocomplete="off" /></label>
+                  <label>属拉丁学名<input name="genus_scientific" autocomplete="off" /></label>
+                </div>
+              </div>
+              <label><span class="step-label">4 · 种中文名</span><input name="species_chinese" autocomplete="off" /></label>
+              <label><span class="step-label">4 · 种拉丁学名</span><input name="species_scientific" placeholder="例如 Alcedo atthis" autocomplete="off" /></label>
+              <label>IUCN 等级
+                <select name="iucn_status">
+                  <option>NE</option><option>LC</option><option>NT</option><option>VU</option>
+                  <option>EN</option><option>CR</option><option>EW</option><option>EX</option>
+                </select>
+              </label>
+              <label>中国保护等级
+                <select name="china_status">
+                  <option value="">无</option><option value="three_protected">三有</option>
+                  <option value="level_2">二级</option><option value="level_1">一级</option>
+                </select>
+              </label>
+              <label class="check-field full-field">
+                <input id="has-subspecies" name="has_subspecies" type="checkbox" />
+                <span>该物种存在亚种</span>
+              </label>
+              <label id="subspecies-list-field" class="full-field" hidden>完整亚种名单
+                <textarea name="subspecies_list" rows="3" placeholder="每行一个：拉丁学名 | 可选中文名"></textarea>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><span>02</span> 照片与个体</legend>
+            <div class="form-grid">
+              <label class="full-field file-field">JPEG/JPG 照片
+                <input id="photo-input" name="photo" type="file" accept="image/jpeg,.jpg,.jpeg" required />
+                <span id="photo-metadata-status" class="field-hint">选择照片后将自动读取 EXIF 拍摄时间。</span>
+              </label>
+              <label>照片类型
+                <select id="photo-type" name="photo_type">
+                  <option value="individual">个体照片</option><option value="group">群体照片</option>
+                </select>
+              </label>
+              <label class="individual-field">性别
+                <select name="sex"><option value="unknown">未知</option><option value="male">雄性</option><option value="female">雌性</option></select>
+              </label>
+              <label class="individual-field">生命阶段
+                <select name="life_stage">
+                  <option value="unknown">未知</option><option value="egg">卵</option><option value="chick">雏鸟</option>
+                  <option value="subadult">亚成</option><option value="adult">成鸟</option>
+                </select>
+              </label>
+              <label class="individual-field">亚种
+                <select id="subspecies-select" name="subspecies"><option value="">未知 / 无亚种</option></select>
+              </label>
+              <label class="full-field file-field">MP3 录音（可多选）
+                <input name="audio" type="file" accept="audio/mpeg,.mp3" multiple />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><span>03</span> 时间、地点与环境</legend>
+            <div class="form-grid">
+              <label class="full-field">地点资料库
+                <select id="location-select" name="location_id"><option value="">暂不关联地点</option></select>
+                <span class="field-hint">可选择已有地点；没有合适地点时，可先前往“地点浏览”建立。</span>
+              </label>
+              <label>拍摄时间<input id="observed-at" name="observed_at" type="datetime-local" step="60" required /></label>
+              <label>季节
+                <select name="season">
+                  <option value="spring">春</option><option value="summer">夏</option>
+                  <option value="autumn">秋</option><option value="winter">冬</option><option value="other">其他</option>
+                </select>
+              </label>
+              <label>纬度<input id="latitude" name="latitude" type="number" min="-90" max="90" step="any" required /></label>
+              <label>经度<input id="longitude" name="longitude" type="number" min="-180" max="180" step="any" required /></label>
+              <button id="use-location" type="button" class="secondary-button full-field">使用当前设备位置</button>
+              <label>国家代码<input name="country_code" value="CN" required /></label>
+              <label>国家名称<input name="country_name" value="中国" required /></label>
+              <label>一级行政区代码<input name="admin1_code" placeholder="例如 CN-ZJ" required /></label>
+              <label>一级行政区名称<input name="admin1_name" placeholder="例如 浙江省" required /></label>
+              <label class="full-field">具体地点<input name="locality" required /></label>
+              <label class="full-field">备注<textarea name="notes" rows="3"></textarea></label>
+            </div>
+          </fieldset>
+        </div>
+
+        <footer class="dialog-footer">
+          <span id="form-status" role="status"></span>
+          <button type="submit" class="primary-button">保存并入藏</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <script src="/static/core.js" defer></script>
+    <script src="/static/observations.js" defer></script>
+  </body>
+</html>

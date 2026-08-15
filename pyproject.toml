@@ -1,0 +1,32 @@
+[project]
+name = "yuhen"
+version = "0.1.0"
+description = "羽迹：本地鸟类观察记录与个人图鉴"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic",
+    "fastapi",
+    "mutagen",
+    "pillow",
+    "pydantic-settings",
+    "python-multipart",
+    "sqlalchemy",
+    "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+dev = ["httpx", "pytest", "ruff"]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/app/api.py" = ["B008"]

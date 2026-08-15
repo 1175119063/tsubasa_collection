@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>观鸟行程 · 羽迹</title><link rel="stylesheet" href="/static/styles.css" /></head>
+  <body>
+    <div class="paper-noise"></div>
+    <header class="topbar"><a class="brand" href="/"><span class="brand-mark">羽</span><span><strong>羽迹</strong><small>观鸟行程</small></span></a><div class="top-actions"><a class="nav-link" href="/">首页</a><a class="nav-link" href="/observations">观察记录</a><a class="nav-link" href="/dex">个人图鉴</a><a class="nav-link" href="/locations">地点浏览</a><button id="new-trip-button" class="primary-button">＋ 创建行程</button></div></header>
+    <main>
+      <section class="page-intro"><p class="eyebrow">BIRDING TRIPS</p><div><h1>观鸟行程</h1><span id="trip-total" class="section-count">0 次行程</span></div><p>把同一次外出中的观察整理在一起，回顾地点、时间与本次拍摄到的科、属、种。</p></section>
+      <section class="records-page-section">
+        <div class="filter-panel trip-filters">
+          <label>年份<select id="trip-year-filter"><option value="">全部年份</option></select></label><label>月份<select id="trip-month-filter"><option value="">全部月份</option></select></label><label>地点<select id="trip-location-filter"><option value="">全部地点</option></select></label>
+          <label>排列顺序<select id="trip-sort"><option value="asc">从早到晚</option><option value="desc">从晚到早</option></select></label><button id="trip-filter-reset" class="secondary-button filter-reset">清除筛选</button>
+        </div>
+        <div id="trip-empty" class="empty-state" hidden><span class="empty-feather">⌁</span><h3>还没有观鸟行程</h3><p>创建一次行程，再把时间和地点相符的观察关联进来。</p><button id="empty-new-trip" class="text-button">创建第一次行程 →</button></div>
+        <div id="trip-filter-empty" class="compact-empty" hidden>当前筛选条件下没有行程。</div><div id="trip-groups" class="observation-groups"></div>
+      </section>
+    </main>
+    <dialog id="trip-form-dialog" class="record-dialog trip-form-dialog"><form id="trip-form"><header class="dialog-header"><div><p class="eyebrow">TRIP ARCHIVE</p><h2 id="trip-form-title">创建观鸟行程</h2></div><button type="button" class="icon-button" data-close-trip-form>×</button></header><div class="form-scroll"><fieldset><legend><span>01</span> 行程时间与地点</legend><div class="form-grid"><label class="full-field">地点<select name="location_id" required></select></label><label>开始时间<input name="started_at" type="datetime-local" step="60" required /></label><label>结束时间<input name="ended_at" type="datetime-local" step="60" required /></label><label class="full-field">行程备注<textarea name="notes" rows="5" placeholder="天气、路线、同行者或器材等，可不填"></textarea></label></div></fieldset></div><footer class="dialog-footer"><span id="trip-form-status"></span><button type="submit" class="primary-button">保存行程</button></footer></form></dialog>
+    <dialog id="trip-detail-dialog" class="detail-dialog trip-detail-dialog"><button type="button" class="detail-close" data-close-trip-detail>×</button><div id="trip-detail-content"></div></dialog>
+    <dialog id="trip-link-dialog" class="record-dialog trip-link-dialog"><form id="trip-link-form"><header class="dialog-header"><div><p class="eyebrow">LINK OBSERVATIONS</p><h2>关联观察记录</h2></div><button type="button" class="icon-button" data-close-trip-link>×</button></header><div class="form-scroll"><p class="section-note">这里只显示时间符合且地点相同或尚未关联地点的观察；已属于其他行程的记录不可选择。</p><div id="trip-link-list" class="location-link-list"></div></div><footer class="dialog-footer"><span id="trip-link-status"></span><button type="submit" class="primary-button">保存关联</button></footer></form></dialog>
+    <script src="/static/core.js" defer></script><script src="/static/trips.js" defer></script>
+  </body>
+</html>

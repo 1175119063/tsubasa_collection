@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>个人图鉴 · 羽迹</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="paper-noise"></div>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">羽</span>
+        <span><strong>羽迹</strong><small>个人图鉴</small></span>
+      </a>
+      <div class="top-actions">
+        <a class="nav-link" href="/">首页</a>
+        <a class="nav-link" href="/observations">观察记录</a>
+        <a class="primary-button button-link" href="/observations?new=1">＋ 新增观察</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-intro">
+        <p class="eyebrow">THE COLLECTION</p>
+        <div><h1>个人图鉴</h1><span id="dex-total" class="section-count">0 个物种</span></div>
+        <p>浏览由个人观察自然生长出来的物种档案，并选择最能代表它们的封面。</p>
+      </section>
+
+      <section class="dex-page-section">
+        <div class="section-heading dex-tools">
+          <p class="section-note">点击馆藏卡查看完整档案</p>
+          <label class="search-box">
+            <span>⌕</span>
+            <input id="search-input" type="search" placeholder="搜索中文名或拉丁学名" />
+          </label>
+        </div>
+        <div class="filter-panel dex-filters" aria-label="个人图鉴分类筛选">
+          <label>科
+            <select id="family-filter"><option value="">全部科</option></select>
+          </label>
+          <label>属
+            <select id="genus-filter"><option value="">全部属</option></select>
+          </label>
+          <label>种
+            <select id="species-filter"><option value="">全部种</option></select>
+          </label>
+          <button id="dex-filter-reset" type="button" class="secondary-button filter-reset">清除筛选</button>
+        </div>
+        <div id="empty-state" class="empty-state" hidden>
+          <span class="empty-feather">⌁</span>
+          <h3>馆藏仍是空的</h3>
+          <p>上传第一张鸟类照片，建立你的第一份物种档案。</p>
+          <a class="text-button" href="/observations?new=1">开始第一笔观察 →</a>
+        </div>
+        <div id="dex-filter-empty" class="compact-empty" hidden>当前筛选条件下没有物种。</div>
+        <div id="species-grid" class="species-grid"></div>
+      </section>
+    </main>
+
+    <dialog id="detail-dialog" class="detail-dialog">
+      <button type="button" class="icon-button detail-close" data-close-detail aria-label="关闭">×</button>
+      <div id="detail-content"></div>
+    </dialog>
+
+    <script src="/static/core.js" defer></script>
+    <script src="/static/dex.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+# Local Conda environment and package cache
+.conda/
+
+# Runtime data must never be committed
+data/
+backups/
+
+# Python caches and tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local configuration and secrets
+.env
+*.local.toml
+
+# IDE and OS files
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store

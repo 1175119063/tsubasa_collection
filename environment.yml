@@ -1,0 +1,20 @@
+name: yuhen
+
+channels:
+  - defaults
+
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - alembic
+      - fastapi
+      - httpx
+      - mutagen
+      - pillow
+      - pydantic-settings
+      - pytest
+      - python-multipart
+      - ruff
+      - sqlalchemy
+      - uvicorn[standard]
