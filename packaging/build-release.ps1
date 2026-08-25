@@ -62,7 +62,13 @@ $versionText = @(
     'Default URL: http://127.0.0.1:8000'
 ) -join [Environment]::NewLine
 [System.IO.File]::WriteAllText((Join-Path $blankDir 'VERSION.txt'), $versionText, [System.Text.UTF8Encoding]::new($false))
-Compress-Archive -LiteralPath $blankDir -DestinationPath $blankZip -CompressionLevel Optimal
+Push-Location $releaseRoot
+try {
+    & tar.exe -a -c -f $blankZip $blankName
+    if ($LASTEXITCODE -ne 0) { throw "Archive creation failed with exit code $LASTEXITCODE" }
+} finally {
+    Pop-Location
+}
 
 Write-Host '[4/4] Writing SHA-256 checksum' -ForegroundColor Cyan
 $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $blankZip
