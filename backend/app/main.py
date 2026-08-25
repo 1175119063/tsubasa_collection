@@ -14,6 +14,7 @@ from .database import Database
 from .feather_assistant import FeatherAssistant
 from .integration_store import IntegrationStore
 from .media_store import MediaStore
+from .update_service import UpdateService
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -29,6 +30,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.database = database
         app.state.media_store = MediaStore(app_settings)
         app.state.backup_service = BackupService(app_settings)
+        app.state.update_service = UpdateService(app_settings)
         app.state.integration_store = IntegrationStore(app_settings)
         app.state.feather_assistant = FeatherAssistant(
             app_settings,
@@ -85,6 +87,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/locations", include_in_schema=False)
     def locations_page() -> FileResponse:
         return FileResponse(STATIC_DIR / "v2-locations.html")
+
+    @app.get("/map", include_in_schema=False)
+    def map_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "v2-map.html")
 
     @app.get("/trips", include_in_schema=False)
     def trips_page() -> FileResponse:

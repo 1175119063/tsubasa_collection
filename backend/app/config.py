@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     feather_assistant_timeout_seconds: float = 120.0
     feather_assistant_context_size: int = 8192
     feather_assistant_max_output_tokens: int = 512
+    update_manifest_url: str | None = None
 
     model_config = SettingsConfigDict(
         env_prefix="YUHEN_",
@@ -51,6 +52,10 @@ class Settings(BaseSettings):
     def integrations_path(self) -> Path:
         return self.data_dir / "integrations.dat"
 
+    @property
+    def updates_dir(self) -> Path:
+        return self.data_dir.parent / "updates"
+
     def ensure_directories(self) -> None:
         for path in (
             self.data_dir,
@@ -59,5 +64,6 @@ class Settings(BaseSettings):
             self.audio_dir,
             self.temp_dir,
             self.backups_dir,
+            self.updates_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)

@@ -18,6 +18,7 @@
         <label for="v2-observation-location">调查区域</label><select id="v2-observation-location"><option value="">全部区域</option></select>
         <label for="v2-observation-sort">装订顺序</label><select id="v2-observation-sort"><option value="asc">从早到晚</option><option value="desc">从晚到早</option></select>
         <button class="v2-filter-reset" id="v2-observation-reset" type="button">清除检索条件</button>
+        <a class="v2-filter-reset" href="/api/exports/observations.csv" download>导出田野记录 CSV</a>
         <div class="v2-book-count"><strong id="v2-observation-count">—</strong><span>页田野记录</span></div>
       </aside>
       <section class="v2-archive-content"><header class="v2-dex-header"><div><p class="v2-kicker">按时间装订</p><h2>沿着日期重返现场</h2></div><button class="v2-new-entry" id="new-record-button" type="button">＋ 登记新发现</button></header><div id="v2-observation-groups" class="v2-record-groups"><p class="v2-loading">正在整理田野手记…</p></div><div class="v2-empty" id="v2-observation-empty" hidden><strong>没有符合条件的记录</strong><span>换一个月份或区域试试。</span></div></section>
@@ -65,6 +66,6 @@
       </form>
     </dialog>
     <div class="v2-editor-scaffold" hidden><span id="record-total"></span><select id="observation-year-filter"></select><select id="observation-month-filter"></select><select id="observation-sort-order"><option value="asc">asc</option></select><select id="observation-location-filter"></select><button id="observation-filter-reset" type="button"></button><div id="observation-empty"></div><div id="observation-groups"></div><dialog id="observation-detail-dialog"><button data-close-observation-detail type="button"></button><div id="observation-detail-content"></div></dialog></div>
-    <script src="/static/core.js?v=20260815-2" defer></script><script src="/static/v2-pages.js?v=20260825-1" defer></script><script src="/static/observations.js?v=20260819-2" defer></script><script src="/static/assistant.js?v=20260825-4" defer></script>
+    <script src="/static/core.js?v=20260815-2" defer></script><script src="/static/v2-pages.js?v=20260825-2" defer></script><script src="/static/observations.js?v=20260819-2" defer></script><script src="/static/assistant.js?v=20260825-5" defer></script>
   </body>
 </html>

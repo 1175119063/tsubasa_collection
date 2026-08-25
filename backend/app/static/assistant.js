@@ -150,10 +150,10 @@
     panel.querySelectorAll("[data-feather-mode]").forEach((item) => item.classList.toggle("is-active", item === button));
     const searching = chatMode === "search";
     modeNote.textContent = searching
-      ? "描述年份、月份、物种、地点、远征、排序或多物种照片，我会直接应用筛选。"
+      ? "描述日期、多个物种、目科属种、地点、远征或同框关系，我会查询并展示实际命中的记录。"
       : `可以自由聊天；涉及本项目功能时会参考${pageNames[page]}的说明。`;
-    chatInput.placeholder = searching ? "例如：查找2024年4月拍到的喜鹊，按时间倒序" : "给飞羽精灵发送消息…";
-    renderQuickReplies(searching ? ["查找最近的多物种照片", "查看2024年4月的喜鹊", "按时间倒序显示记录"] : undefined);
+    chatInput.placeholder = searching ? "例如：查询2024年4月5日拍到的白头鹎和灰喜鹊" : "给飞羽精灵发送消息…";
+    renderQuickReplies(searching ? ["查询最近的多物种照片", "查看2024年4月5日的全部记录", "查询鸦科的所有记录"] : undefined);
     chatInput.focus();
   }));
 
@@ -173,17 +173,8 @@
           body: JSON.stringify({ query: text }),
         });
         document.dispatchEvent(new CustomEvent("feather:apply-observation-search", { detail: result }));
-        const applied = [
-          result.year ? `${result.year}年` : "",
-          result.month ? `${result.month}月` : "",
-          result.species_name || "",
-          result.location_name || "",
-          result.trip_name || "",
-          result.multi_species_only ? "多物种照片" : "",
-          result.sort === "desc" ? "从晚到早" : result.sort === "asc" ? "从早到晚" : "",
-        ].filter(Boolean);
         const warnings = result.warnings.length ? `\n${result.warnings.join("\n")}` : "";
-        resolveMessage(pending, `线索已经整理好了，探险家！\n${applied.join(" · ") || "没有识别到有效筛选条件"}${warnings}`);
+        resolveMessage(pending, `${result.answer}\n${result.interpretation}${warnings}`);
       } else {
         chatHistory.push({ role: "user", content: text });
         chatHistory = chatHistory.slice(-12);

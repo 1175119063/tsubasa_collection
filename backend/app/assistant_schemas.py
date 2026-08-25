@@ -43,6 +43,21 @@ class AssistantSearchInput(BaseModel):
     query: str = Field(min_length=2, max_length=500)
 
 
+SearchParameter = str | int | float | bool | None
+
+
+class AssistantSqlQuery(BaseModel):
+    """A model-produced, parameterized query against the field-journal views."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    interpretation: str = Field(min_length=1, max_length=500)
+    sql: str = Field(min_length=10, max_length=8000)
+    parameters: dict[str, SearchParameter] = Field(default_factory=dict, max_length=50)
+    sort: Literal["asc", "desc"] = "desc"
+    warnings: list[str] = Field(default_factory=list, max_length=10)
+
+
 class AssistantSearchExtraction(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 

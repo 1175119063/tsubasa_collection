@@ -194,6 +194,28 @@ def test_general_chat_uses_selected_external_provider() -> None:
     assert result.suggestions == []
 
 
+def test_observation_query_skill_uses_selected_openai_compatible_provider() -> None:
+    assistant = HybridAssistant([])
+    assistant._request_openai_chat = lambda *args, **kwargs: json.dumps(
+        {
+            "interpretation": "查询2024年4月5日的全部记录",
+            "sql": (
+                "SELECT observation_id FROM field_observations "
+                "WHERE observed_date = :observed_date"
+            ),
+            "parameters": {"observed_date": "2024-04-05"},
+            "sort": "desc",
+            "warnings": [],
+        },
+        ensure_ascii=False,
+    )
+
+    result = assistant.plan_observation_query("请查询2024年4月5日的全部记录")
+
+    assert result.parameters == {"observed_date": "2024-04-05"}
+    assert "field_observations" in result.sql
+
+
 def test_external_plain_chat_is_truncated_without_validation_failure() -> None:
     result = FeatherAssistant._external_chat_response("羽" * 4000)
 

@@ -1,13 +1,15 @@
 import asyncio
 import json
+import tempfile
 from collections.abc import Generator
+from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from .assistant_catalog import normalized_lookup, resolve_catalog_item
+from .assistant_catalog import normalized_lookup
 from .assistant_schemas import (
     AmapIntegrationInput,
     AssistantChatInput,
@@ -16,11 +18,14 @@ from .assistant_schemas import (
     AssistantTextInput,
     LlmIntegrationInput,
 )
+from .database import Database
+from .export_service import observations_csv
 from .feather_assistant import FeatherAssistantError
 from .integration_store import IntegrationConfigError
 from .map_service import AmapService, MapServiceError
 from .media_store import MediaStore, MediaValidationError
 from .models import MediaAsset
+from .observation_query_skill import ObservationQueryError, ObservationQueryExecutor
 from .schemas import (
     LocationInput,
     LocationObservationSelectionInput,
@@ -34,6 +39,7 @@ from .schemas import (
     TripObservationSelectionInput,
 )
 from .services import BirdService, DomainError
+from .update_service import UpdateError
 
 router = APIRouter(prefix="/api")
 
@@ -156,6 +162,49 @@ def download_backup(filename: str, request: Request) -> FileResponse:
     return FileResponse(path, media_type="application/zip", filename=filename)
 
 
+@router.post("/backups/restore")
+async def restore_backup(request: Request, backup: UploadFile = File(...)) -> dict:
+    if not backup.filename or not backup.filename.lower().endswith(".zip"):
+        raise HTTPException(422, "请选择翼·时光记生成的 ZIP 备份")
+    temporary_path: Path | None = None
+    database_disposed = False
+    try:
+        request.app.state.settings.backups_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            dir=request.app.state.settings.backups_dir,
+            prefix="restore-upload-",
+            suffix=".zip",
+            delete=False,
+        ) as target:
+            temporary_path = Path(target.name)
+            total = 0
+            while chunk := await backup.read(1024 * 1024):
+                total += len(chunk)
+                if total > 20 * 1024 * 1024 * 1024:
+                    raise HTTPException(413, "备份文件超过 20 GB 限制")
+                target.write(chunk)
+
+        request.app.state.database.engine.dispose()
+        database_disposed = True
+        result = await asyncio.to_thread(
+            request.app.state.backup_service.restore,
+            temporary_path,
+        )
+    except HTTPException:
+        raise
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise HTTPException(422, f"恢复备份失败：{exc}") from exc
+    finally:
+        await backup.close()
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        if database_disposed:
+            database = Database(request.app.state.settings)
+            database.create_schema()
+            request.app.state.database = database
+    return result
+
+
 def get_session(request: Request) -> Generator[Session, None, None]:
     yield from request.app.state.database.session()
 
@@ -171,6 +220,31 @@ def health(request: Request) -> dict:
         "app": request.app.state.settings.app_name,
         "version": request.app.state.settings.app_version,
     }
+
+
+@router.get("/updates/status")
+def update_status(request: Request) -> dict:
+    try:
+        return request.app.state.update_service.check()
+    except UpdateError as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+
+@router.post("/updates/download")
+def download_update(request: Request) -> dict:
+    try:
+        return request.app.state.update_service.download()
+    except UpdateError as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+
+@router.get("/updates/files/{filename}", response_class=FileResponse)
+def get_update_file(filename: str, request: Request) -> FileResponse:
+    try:
+        path = request.app.state.update_service.resolve(filename)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "更新安装包不存在") from exc
+    return FileResponse(path, media_type="application/vnd.microsoft.portable-executable")
 
 
 @router.get("/assistant/status")
@@ -199,55 +273,35 @@ async def feather_assistant_parse_search(
     request: Request,
 ) -> dict:
     try:
-        extracted = await asyncio.to_thread(
-            request.app.state.feather_assistant.parse_search,
+        plan = await asyncio.to_thread(
+            request.app.state.feather_assistant.plan_observation_query,
             payload.query,
+        )
+        execution = await asyncio.to_thread(
+            ObservationQueryExecutor(request.app.state.settings.database_path).execute,
+            plan,
         )
     except FeatherAssistantError as exc:
         raise assistant_error(exc) from exc
+    except ObservationQueryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    with request.app.state.database.session_factory() as session:
-        service = service_for(request, session)
-        species, locations, trips = (
-            service.list_species(),
-            service.list_locations(),
-            service.list_trips(),
-        )
-    species_match, species_candidates = resolve_catalog_item(
-        extracted.species_name,
-        species,
-        ("chinese_name", "scientific_name", "catalog_number"),
+    count = len(execution.observation_ids)
+    qualifier = "至少" if execution.truncated else ""
+    answer = (
+        f"找到{qualifier}{count}笔符合条件的田野记录，已在页面中展示。"
+        if count
+        else "没有找到符合这些条件的田野记录。"
     )
-    location_match, location_candidates = resolve_catalog_item(
-        extracted.location_name,
-        locations,
-        ("name", "catalog_number", "city", "district"),
-    )
-    trip_match, trip_candidates = resolve_catalog_item(
-        extracted.trip_name,
-        trips,
-        ("name", "catalog_number"),
-    )
-    warnings = list(extracted.warnings)
-    for label, query, match, candidates in (
-        ("物种", extracted.species_name, species_match, species_candidates),
-        ("地点", extracted.location_name, location_match, location_candidates),
-        ("远征", extracted.trip_name, trip_match, trip_candidates),
-    ):
-        if query and candidates:
-            warnings.append(f"{label}“{query}”存在多个候选：{'、'.join(candidates)}。")
-        elif query and match is None:
-            warnings.append(f"没有在当前资料库中找到{label}“{query}”。")
-    result = extracted.model_dump(exclude={"warnings"})
-    result.update(
-        {
-            "species_id": species_match["id"] if species_match else None,
-            "location_id": location_match["id"] if location_match else None,
-            "trip_id": trip_match["id"] if trip_match else None,
-            "warnings": warnings,
-        }
-    )
-    return result
+    return {
+        "interpretation": plan.interpretation,
+        "observation_ids": execution.observation_ids,
+        "result_count": count,
+        "truncated": execution.truncated,
+        "sort": plan.sort,
+        "warnings": plan.warnings,
+        "answer": answer,
+    }
 
 
 @router.post("/assistant/help")
@@ -432,6 +486,17 @@ def update_species_profile(
 def list_observations(request: Request) -> list[dict]:
     with request.app.state.database.session_factory() as session:
         return service_for(request, session).list_observations()
+
+
+@router.get("/exports/observations.csv", response_class=Response)
+def export_observations_csv(request: Request) -> Response:
+    with request.app.state.database.session_factory() as session:
+        content = observations_csv(service_for(request, session).list_observations())
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="yuhen-observations.csv"'},
+    )
 
 
 @router.get("/home/cover")
@@ -749,6 +814,15 @@ async def add_species_audio(
             raise HTTPException(exc.status_code, exc.message) from exc
         except MediaValidationError as exc:
             raise HTTPException(422, str(exc)) from exc
+
+
+@router.delete("/species/{species_id}/audio/{audio_id}")
+def delete_species_audio(species_id: int, audio_id: int, request: Request) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).delete_species_audio(species_id, audio_id)
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
 
 
 @router.get("/media/{asset_id}", response_class=FileResponse)

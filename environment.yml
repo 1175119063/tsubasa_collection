@@ -12,6 +12,7 @@ dependencies:
       - httpx
       - mutagen
       - pillow
+      - playwright
       - pydantic-settings
       - pytest
       - python-multipart

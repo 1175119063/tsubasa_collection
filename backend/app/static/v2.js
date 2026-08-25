@@ -127,6 +127,9 @@
     const dialog = byId("backup-dialog");
     const status = byId("backup-status");
     const confirmButton = byId("confirm-backup");
+    const restoreButton = byId("confirm-restore");
+    const restoreFile = byId("restore-backup-file");
+    const restoreStatus = byId("restore-status");
     const download = byId("download-backup");
     byId("create-backup").addEventListener("click", () => {
       status.textContent = "准备创建备份。备份期间请不要关闭软件。";
@@ -134,6 +137,30 @@
       dialog.showModal();
     });
     byId("close-backup").addEventListener("click", () => dialog.close());
+    restoreFile.addEventListener("change", () => {
+      restoreStatus.textContent = restoreFile.files[0]
+        ? `已选择：${restoreFile.files[0].name}`
+        : "尚未选择备份。";
+    });
+    restoreButton.addEventListener("click", async () => {
+      const file = restoreFile.files[0];
+      if (!file) { restoreStatus.textContent = "请先选择 ZIP 备份。"; return; }
+      if (!confirm("恢复会用备份中的数据库和媒体替换当前资料。程序会先自动备份当前状态，确定继续吗？")) return;
+      restoreButton.disabled = true;
+      confirmButton.disabled = true;
+      restoreStatus.textContent = "正在校验数据库、文件哈希和媒体引用，请不要关闭软件……";
+      try {
+        const body = new FormData(); body.append("backup", file);
+        const result = await Yuhen.api("/api/backups/restore", { method: "POST", body });
+        restoreStatus.textContent = `${result.message} 当前状态的安全备份：${result.safety_backup.filename}`;
+        setTimeout(() => window.location.reload(), 1200);
+      } catch (error) {
+        restoreStatus.textContent = error.message;
+      } finally {
+        restoreButton.disabled = false;
+        confirmButton.disabled = false;
+      }
+    });
     confirmButton.addEventListener("click", async () => {
       confirmButton.disabled = true;
       status.textContent = "正在生成一致性数据库快照并归档媒体文件……";
@@ -149,6 +176,21 @@
       } finally {
         confirmButton.disabled = false;
       }
+    });
+  }
+
+  function setupUpdates() {
+    byId("check-update").addEventListener("click", async () => {
+      const button = byId("check-update"); button.disabled = true;
+      try {
+        const status = await Yuhen.api("/api/updates/status");
+        if (!status.update_available) { alert(status.message); return; }
+        if (!confirm(`${status.message}\n${status.notes || ""}\n\n现在下载经过 SHA-256 校验的安装包吗？`)) return;
+        const result = await Yuhen.api("/api/updates/download", { method: "POST" });
+        const link = document.createElement("a"); link.href = result.download_url; link.download = result.filename; link.click();
+        alert(`${result.message}\n安装包：${result.filename}`);
+      } catch (error) { alert(error.message); }
+      finally { button.disabled = false; }
     });
   }
 
@@ -427,7 +469,7 @@
             <article><p class="v2-kicker">首次相遇</p><h3>首次遭遇</h3><a class="v2-first-encounter" href="/observations?observation=${detail.first_encounter.observation_id}"><strong>${formatDate(detail.first_encounter.observed_at)}</strong><span>${esc(detail.first_encounter.admin1_name)} · ${esc(detail.first_encounter.locality)}</span></a></article>
             <article><p class="v2-kicker">最近照片</p><h3>最近的照片凭证</h3><div class="v2-evidence-grid">${recent.map((item) => `<a href="/observations?observation=${item.id}"><img src="${esc(item.thumbnail_url)}" alt="" /><span>${formatDate(item.observed_at)}</span></a>`).join("")}</div></article>
             <article><p class="v2-kicker">馆藏管理</p><h3>观察记录与图鉴封面</h3><div class="v2-dex-observation-grid">${detail.observations.map((item) => { const current = item.id === detail.cover.observation_id; return `<section class="v2-dex-observation ${current ? "is-current" : ""}"><a href="/observations?observation=${item.id}"><img src="${esc(item.thumbnail_url)}" alt="" /><span>${formatDate(item.observed_at)} · ${esc(item.locality)}</span></a><div><button type="button" data-v2-species-cover="${item.id}" ${current ? "disabled" : ""}>${current ? "当前封面" : "设为封面"}</button><button type="button" class="is-danger" data-v2-delete-species-observation="${item.id}">删除记录</button></div></section>`; }).join("")}</div></article>
-            <article><p class="v2-kicker">声音档案</p><h3>独立物种录音</h3><div class="v2-species-audio-list">${detail.species_audio.length ? detail.species_audio.map((audio) => `<section><strong>${esc(audio.title || "未命名录音")}</strong><small>${esc(audio.recorded_at ? String(audio.recorded_at).replace("T", " ") : "时间未记录")}${audio.locality ? ` · ${esc(audio.locality)}` : ""}</small><audio controls preload="metadata" src="${esc(audio.url)}"></audio>${audio.notes ? `<p>${esc(audio.notes)}</p>` : ""}</section>`).join("") : "<p class=\"v2-intel-missing\">尚未添加独立物种录音。</p>"}</div></article>
+            <article><p class="v2-kicker">声音档案</p><h3>独立物种录音</h3><div class="v2-species-audio-list">${detail.species_audio.length ? detail.species_audio.map((audio) => `<section><strong>${esc(audio.title || "未命名录音")}</strong><small>${esc(audio.recorded_at ? String(audio.recorded_at).replace("T", " ") : "时间未记录")}${audio.locality ? ` · ${esc(audio.locality)}` : ""}</small><audio controls preload="metadata" src="${esc(audio.url)}"></audio>${audio.notes ? `<p>${esc(audio.notes)}</p>` : ""}<button type="button" class="is-danger" data-v2-delete-species-audio="${audio.id}">删除录音</button></section>`).join("") : "<p class=\"v2-intel-missing\">尚未添加独立物种录音。</p>"}</div></article>
           </div>
           <aside class="v2-intel-column">
             <article><h3>地理情报</h3><div>${archiveList(detail.collected.admin1_regions, "地理")}</div></article>
@@ -474,6 +516,8 @@
       if (remove && confirm("删除将立即永久生效；若这是最后一笔观察，整个物种档案也会被删除。确定继续吗？")) { const result = await Yuhen.api(`/api/observations/${remove.dataset.v2DeleteSpeciesObservation}`, { method: "DELETE" }); if (result.removed_species) { window.location.href = "/dex"; } else { await openDossier(dexState.currentSpeciesId); } return; }
       const audio = event.target.closest("[data-v2-add-species-audio]");
       if (audio) { dexState.currentSpeciesId = Number(audio.dataset.v2AddSpeciesAudio); byId("species-audio-form").reset(); byId("species-audio-status").textContent = ""; byId("species-audio-dialog").showModal(); }
+      const removeAudio = event.target.closest("[data-v2-delete-species-audio]");
+      if (removeAudio && confirm("永久删除这段独立物种录音吗？")) { await Yuhen.api(`/api/species/${dexState.currentSpeciesId}/audio/${removeAudio.dataset.v2DeleteSpeciesAudio}`, { method: "DELETE" }); await openDossier(dexState.currentSpeciesId); }
     });
     document.querySelectorAll("[data-close-species-audio]").forEach((button) => button.addEventListener("click", () => byId("species-audio-dialog").close()));
     byId("species-audio-form").addEventListener("submit", async (event) => {
@@ -486,6 +530,7 @@
   if (page === "home") {
     setupHomeCoverPicker();
     setupBackup();
+    setupUpdates();
     setupApiManager();
     loadHome();
     loadIntegrations().catch((error) => {

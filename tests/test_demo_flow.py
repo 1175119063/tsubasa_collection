@@ -3,8 +3,11 @@ import json
 import sqlite3
 import zipfile
 
+from app.assistant_schemas import AssistantSqlQuery
 from app.config import Settings
+from app.enums import MediaKind
 from app.main import create_app
+from app.models import MediaAsset, SpeciesAudio
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -61,6 +64,42 @@ def post_observation(client: TestClient, payload: dict, color=(73, 105, 82)):
         data={"payload": json.dumps(payload, ensure_ascii=False)},
         files={"photo": ("bird.jpg", jpeg_bytes(color), "image/jpeg")},
     )
+
+
+class QueryPlanningAssistant:
+    def plan_observation_query(self, _query: str) -> AssistantSqlQuery:
+        return AssistantSqlQuery(
+            interpretation="查询2026年8月15日的全部记录",
+            sql=(
+                "SELECT observation_id FROM field_observations "
+                "WHERE observed_date = :day"
+            ),
+            parameters={"day": "2026-08-15"},
+            sort="asc",
+        )
+
+
+def test_observation_query_skill_returns_exact_record_ids(tmp_path):
+    app = create_app(Settings(_env_file=None, data_dir=tmp_path / "library"))
+    with TestClient(app) as client:
+        app.state.feather_assistant = QueryPlanningAssistant()
+        matching = post_observation(client, observation_payload())
+        other_payload = observation_payload()
+        other_payload["species_id"] = matching.json()["species_id"]
+        other_payload["new_species"] = None
+        other_payload["observed_at"] = "2026-08-16T08:30"
+        other = post_observation(client, other_payload)
+        assert other.status_code == 201
+
+        response = client.post(
+            "/api/assistant/search-parse",
+            json={"query": "请查询2026年8月15日的全部记录"},
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["observation_ids"] == [matching.json()["observation_id"]]
+    assert response.json()["result_count"] == 1
+    assert response.json()["sort"] == "asc"
 
 
 def location_payload(name: str = "杭州西湖") -> dict:
@@ -372,6 +411,130 @@ def test_complete_backup_contains_consistent_database_and_media(tmp_path):
         assert connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     finally:
         connection.close()
+
+
+def test_complete_backup_restore_replaces_database_and_validates_media(tmp_path):
+    data_dir = tmp_path / "library"
+    app = create_app(Settings(data_dir=data_dir))
+    with TestClient(app) as client:
+        original = post_observation(client, observation_payload())
+        backup = client.post("/api/backups").json()
+        backup_path = tmp_path / "backups" / backup["filename"]
+
+        assert client.delete(
+            f"/api/observations/{original.json()['observation_id']}"
+        ).status_code == 200
+        replacement_payload = observation_payload("Passer montanus")
+        replacement_payload["new_species"]["chinese_name"] = "树麻雀"
+        replacement = post_observation(client, replacement_payload, color=(120, 80, 60))
+        assert replacement.status_code == 201
+
+        with backup_path.open("rb") as source:
+            restored = client.post(
+                "/api/backups/restore",
+                files={"backup": (backup_path.name, source, "application/zip")},
+            )
+
+        assert restored.status_code == 200, restored.text
+        assert restored.json()["restored"] is True
+        assert restored.json()["safety_backup"]["filename"] != backup["filename"]
+        observations = client.get("/api/observations").json()
+        assert len(observations) == 1
+        assert observations[0]["species_name"] == "白腰文鸟"
+        assert client.get(observations[0]["photo_url"]).status_code == 200
+        assert client.get(observations[0]["thumbnail_url"]).status_code == 200
+
+
+def test_csv_export_contains_one_utf8_row_per_observed_species(tmp_path):
+    app = create_app(Settings(data_dir=tmp_path / "library"))
+    with TestClient(app) as client:
+        created = post_observation(client, observation_payload())
+        response = client.get("/api/exports/observations.csv")
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"\xef\xbb\xbf")
+    text = response.content.decode("utf-8-sig")
+    assert "observation_id,observed_at" in text
+    assert "白腰文鸟" in text
+    assert f"AV-{created.json()['species_id']:06d}" in text
+
+
+def test_species_audio_can_be_deleted_and_unreferenced_file_is_removed(tmp_path):
+    data_dir = tmp_path / "library"
+    app = create_app(Settings(data_dir=data_dir))
+    with TestClient(app) as client:
+        created = post_observation(client, observation_payload())
+        audio_path = data_dir / "audio" / "test-audio.mp3"
+        audio_path.write_bytes(b"test-audio")
+        with app.state.database.session_factory() as session:
+            asset = MediaAsset(
+                kind=MediaKind.AUDIO,
+                sha256="0" * 64,
+                relative_path="audio/test-audio.mp3",
+                thumbnail_relative_path=None,
+                original_filename="test-audio.mp3",
+                mime_type="audio/mpeg",
+                byte_size=10,
+                width=None,
+                height=None,
+                duration_seconds=1.0,
+            )
+            session.add(asset)
+            session.flush()
+            link = SpeciesAudio(species_id=created.json()["species_id"], asset=asset)
+            session.add(link)
+            session.commit()
+            audio_id = link.id
+
+        response = client.delete(
+            f"/api/species/{created.json()['species_id']}/audio/{audio_id}"
+        )
+
+        assert response.status_code == 200
+        assert client.get(f"/api/species/{created.json()['species_id']}").json()[
+            "species_audio"
+        ] == []
+        assert not audio_path.exists()
+
+
+def test_map_overview_page_is_available(tmp_path):
+    app = create_app(Settings(data_dir=tmp_path / "library"))
+    with TestClient(app) as client:
+        response = client.get("/map")
+
+    assert response.status_code == 200
+    assert 'id="region-overview-map"' in response.text
+    assert "leaflet.markercluster" in response.text
+
+
+def test_restore_rejects_tampered_media_without_changing_library(tmp_path):
+    data_dir = tmp_path / "library"
+    app = create_app(Settings(data_dir=data_dir))
+    with TestClient(app) as client:
+        created = post_observation(client, observation_payload())
+        backup = client.post("/api/backups").json()
+        source_path = tmp_path / "backups" / backup["filename"]
+        tampered_path = tmp_path / "tampered.zip"
+        with zipfile.ZipFile(source_path) as source, zipfile.ZipFile(
+            tampered_path, "w", compression=zipfile.ZIP_DEFLATED
+        ) as target:
+            for member in source.infolist():
+                content = source.read(member.filename)
+                if member.filename.startswith("data/photos/"):
+                    content = b"tampered-photo"
+                target.writestr(member, content)
+
+        with tampered_path.open("rb") as source:
+            response = client.post(
+                "/api/backups/restore",
+                files={"backup": ("tampered.zip", source, "application/zip")},
+            )
+
+        assert response.status_code == 422
+        assert "校验失败" in response.text
+        observations = client.get("/api/observations").json()
+        assert [item["id"] for item in observations] == [created.json()["observation_id"]]
+        assert client.get(observations[0]["photo_url"]).status_code == 200
 
 
 def test_existing_database_is_registered_at_migration_baseline(tmp_path):

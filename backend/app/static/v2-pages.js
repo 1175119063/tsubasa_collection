@@ -12,6 +12,7 @@
   const state = {
     observations: [], locations: [], trips: [], activeObservationSpecies: new Map(),
     observationTripId: null, observationSpeciesId: null, observationMultiSpeciesOnly: false,
+    observationQueryIds: null,
     activeTripId: null, tripCoverChoices: [],
   };
 
@@ -102,7 +103,8 @@
         && (!location || String(item.location?.id) === location)
         && (!state.observationTripId || item.trip?.id === state.observationTripId)
         && (!state.observationSpeciesId || entries.some((entry) => entry.species_id === state.observationSpeciesId))
-        && (!state.observationMultiSpeciesOnly || entries.length > 1);
+        && (!state.observationMultiSpeciesOnly || entries.length > 1)
+        && (state.observationQueryIds === null || state.observationQueryIds.has(item.id));
     }).sort((a, b) => a.observed_at.localeCompare(b.observed_at) * direction);
     const groups = new Map(); filtered.forEach((item) => { const key = item.observed_at.slice(0, 7); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(item); });
     byId("v2-observation-count").textContent = filtered.length === state.observations.length ? state.observations.length : `${filtered.length}/${state.observations.length}`;
@@ -136,7 +138,7 @@
     renderObservations();
     byId("v2-observation-year").addEventListener("change", () => { populateObservationMonths(); renderObservations(); });
     ["v2-observation-month", "v2-observation-location", "v2-observation-sort"].forEach((id) => byId(id).addEventListener("change", renderObservations));
-    byId("v2-observation-reset").addEventListener("click", () => { ["v2-observation-year", "v2-observation-month", "v2-observation-location"].forEach((id) => { byId(id).value = ""; }); byId("v2-observation-sort").value = "asc"; state.observationTripId = null; state.observationSpeciesId = null; state.observationMultiSpeciesOnly = false; history.replaceState(null, "", "/observations"); populateObservationMonths(); renderObservations(); });
+    byId("v2-observation-reset").addEventListener("click", () => { ["v2-observation-year", "v2-observation-month", "v2-observation-location"].forEach((id) => { byId(id).value = ""; }); byId("v2-observation-sort").value = "asc"; state.observationTripId = null; state.observationSpeciesId = null; state.observationMultiSpeciesOnly = false; state.observationQueryIds = null; history.replaceState(null, "", "/observations"); populateObservationMonths(); renderObservations(); });
     wireDialog(byId("v2-observation-dialog"));
     byId("v2-observation-dialog").addEventListener("click", async (event) => {
       const navigation = event.target.closest("[data-v2-species-nav]");
@@ -295,26 +297,15 @@
   if (page === "observations") {
     document.addEventListener("feather:apply-observation-search", (event) => {
       const filters = event.detail || {};
-      const year = filters.year ? String(filters.year) : "";
-      if (year && ![...byId("v2-observation-year").options].some((option) => option.value === year)) {
-        byId("v2-observation-year").add(new Option(`${year}年`, year));
-      }
-      byId("v2-observation-year").value = year;
+      state.observationQueryIds = new Set((filters.observation_ids || []).map(Number));
+      state.observationTripId = null;
+      state.observationSpeciesId = null;
+      state.observationMultiSpeciesOnly = false;
+      byId("v2-observation-year").value = "";
       populateObservationMonths();
-      const month = filters.month ? String(filters.month).padStart(2, "0") : "";
-      if (month && ![...byId("v2-observation-month").options].some((option) => option.value === month)) {
-        byId("v2-observation-month").add(new Option(`${Number(month)}月`, month));
-      }
-      byId("v2-observation-month").value = month;
-      const locationId = filters.location_id ? String(filters.location_id) : "";
-      if (locationId && ![...byId("v2-observation-location").options].some((option) => option.value === locationId)) {
-        byId("v2-observation-location").add(new Option(filters.location_name || `地点 ${locationId}`, locationId));
-      }
-      byId("v2-observation-location").value = locationId;
+      byId("v2-observation-month").value = "";
+      byId("v2-observation-location").value = "";
       if (filters.sort) byId("v2-observation-sort").value = filters.sort;
-      state.observationSpeciesId = filters.species_id || null;
-      state.observationTripId = filters.trip_id || null;
-      state.observationMultiSpeciesOnly = filters.multi_species_only === true;
       renderObservations();
     });
   }

@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["httpx", "pytest", "ruff"]
+dev = ["httpx", "playwright", "pytest", "ruff"]
 
 [tool.pytest.ini_options]
 pythonpath = ["backend"]

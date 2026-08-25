@@ -393,6 +393,13 @@ a { color: inherit; }
 .v2-trip-detail-column > :first-child { background-image: repeating-linear-gradient(to right, var(--line) 0 7px, transparent 7px 21px); background-position: left bottom; background-size: 100% 1px; background-repeat: no-repeat; }
 .v2-trip-detail-column > .v2-trip-route { background-color: transparent; }
 .v2-trip-detail-column .v2-detail-evidence-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.v2-map-layout { display: grid; grid-template-columns: 340px 1fr; height: calc(100vh - 86px); padding-top: 86px; }
+.v2-map-sidebar { overflow-y: auto; padding: 48px 34px; color: var(--ink); background: var(--paper); border-right: 1px solid var(--line); }
+.v2-map-sidebar h1 { margin: 8px 0 12px; font-size: 38px; }.v2-map-sidebar > p { color: var(--muted); line-height: 1.7; }
+.v2-map-sidebar label { display: block; margin: 24px 0 7px; font: 10px var(--sans); letter-spacing: .12em; }
+.v2-map-stage { position: relative; min-width: 0; }.v2-map-stage #region-overview-map { width: 100%; height: 100%; background: #d9d5c8; }
+.v2-map-stage > p { position: absolute; z-index: 500; left: 20px; bottom: 20px; margin: 0; padding: 9px 13px; background: rgba(249,245,234,.9); border: 1px solid var(--line); }
+.v2-map-location-list { display: grid; gap: 8px; margin-top: 24px; }.v2-map-location-list button { display: grid; gap: 3px; padding: 12px 14px; text-align: left; color: var(--ink); background: rgba(255,255,255,.32); border: 1px solid var(--line); cursor: pointer; }.v2-map-location-list span { color: var(--muted); font-size: 11px; }
 
 @media (max-width: 1500px) { .v2-field-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 1250px) { .v2-field-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -407,6 +414,7 @@ a { color: inherit; }
 }
 
 @media (max-width: 780px) {
+  .v2-map-layout { display: block; height: auto; }.v2-map-sidebar { padding: 35px 22px; border-right: 0; }.v2-map-stage { height: 65vh; }
   .v2-topbar { height: 76px; padding: 0 18px; }.v2-brand-seal { width: 49px; height: 42px; }.v2-brand strong { font-size: 17px; }.v2-brand small { display: none; }.v2-stable-link { font-size: 11px; }
   .v2-camp-hero { min-height: 620px; }.v2-hero-copy { padding: 75px 28px 72px; }.v2-hero-copy h1 { font-size: 40px; }.v2-hero-copy > p:not(.v2-kicker) { font-size: 14px; }.v2-hero-actions { flex-direction: column; align-items: stretch; max-width: 280px; }.v2-hero-actions .v2-button { width: 100%; min-width: 0; }.v2-home-cover-dialog { width: 100vw; height: 100vh; }.v2-home-cover-dialog > header, .v2-home-cover-toolbar { padding-inline: 22px; }.v2-home-cover-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: 22px; }.v2-home-cover-dialog > footer { padding-inline: 22px; }
   .v2-camp-board, .v2-latest-section, .v2-api-section { padding: 55px 22px 65px; }.v2-board-heading, .v2-section-title, .v2-api-heading { align-items: start; flex-direction: column; }.v2-board-heading > p, .v2-api-heading > p { text-align: left; }.v2-stat-strip { grid-template-columns: 1fr 1fr; }.v2-stat-strip article:nth-child(2) { border-right: 0; }.v2-stat-strip article:nth-child(-n+2) { border-bottom: 1px solid var(--line); }.v2-board-grid, .v2-discovery-row, .v2-api-overview { grid-template-columns: 1fr; }.v2-api-manage { grid-column: auto; }.v2-quest-card, .v2-quest-card:nth-child(1) { min-height: 220px; }

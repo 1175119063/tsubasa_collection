@@ -37,6 +37,7 @@
             <a class="v2-button v2-button-ghost" href="/observations?new=1">登记新发现</a>
             <button class="v2-button v2-button-ghost" id="change-home-cover" type="button">选择首页封面</button>
             <button class="v2-button v2-button-ghost" id="create-backup" type="button">完整备份资料库</button>
+            <button class="v2-button v2-button-ghost" id="check-update" type="button">检查软件更新</button>
           </div>
         </div>
         <aside class="v2-featured-tag" id="featured-tag">
@@ -119,8 +120,14 @@
       <div class="v2-home-cover-toolbar">
         <p>备份包含一致性数据库快照、全部照片、缩略图和录音。文件保存在程序旁的 backups 目录中。</p>
         <p id="backup-status">准备创建备份。</p>
+        <hr />
+        <p><strong>恢复完整备份</strong></p>
+        <p>恢复前会自动保存当前资料库的安全备份。所选备份通过数据库、文件哈希和媒体引用校验后才会替换当前资料。</p>
+        <label class="file-field">选择 ZIP 备份<input id="restore-backup-file" type="file" accept="application/zip,.zip" /></label>
+        <p id="restore-status">尚未选择备份。</p>
       </div>
       <footer>
+        <button class="v2-button v2-button-danger" id="confirm-restore" type="button">校验并恢复备份</button>
         <button class="v2-button v2-button-primary" id="confirm-backup" type="button">立即创建完整备份</button>
         <a class="v2-button v2-button-ghost" id="download-backup" hidden>下载备份</a>
       </footer>
@@ -162,7 +169,7 @@
 
     <footer class="v2-footer"><span>翼·时光记 · 探索者田野日志</span><span>所有资料仍保存在本地</span></footer>
     <script src="/static/core.js?v=20260815-2" defer></script>
-    <script src="/static/v2.js?v=20260825-4" defer></script>
+    <script src="/static/v2.js?v=20260826-1" defer></script>
     <script src="/static/assistant.js?v=20260825-4" defer></script>
   </body>
 </html>
