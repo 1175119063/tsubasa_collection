@@ -68,3 +68,39 @@ class EvidenceDimension(StrEnum):
     SEX = "sex"
     LIFE_STAGE = "life_stage"
     SUBSPECIES = "subspecies"
+
+
+class EcologicalGroup(StrEnum):
+    UNKNOWN = "unknown"
+    RAPTOR = "raptor"
+    SONGBIRD = "songbird"
+    LANDFOWL = "landfowl"
+    SCANSORIAL = "scansorial"
+    WADER = "wader"
+    WATERFOWL = "waterfowl"
+
+
+class BodySize(StrEnum):
+    UNKNOWN = "unknown"
+    SMALL = "small"
+    SMALL_MEDIUM = "small_medium"
+    MEDIUM = "medium"
+    MEDIUM_LARGE = "medium_large"
+    LARGE = "large"
+
+
+class HabitatType(StrEnum):
+    CITY = "city"
+    FARMLAND = "farmland"
+    GRASSLAND = "grassland"
+    SHRUB = "shrub"
+    FOREST = "forest"
+    WETLAND = "wetland"
+    RIVER = "river"
+    LAKE = "lake"
+    DESERT = "desert"
+    COAST = "coast"
+    OCEAN = "ocean"
+    MUDFLAT = "mudflat"
+    ALPINE = "alpine"
+    OTHER = "other"

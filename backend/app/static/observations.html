@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>观察记录 · 羽迹</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <title>观察记录 · 翼·时光记</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260816-5" />
   </head>
   <body>
     <div class="paper-noise"></div>
     <header class="topbar">
       <a class="brand" href="/">
         <span class="brand-mark">羽</span>
-        <span><strong>羽迹</strong><small>观察记录</small></span>
+        <span><strong>翼·时光记</strong><small>观察记录</small></span>
       </a>
       <div class="top-actions">
         <a class="nav-link" href="/">首页</a>
@@ -65,11 +65,29 @@
         <div class="form-scroll">
           <fieldset>
             <legend><span>01</span> 目标物种</legend>
+            <div class="full-field species-search-field">
+              <label for="species-search">搜索已有图鉴物种</label>
+              <div class="species-search-control">
+                <input id="species-search" type="search" placeholder="输入馆藏编号、中文名、拉丁学名、科名或属名" autocomplete="off" aria-autocomplete="list" aria-controls="species-search-results" />
+                <div id="species-search-results" class="species-search-results" role="listbox" hidden></div>
+              </div>
+              <span id="species-search-status" class="field-hint"></span>
+              <div id="species-selection-summary" class="species-selection-summary" hidden>
+                <span><small>已选择</small><strong id="species-selection-text"></strong></span>
+                <button id="change-species-selection" type="button">重新选择</button>
+              </div>
+            </div>
             <label class="full-field">选择图鉴物种
               <select id="species-select" name="species-select"></select>
             </label>
             <div id="new-species-fields" class="form-grid taxonomy-fields">
               <div class="taxonomy-node full-field">
+                <label for="order-node-search">搜索已有目</label>
+                <div class="species-search-control taxonomy-search-control">
+                  <input id="order-node-search" type="search" placeholder="输入目中文名或拉丁学名" autocomplete="off" aria-controls="order-node-results" />
+                  <div id="order-node-results" class="species-search-results" role="listbox" hidden></div>
+                </div>
+                <span id="order-node-status" class="field-hint"></span>
                 <label><span class="step-label">1 · 目</span><select id="order-node-select" name="order_node"></select></label>
                 <div id="order-new-fields" class="node-new-grid">
                   <label>目中文名<input name="order_chinese" autocomplete="off" /></label>
@@ -77,6 +95,12 @@
                 </div>
               </div>
               <div class="taxonomy-node full-field">
+                <label for="family-node-search">搜索当前目下的科</label>
+                <div class="species-search-control taxonomy-search-control">
+                  <input id="family-node-search" type="search" placeholder="先选择目，再输入科中文名或拉丁学名" autocomplete="off" aria-controls="family-node-results" />
+                  <div id="family-node-results" class="species-search-results" role="listbox" hidden></div>
+                </div>
+                <span id="family-node-status" class="field-hint"></span>
                 <label><span class="step-label">2 · 科</span><select id="family-node-select" name="family_node"></select></label>
                 <div id="family-new-fields" class="node-new-grid">
                   <label>科中文名<input name="family_chinese" autocomplete="off" /></label>
@@ -84,6 +108,12 @@
                 </div>
               </div>
               <div class="taxonomy-node full-field">
+                <label for="genus-node-search">搜索当前科下的属</label>
+                <div class="species-search-control taxonomy-search-control">
+                  <input id="genus-node-search" type="search" placeholder="先选择科，再输入属中文名或拉丁学名" autocomplete="off" aria-controls="genus-node-results" />
+                  <div id="genus-node-results" class="species-search-results" role="listbox" hidden></div>
+                </div>
+                <span id="genus-node-status" class="field-hint"></span>
                 <label><span class="step-label">3 · 属</span><select id="genus-node-select" name="genus_node"></select></label>
                 <div id="genus-new-fields" class="node-new-grid">
                   <label>属中文名<input name="genus_chinese" autocomplete="off" /></label>
@@ -117,7 +147,7 @@
           <fieldset>
             <legend><span>02</span> 照片与个体</legend>
             <div class="form-grid">
-              <label class="full-field file-field">JPEG/JPG 照片
+              <label class="full-field file-field">JPEG/JPG 照片（不超过 10 MB）
                 <input id="photo-input" name="photo" type="file" accept="image/jpeg,.jpg,.jpeg" required />
                 <span id="photo-metadata-status" class="field-hint">选择照片后将自动读取 EXIF 拍摄时间。</span>
               </label>
@@ -145,12 +175,32 @@
           </fieldset>
 
           <fieldset>
-            <legend><span>03</span> 时间、地点与环境</legend>
+            <legend><span>03</span> 照片中的其他物种</legend>
             <div class="form-grid">
-              <label class="full-field">地点资料库
-                <select id="location-select" name="location_id"><option value="">暂不关联地点</option></select>
-                <span class="field-hint">可选择已有地点；没有合适地点时，可先前往“地点浏览”建立。</span>
+              <label class="full-field">选择已有图鉴物种
+                <select id="additional-species-select"><option value="">选择物种</option></select>
               </label>
+              <button id="add-additional-species" class="secondary-button full-field" type="button">＋ 添加到这笔观察</button>
+              <div id="additional-species-list" class="full-field"></div>
+              <p class="field-hint full-field">同一张照片最多记录 10 个物种；每个物种可以分别填写个体信息。</p>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><span>04</span> 时间、地点与环境</legend>
+            <div class="form-grid">
+              <div class="full-field location-search-field">
+                <label for="location-search">搜索已有地点</label>
+                <div class="species-search-control">
+                  <input id="location-search" type="search" placeholder="输入地点名称、行政区或地点编号" autocomplete="off" aria-controls="location-search-results" />
+                  <div id="location-search-results" class="species-search-results" role="listbox" hidden></div>
+                </div>
+                <span id="location-search-status" class="field-hint"></span>
+                <label>地点资料库
+                  <select id="location-select" name="location_id"><option value="">暂不关联地点</option></select>
+                </label>
+                <span class="field-hint">可选择已有地点；没有合适地点时，可先前往“地点浏览”建立。</span>
+              </div>
               <label>拍摄时间<input id="observed-at" name="observed_at" type="datetime-local" step="60" required /></label>
               <label>季节
                 <select name="season">
@@ -178,7 +228,7 @@
       </form>
     </dialog>
 
-    <script src="/static/core.js" defer></script>
-    <script src="/static/observations.js" defer></script>
+    <script src="/static/core.js?v=20260815-2" defer></script>
+    <script src="/static/observations.js?v=20260816-3" defer></script>
   </body>
 </html>

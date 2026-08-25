@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">飞羽精灵占位头像</title>
+  <desc id="desc">环绕着星光与羽翼的精灵剪影占位图</desc>
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#6551a6"/>
+      <stop offset="0.58" stop-color="#29254f"/>
+      <stop offset="1" stop-color="#15132d"/>
+    </radialGradient>
+    <linearGradient id="wing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dcfff5"/>
+      <stop offset="0.5" stop-color="#8de3d2"/>
+      <stop offset="1" stop-color="#b99beb"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="128" cy="128" r="124" fill="url(#sky)" stroke="#e8cf85" stroke-width="4"/>
+  <circle cx="128" cy="128" r="108" fill="none" stroke="#8de3d2" stroke-opacity=".3" stroke-width="2" stroke-dasharray="4 11"/>
+  <g fill="#f3d783" filter="url(#glow)">
+    <path d="M54 67l3 9 9 3-9 3-3 9-3-9-9-3 9-3z"/>
+    <path d="M196 49l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>
+    <circle cx="204" cy="117" r="3"/>
+    <circle cx="64" cy="151" r="2.5"/>
+  </g>
+  <g fill="url(#wing)" filter="url(#glow)">
+    <path d="M125 93c-26-29-55-21-67-10 25 1 38 12 50 29-24-16-43-10-53-2 25 5 37 17 51 35-21-9-36-2-44 7 25 1 45 14 63 35z"/>
+    <path d="M131 93c26-29 55-21 67-10-25 1-38 12-50 29 24-16 43-10 53-2-25 5-37 17-51 35 21-9 36-2 44 7-25 1-45 14-63 35z"/>
+    <ellipse cx="128" cy="126" rx="18" ry="27"/>
+    <circle cx="128" cy="91" r="14"/>
+    <path d="M119 151l-10 47 19-24 19 24-10-47z"/>
+  </g>
+  <circle cx="123" cy="89" r="2.5" fill="#29254f"/>
+  <circle cx="133" cy="89" r="2.5" fill="#29254f"/>
+  <path d="M124 98q4 4 8 0" fill="none" stroke="#29254f" stroke-width="2" stroke-linecap="round"/>
+</svg>

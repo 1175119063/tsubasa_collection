@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>地点浏览 · 羽迹</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <title>地点浏览 · 翼·时光记</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260822-1" />
   </head>
   <body>
     <div class="paper-noise"></div>
     <header class="topbar">
-      <a class="brand" href="/"><span class="brand-mark">羽</span><span><strong>羽迹</strong><small>地点浏览</small></span></a>
+      <a class="brand" href="/"><span class="brand-mark">羽</span><span><strong>翼·时光记</strong><small>地点浏览</small></span></a>
       <div class="top-actions">
         <a class="nav-link" href="/">首页</a><a class="nav-link" href="/observations">观察记录</a><a class="nav-link" href="/dex">个人图鉴</a>
         <button id="new-location-button" class="primary-button">＋ 新增地点</button>
@@ -40,7 +40,9 @@
             <label>城市<input name="city" /></label><label>区县<input name="district" /></label>
           </div></fieldset>
           <fieldset><legend><span>02</span> 中心位置</legend><div class="form-grid">
+            <section class="location-map-picker full-field" aria-labelledby="location-map-heading"><div class="location-map-search"><label for="location-map-search"><span id="location-map-heading">搜索地图地点</span><input id="location-map-search" type="search" placeholder="例如：山东大学兴隆山校区" autocomplete="off" /></label><button id="location-map-search-button" type="button" class="secondary-button">搜索</button></div><p id="location-map-status" class="field-hint" role="status">可以搜索地点，也可以直接点击地图选择中心点。</p><div id="location-map" aria-label="地点选择地图"></div><div id="location-map-results" class="location-map-results"></div></section>
             <label>中心纬度<input name="center_latitude" type="number" min="-90" max="90" step="any" required /></label><label>中心经度<input name="center_longitude" type="number" min="-180" max="180" step="any" required /></label>
+            <label class="full-field">坐标系统<select name="coordinate_system"><option value="wgs84">WGS-84（设备定位、照片坐标）</option><option value="gcj02">GCJ-02（高德地图）</option></select></label>
             <button id="use-location-center" type="button" class="secondary-button full-field">使用当前设备位置作为中心点</button>
             <label class="full-field">地点备注<textarea name="notes" rows="4"></textarea></label>
             <label id="auto-link-field" class="check-field full-field"><input name="link_matching_records" type="checkbox" checked /><span>自动关联同省份、地点名称完全相同的已有观察</span></label>
@@ -57,6 +59,6 @@
       </form>
     </dialog>
     <input id="location-cover-input" type="file" accept="image/jpeg,.jpg,.jpeg" hidden />
-    <script src="/static/core.js" defer></script><script src="/static/locations.js" defer></script>
+    <script src="/static/core.js?v=20260815-1" defer></script><script src="/static/locations.js?v=20260822-1" defer></script>
   </body>
 </html>

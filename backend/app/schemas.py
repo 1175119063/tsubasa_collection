@@ -1,9 +1,15 @@
+import unicodedata
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .enums import (
+    BodySize,
     ChinaProtectionStatus,
+    EcologicalGroup,
+    EvidenceDimension,
+    HabitatType,
     IUCNStatus,
     LifeStage,
     LocationType,
@@ -53,6 +59,26 @@ class NewSpeciesInput(BaseModel):
         return self
 
 
+class ObservationSpeciesInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    species_id: int = Field(ge=1)
+    subspecies_id: int | None = Field(default=None, ge=1)
+    photo_type: PhotoType
+    sex: Sex | None = None
+    life_stage: LifeStage | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_subject(self) -> "ObservationSpeciesInput":
+        if self.photo_type is PhotoType.INDIVIDUAL:
+            if self.sex is None or self.life_stage is None:
+                raise ValueError("个体照片必须填写性别和生命阶段")
+        elif any(value is not None for value in (self.sex, self.life_stage, self.subspecies_id)):
+            raise ValueError("群体照片不能填写性别、生命阶段或亚种")
+        return self
+
+
 class ObservationInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -75,6 +101,7 @@ class ObservationInput(BaseModel):
     sex: Sex | None = None
     life_stage: LifeStage | None = None
     notes: str | None = None
+    additional_species: list[ObservationSpeciesInput] = Field(default_factory=list, max_length=9)
 
     @model_validator(mode="after")
     def validate_observation(self) -> "ObservationInput":
@@ -105,6 +132,11 @@ class ObservationInput(BaseModel):
             raise ValueError("拍摄时间必须精确到分钟")
         if self.season is not Season.OTHER and self.season_note:
             raise ValueError("只有季节为“其他”时才能填写季节说明")
+        additional_ids = [item.species_id for item in self.additional_species]
+        if len(additional_ids) != len(set(additional_ids)):
+            raise ValueError("同一观察中不能重复添加同一物种")
+        if self.species_id is not None and self.species_id in additional_ids:
+            raise ValueError("主要物种不能在附加物种中重复出现")
         return self
 
 
@@ -130,6 +162,68 @@ class ObservationUpdateInput(BaseModel):
     notes: str | None = None
 
 
+class ArchiveEvidenceInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    dimension: EvidenceDimension
+    value_key: str = Field(min_length=1, max_length=220)
+    observation_id: int = Field(ge=1)
+
+
+class BehaviorTagInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    label: str = Field(min_length=1, max_length=80)
+    observation_id: int | None = Field(default=None, ge=1)
+
+
+class IndividualTagInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    label: str = Field(min_length=1, max_length=120)
+    observation_id: int | None = Field(default=None, ge=1)
+
+
+class SpeciesProfileUpdateInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    introduction: str | None = Field(default=None, max_length=10000)
+    order: TaxonNodeInput
+    family: TaxonNodeInput
+    genus: TaxonNodeInput
+    ecological_group: EcologicalGroup = EcologicalGroup.UNKNOWN
+    body_size: BodySize = BodySize.UNKNOWN
+    preferred_habitats: list[HabitatType] = Field(default_factory=list, max_length=3)
+    evidence_selections: list[ArchiveEvidenceInput] = Field(default_factory=list)
+    behaviors: list[BehaviorTagInput] = Field(default_factory=list)
+    individuals: list[IndividualTagInput] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_archives(self) -> "SpeciesProfileUpdateInput":
+        if len(set(self.preferred_habitats)) != len(self.preferred_habitats):
+            raise ValueError("偏好生境不能重复")
+        supported = {
+            EvidenceDimension.SEX,
+            EvidenceDimension.LIFE_STAGE,
+            EvidenceDimension.SUBSPECIES,
+        }
+        if any(item.dimension not in supported for item in self.evidence_selections):
+            raise ValueError("只能为个体档案和亚种档案选择观察凭证")
+        evidence_keys = {
+            (item.dimension, item.value_key.casefold())
+            for item in self.evidence_selections
+        }
+        if len(evidence_keys) != len(self.evidence_selections):
+            raise ValueError("同一档案项不能重复选择观察凭证")
+        behavior_keys = {
+            " ".join(unicodedata.normalize("NFKC", item.label).split()).casefold()
+            for item in self.behaviors
+        }
+        if len(behavior_keys) != len(self.behaviors):
+            raise ValueError("行为标签不能重复")
+        return self
+
+
 class LocationInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
@@ -143,6 +237,7 @@ class LocationInput(BaseModel):
     district: str | None = Field(default=None, max_length=120)
     center_latitude: float = Field(ge=-90, le=90)
     center_longitude: float = Field(ge=-180, le=180)
+    coordinate_system: Literal["wgs84", "gcj02"] = "wgs84"
     radius_meters: float | None = Field(default=None, gt=0)
     notes: str | None = None
     link_matching_records: bool = True
@@ -155,13 +250,26 @@ class LocationObservationSelectionInput(BaseModel):
 class TripInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    location_id: int = Field(ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=180)
+    location_id: int | None = Field(default=None, ge=1)
+    location_ids: list[int] = Field(default_factory=list, min_length=1)
+    primary_location_id: int | None = Field(default=None, ge=1)
     started_at: datetime
     ended_at: datetime
     notes: str | None = None
 
     @model_validator(mode="after")
     def validate_trip_times(self) -> "TripInput":
+        if not self.location_ids and self.location_id is not None:
+            self.location_ids = [self.location_id]
+        if not self.location_ids:
+            raise ValueError("远征必须至少包含一个地点")
+        if len(self.location_ids) != len(set(self.location_ids)):
+            raise ValueError("远征地点不能重复")
+        if self.primary_location_id is None:
+            self.primary_location_id = self.location_id or self.location_ids[0]
+        if self.primary_location_id not in self.location_ids:
+            raise ValueError("主要地点必须属于远征地点")
         for value in (self.started_at, self.ended_at):
             if value.tzinfo is not None:
                 raise ValueError("行程时间应使用当地时间，不包含时区")

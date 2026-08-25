@@ -21,8 +21,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
 from .enums import (
+    BodySize,
     ChinaProtectionStatus,
+    EcologicalGroup,
     EvidenceDimension,
+    HabitatType,
     IUCNStatus,
     LifeStage,
     LocationType,
@@ -124,6 +127,9 @@ class Species(TimestampMixin, Base):
     observations: Mapped[list[Observation]] = relationship(
         back_populates="species", cascade="all, delete-orphan"
     )
+    observation_entries: Mapped[list[ObservationSpecies]] = relationship(
+        back_populates="species", cascade="all, delete-orphan"
+    )
     audio_links: Mapped[list[SpeciesAudio]] = relationship(
         back_populates="species", cascade="all, delete-orphan"
     )
@@ -131,6 +137,18 @@ class Species(TimestampMixin, Base):
         back_populates="species", cascade="all, delete-orphan", uselist=False
     )
     evidence_selections: Mapped[list[EvidenceSelection]] = relationship(
+        back_populates="species", cascade="all, delete-orphan"
+    )
+    behavior_tags: Mapped[list[SpeciesBehaviorTag]] = relationship(
+        back_populates="species", cascade="all, delete-orphan"
+    )
+    individual_tags: Mapped[list[SpeciesIndividualTag]] = relationship(
+        back_populates="species", cascade="all, delete-orphan"
+    )
+    ecology_profile: Mapped[SpeciesEcologyProfile | None] = relationship(
+        back_populates="species", cascade="all, delete-orphan", uselist=False
+    )
+    habitat_preferences: Mapped[list[SpeciesHabitatPreference]] = relationship(
         back_populates="species", cascade="all, delete-orphan"
     )
 
@@ -222,6 +240,44 @@ class Observation(TimestampMixin, Base):
     trip_link: Mapped[ObservationTripLink | None] = relationship(
         back_populates="observation", cascade="all, delete-orphan", uselist=False
     )
+    species_entries: Mapped[list[ObservationSpecies]] = relationship(
+        back_populates="observation", cascade="all, delete-orphan"
+    )
+
+
+class ObservationSpecies(TimestampMixin, Base):
+    __tablename__ = "observation_species"
+    __table_args__ = (
+        UniqueConstraint("observation_id", "species_id"),
+        CheckConstraint(
+            "(photo_type = 'group' AND sex IS NULL AND life_stage IS NULL "
+            "AND subspecies_id IS NULL) OR "
+            "(photo_type = 'individual' AND sex IS NOT NULL AND life_stage IS NOT NULL)",
+            name="subject_fields",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    observation_id: Mapped[int] = mapped_column(
+        ForeignKey("observations.id", ondelete="CASCADE"), index=True
+    )
+    species_id: Mapped[int] = mapped_column(
+        ForeignKey("species.id", ondelete="CASCADE"), index=True
+    )
+    subspecies_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subspecies.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    photo_type: Mapped[PhotoType] = mapped_column(enum_type(PhotoType, "entry_photo_type"))
+    sex: Mapped[Sex | None] = mapped_column(enum_type(Sex, "entry_sex"), nullable=True)
+    life_stage: Mapped[LifeStage | None] = mapped_column(
+        enum_type(LifeStage, "entry_life_stage"), nullable=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+    observation: Mapped[Observation] = relationship(back_populates="species_entries")
+    species: Mapped[Species] = relationship(back_populates="observation_entries")
+    subspecies: Mapped[Subspecies | None] = relationship()
 
 
 class BirdingLocation(TimestampMixin, Base):
@@ -253,6 +309,7 @@ class BirdingLocation(TimestampMixin, Base):
     district: Mapped[str | None] = mapped_column(String(120), nullable=True)
     center_latitude: Mapped[float] = mapped_column(Float)
     center_longitude: Mapped[float] = mapped_column(Float)
+    coordinate_system: Mapped[str] = mapped_column(String(12), default="wgs84")
     radius_meters: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -263,6 +320,9 @@ class BirdingLocation(TimestampMixin, Base):
         back_populates="location", cascade="all, delete-orphan", uselist=False
     )
     trips: Mapped[list[BirdingTrip]] = relationship(back_populates="location")
+    trip_links: Mapped[list[TripLocation]] = relationship(
+        back_populates="location", cascade="all, delete-orphan"
+    )
 
     @property
     def catalog_number(self) -> str:
@@ -305,6 +365,7 @@ class BirdingTrip(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str | None] = mapped_column(String(180), nullable=True)
     location_id: Mapped[int] = mapped_column(
         ForeignKey("birding_locations.id", ondelete="RESTRICT"), index=True
     )
@@ -319,6 +380,9 @@ class BirdingTrip(TimestampMixin, Base):
     observation_links: Mapped[list[ObservationTripLink]] = relationship(
         back_populates="trip", cascade="all, delete-orphan"
     )
+    location_links: Mapped[list[TripLocation]] = relationship(
+        back_populates="trip", cascade="all, delete-orphan"
+    )
     cover_observation: Mapped[Observation | None] = relationship(
         foreign_keys=[cover_observation_id]
     )
@@ -326,6 +390,24 @@ class BirdingTrip(TimestampMixin, Base):
     @property
     def catalog_number(self) -> str:
         return f"TRIP-{self.id:06d}"
+
+
+class TripLocation(TimestampMixin, Base):
+    __tablename__ = "trip_locations"
+    __table_args__ = (UniqueConstraint("trip_id", "location_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    trip_id: Mapped[int] = mapped_column(
+        ForeignKey("birding_trips.id", ondelete="CASCADE"), index=True
+    )
+    location_id: Mapped[int] = mapped_column(
+        ForeignKey("birding_locations.id", ondelete="RESTRICT"), index=True
+    )
+    visit_order: Mapped[int] = mapped_column(Integer)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+    trip: Mapped[BirdingTrip] = relationship(back_populates="location_links")
+    location: Mapped[BirdingLocation] = relationship(back_populates="trip_links")
 
 
 class ObservationTripLink(TimestampMixin, Base):
@@ -402,6 +484,46 @@ class SpeciesDisplayPreference(TimestampMixin, Base):
     )
 
 
+class HomeDisplayPreference(TimestampMixin, Base):
+    __tablename__ = "home_display_preferences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    featured_observation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("observations.id", ondelete="SET NULL"), nullable=True
+    )
+
+    featured_observation: Mapped[Observation | None] = relationship()
+
+
+class SpeciesEcologyProfile(TimestampMixin, Base):
+    __tablename__ = "species_ecology_profiles"
+
+    species_id: Mapped[int] = mapped_column(
+        ForeignKey("species.id", ondelete="CASCADE"), primary_key=True
+    )
+    ecological_group: Mapped[EcologicalGroup] = mapped_column(
+        enum_type(EcologicalGroup, "ecological_group"), default=EcologicalGroup.UNKNOWN
+    )
+    body_size: Mapped[BodySize] = mapped_column(
+        enum_type(BodySize, "body_size"), default=BodySize.UNKNOWN
+    )
+
+    species: Mapped[Species] = relationship(back_populates="ecology_profile")
+
+
+class SpeciesHabitatPreference(TimestampMixin, Base):
+    __tablename__ = "species_habitat_preferences"
+
+    species_id: Mapped[int] = mapped_column(
+        ForeignKey("species.id", ondelete="CASCADE"), primary_key=True
+    )
+    habitat: Mapped[HabitatType] = mapped_column(
+        enum_type(HabitatType, "habitat_type"), primary_key=True
+    )
+
+    species: Mapped[Species] = relationship(back_populates="habitat_preferences")
+
+
 class EvidenceSelection(TimestampMixin, Base):
     __tablename__ = "evidence_selections"
     __table_args__ = (UniqueConstraint("species_id", "dimension", "value_key"),)
@@ -420,3 +542,45 @@ class EvidenceSelection(TimestampMixin, Base):
 
     species: Mapped[Species] = relationship(back_populates="evidence_selections")
     observation: Mapped[Observation] = relationship()
+
+
+class SpeciesBehaviorTag(TimestampMixin, Base):
+    __tablename__ = "species_behavior_tags"
+    __table_args__ = (
+        UniqueConstraint("species_id", "label_key"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    species_id: Mapped[int] = mapped_column(
+        ForeignKey("species.id", ondelete="CASCADE"), index=True
+    )
+    label: Mapped[str] = mapped_column(String(80))
+    label_key: Mapped[str] = mapped_column(String(80))
+    observation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("observations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    species: Mapped[Species] = relationship(back_populates="behavior_tags")
+    observation: Mapped[Observation | None] = relationship()
+
+
+class SpeciesIndividualTag(TimestampMixin, Base):
+    __tablename__ = "species_individual_tags"
+    __table_args__ = (
+        UniqueConstraint("species_id", "label_key"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    species_id: Mapped[int] = mapped_column(
+        ForeignKey("species.id", ondelete="CASCADE"), index=True
+    )
+    label: Mapped[str] = mapped_column(String(120))
+    label_key: Mapped[str] = mapped_column(String(120))
+    observation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("observations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    species: Mapped[Species] = relationship(back_populates="individual_tags")
+    observation: Mapped[Observation | None] = relationship()

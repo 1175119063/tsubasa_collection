@@ -1,10 +1,24 @@
+import asyncio
+import json
 from collections.abc import Generator
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from .assistant_catalog import normalized_lookup, resolve_catalog_item
+from .assistant_schemas import (
+    AmapIntegrationInput,
+    AssistantChatInput,
+    AssistantHelpInput,
+    AssistantSearchInput,
+    AssistantTextInput,
+    LlmIntegrationInput,
+)
+from .feather_assistant import FeatherAssistantError
+from .integration_store import IntegrationConfigError
+from .map_service import AmapService, MapServiceError
 from .media_store import MediaStore, MediaValidationError
 from .models import MediaAsset
 from .schemas import (
@@ -12,14 +26,134 @@ from .schemas import (
     LocationObservationSelectionInput,
     ObservationInput,
     ObservationSelectionInput,
+    ObservationSpeciesInput,
     ObservationUpdateInput,
     SpeciesAudioInput,
+    SpeciesProfileUpdateInput,
     TripInput,
     TripObservationSelectionInput,
 )
 from .services import BirdService, DomainError
 
 router = APIRouter(prefix="/api")
+
+
+def assistant_error(exc: FeatherAssistantError) -> HTTPException:
+    return HTTPException(exc.status_code, exc.message)
+
+
+def integration_error(exc: IntegrationConfigError) -> HTTPException:
+    return HTTPException(422, str(exc))
+
+
+def assistant_library_context(request: Request, question: str) -> str | None:
+    project_terms = (
+        "记录",
+        "观察",
+        "物种",
+        "鸟种",
+        "馆藏",
+        "资料库",
+        "地点",
+        "区域",
+        "远征",
+        "多少",
+        "几笔",
+        "几种",
+    )
+    if not any(term in question for term in project_terms):
+        return None
+    query = normalized_lookup(question)
+    with request.app.state.database.session_factory() as session:
+        service = service_for(request, session)
+        stats = service.stats()
+        species = service.list_species()
+        locations = service.list_locations()
+        trips = service.list_trips()
+
+        def matches(item: dict, fields: tuple[str, ...]) -> bool:
+            return any(
+                (needle := normalized_lookup(str(item.get(field) or ""))) and needle in query
+                for field in fields
+            )
+
+        matched_species = [
+            item
+            for item in species
+            if matches(item, ("chinese_name", "scientific_name", "catalog_number"))
+        ][:3]
+        matched_locations = [
+            item
+            for item in locations
+            if matches(item, ("name", "catalog_number", "city", "district"))
+        ][:3]
+        matched_trips = [
+            item for item in trips if matches(item, ("name", "catalog_number"))
+        ][:3]
+        include_records = any(term in question for term in ("哪些", "列出", "分别", "时间", "日期"))
+        species_context = []
+        for item in matched_species:
+            entry = {
+                "catalog_number": item["catalog_number"],
+                "chinese_name": item["chinese_name"],
+                "scientific_name": item["scientific_name"],
+                "observation_count": item["observation_count"],
+            }
+            if include_records:
+                detail = service.species_detail(item["id"])
+                entry["records"] = [
+                    {
+                        "id": record["id"],
+                        "observed_at": record["observed_at"],
+                        "admin1_name": record["admin1_name"],
+                        "locality": record["locality"],
+                    }
+                    for record in detail["observations"][:20]
+                ]
+            species_context.append(entry)
+        context = {
+            "source": "翼·时光记当前数据库的只读即时摘要",
+            "totals": stats,
+            "matched_species": species_context,
+            "matched_locations": [
+                {
+                    "catalog_number": item["catalog_number"],
+                    "name": item["name"],
+                    "observation_count": item["observation_count"],
+                    "species_count": item["species_count"],
+                    "trip_count": item["trip_count"],
+                }
+                for item in matched_locations
+            ],
+            "matched_trips": [
+                {
+                    "catalog_number": item["catalog_number"],
+                    "name": item["name"],
+                    "observation_count": item["observation_count"],
+                    "species_count": item["species_count"],
+                    "location_count": item["location_count"],
+                }
+                for item in matched_trips
+            ],
+        }
+    return json.dumps(context, ensure_ascii=False, separators=(",", ":"))
+
+
+@router.post("/backups", status_code=201)
+def create_backup(request: Request) -> dict:
+    try:
+        return request.app.state.backup_service.create()
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(500, f"创建备份失败：{exc}") from exc
+
+
+@router.get("/backups/{filename}", response_class=FileResponse)
+def download_backup(filename: str, request: Request) -> FileResponse:
+    try:
+        path = request.app.state.backup_service.resolve(filename)
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(404, "备份文件不存在") from exc
+    return FileResponse(path, media_type="application/zip", filename=filename)
 
 
 def get_session(request: Request) -> Generator[Session, None, None]:
@@ -37,6 +171,221 @@ def health(request: Request) -> dict:
         "app": request.app.state.settings.app_name,
         "version": request.app.state.settings.app_version,
     }
+
+
+@router.get("/assistant/status")
+async def feather_assistant_status(request: Request) -> dict:
+    return await asyncio.to_thread(request.app.state.feather_assistant.status)
+
+
+@router.post("/assistant/species-extract")
+async def feather_assistant_extract_species(
+    payload: AssistantTextInput,
+    request: Request,
+) -> dict:
+    try:
+        result = await asyncio.to_thread(
+            request.app.state.feather_assistant.extract_species,
+            payload.text,
+        )
+    except FeatherAssistantError as exc:
+        raise assistant_error(exc) from exc
+    return result.model_dump()
+
+
+@router.post("/assistant/search-parse")
+async def feather_assistant_parse_search(
+    payload: AssistantSearchInput,
+    request: Request,
+) -> dict:
+    try:
+        extracted = await asyncio.to_thread(
+            request.app.state.feather_assistant.parse_search,
+            payload.query,
+        )
+    except FeatherAssistantError as exc:
+        raise assistant_error(exc) from exc
+
+    with request.app.state.database.session_factory() as session:
+        service = service_for(request, session)
+        species, locations, trips = (
+            service.list_species(),
+            service.list_locations(),
+            service.list_trips(),
+        )
+    species_match, species_candidates = resolve_catalog_item(
+        extracted.species_name,
+        species,
+        ("chinese_name", "scientific_name", "catalog_number"),
+    )
+    location_match, location_candidates = resolve_catalog_item(
+        extracted.location_name,
+        locations,
+        ("name", "catalog_number", "city", "district"),
+    )
+    trip_match, trip_candidates = resolve_catalog_item(
+        extracted.trip_name,
+        trips,
+        ("name", "catalog_number"),
+    )
+    warnings = list(extracted.warnings)
+    for label, query, match, candidates in (
+        ("物种", extracted.species_name, species_match, species_candidates),
+        ("地点", extracted.location_name, location_match, location_candidates),
+        ("远征", extracted.trip_name, trip_match, trip_candidates),
+    ):
+        if query and candidates:
+            warnings.append(f"{label}“{query}”存在多个候选：{'、'.join(candidates)}。")
+        elif query and match is None:
+            warnings.append(f"没有在当前资料库中找到{label}“{query}”。")
+    result = extracted.model_dump(exclude={"warnings"})
+    result.update(
+        {
+            "species_id": species_match["id"] if species_match else None,
+            "location_id": location_match["id"] if location_match else None,
+            "trip_id": trip_match["id"] if trip_match else None,
+            "warnings": warnings,
+        }
+    )
+    return result
+
+
+@router.post("/assistant/help")
+async def feather_assistant_help(payload: AssistantHelpInput, request: Request) -> dict:
+    try:
+        result = await asyncio.to_thread(
+            request.app.state.feather_assistant.answer_help,
+            payload.page,
+            payload.question,
+        )
+    except FeatherAssistantError as exc:
+        raise assistant_error(exc) from exc
+    return result.model_dump()
+
+
+@router.post("/assistant/chat")
+async def feather_assistant_chat(payload: AssistantChatInput, request: Request) -> dict:
+    try:
+        library_context = await asyncio.to_thread(
+            assistant_library_context,
+            request,
+            payload.messages[-1].content,
+        )
+        result = await asyncio.to_thread(
+            request.app.state.feather_assistant.answer_chat,
+            payload.page,
+            payload.messages,
+            library_context,
+        )
+    except FeatherAssistantError as exc:
+        raise assistant_error(exc) from exc
+    return result.model_dump()
+
+
+@router.get("/integrations")
+def integration_summary(request: Request) -> dict:
+    try:
+        result = request.app.state.integration_store.summary()
+    except IntegrationConfigError as exc:
+        raise integration_error(exc) from exc
+    settings = request.app.state.settings
+    result["local_model"] = {
+        "base_url": settings.feather_assistant_base_url,
+        "model": settings.feather_assistant_model,
+    }
+    return result
+
+
+@router.put("/integrations/amap")
+def update_amap_integration(payload: AmapIntegrationInput, request: Request) -> dict:
+    try:
+        return request.app.state.integration_store.update_amap(
+            payload.api_key,
+            payload.clear_api_key,
+        )
+    except IntegrationConfigError as exc:
+        raise integration_error(exc) from exc
+
+
+@router.post("/integrations/amap/test")
+def test_amap_integration(request: Request) -> dict:
+    try:
+        items = AmapService(request.app.state.integration_store.get_amap_key()).search(
+            "北京市"
+        )
+    except (IntegrationConfigError, MapServiceError) as exc:
+        status_code = exc.status_code if isinstance(exc, MapServiceError) else 422
+        raise HTTPException(status_code, str(exc)) from exc
+    return {"ok": True, "result_count": len(items), "message": "高德地图 API 连接成功。"}
+
+
+@router.put("/integrations/llm")
+def update_llm_integration(payload: LlmIntegrationInput, request: Request) -> dict:
+    try:
+        return request.app.state.integration_store.update_llm(
+            payload.provider,
+            payload.base_url,
+            payload.model,
+            payload.api_key,
+            payload.clear_api_key,
+        )
+    except IntegrationConfigError as exc:
+        raise integration_error(exc) from exc
+
+
+@router.post("/integrations/llm/test")
+async def test_llm_integration(request: Request) -> dict:
+    try:
+        return await asyncio.to_thread(
+            request.app.state.feather_assistant.test_external_connection
+        )
+    except FeatherAssistantError as exc:
+        raise assistant_error(exc) from exc
+
+
+@router.get("/map/config")
+def map_config(request: Request) -> dict:
+    try:
+        key = request.app.state.integration_store.get_amap_key()
+    except IntegrationConfigError as exc:
+        raise integration_error(exc) from exc
+    return {
+        "provider": "amap",
+        "map_provider": "openstreetmap",
+        "enabled": bool(key),
+    }
+
+
+@router.get("/map/search")
+def search_map_places(
+    request: Request,
+    query: str = Query(min_length=1, max_length=120),
+    city: str | None = Query(default=None, max_length=80),
+) -> dict:
+    try:
+        return {
+            "items": AmapService(request.app.state.integration_store.get_amap_key()).search(
+                query, city
+            )
+        }
+    except (IntegrationConfigError, MapServiceError) as exc:
+        status_code = exc.status_code if isinstance(exc, MapServiceError) else 422
+        raise HTTPException(status_code, str(exc)) from exc
+
+
+@router.get("/map/reverse")
+def reverse_map_point(
+    request: Request,
+    latitude: float = Query(ge=-90, le=90),
+    longitude: float = Query(ge=-180, le=180),
+) -> dict:
+    try:
+        return AmapService(request.app.state.integration_store.get_amap_key()).reverse_wgs84(
+            latitude, longitude
+        )
+    except (IntegrationConfigError, MapServiceError) as exc:
+        status_code = exc.status_code if isinstance(exc, MapServiceError) else 422
+        raise HTTPException(status_code, str(exc)) from exc
 
 
 @router.get("/stats")
@@ -66,10 +415,43 @@ def species_detail(species_id: int, request: Request) -> dict:
             raise HTTPException(exc.status_code, exc.message) from exc
 
 
+@router.put("/species/{species_id}/profile")
+def update_species_profile(
+    species_id: int,
+    payload: SpeciesProfileUpdateInput,
+    request: Request,
+) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).update_species_profile(species_id, payload)
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
 @router.get("/observations")
 def list_observations(request: Request) -> list[dict]:
     with request.app.state.database.session_factory() as session:
         return service_for(request, session).list_observations()
+
+
+@router.get("/home/cover")
+def homepage_cover(request: Request) -> dict:
+    with request.app.state.database.session_factory() as session:
+        return service_for(request, session).homepage_feature()
+
+
+@router.put("/home/cover")
+def set_homepage_cover(
+    payload: ObservationSelectionInput,
+    request: Request,
+) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).set_homepage_feature(
+                payload.observation_id
+            )
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
 
 
 @router.get("/locations")
@@ -262,6 +644,15 @@ async def create_observation(
                 "observation_id": result.observation.id,
                 "species_id": result.species.id,
                 "catalog_number": result.species.catalog_number,
+                "species_entries": [
+                    {
+                        "id": entry.id,
+                        "species_id": entry.species_id,
+                        "catalog_number": entry.species.catalog_number,
+                        "is_primary": entry.is_primary,
+                    }
+                    for entry in result.observation.species_entries
+                ],
             }
         except DomainError as exc:
             raise HTTPException(exc.status_code, exc.message) from exc
@@ -278,6 +669,52 @@ def update_observation(
     with request.app.state.database.session_factory() as session:
         try:
             return service_for(request, session).update_observation(observation_id, payload)
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.patch("/observations/{observation_id}/species/{entry_id}")
+def update_observation_species(
+    observation_id: int,
+    entry_id: int,
+    payload: ObservationUpdateInput,
+    request: Request,
+) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).update_observation_species(
+                observation_id, entry_id, payload
+            )
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.post("/observations/{observation_id}/species", status_code=201)
+def add_observation_species(
+    observation_id: int,
+    payload: ObservationSpeciesInput,
+    request: Request,
+) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).add_observation_species(
+                observation_id, payload
+            )
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.delete("/observations/{observation_id}/species/{entry_id}")
+def delete_observation_species(
+    observation_id: int,
+    entry_id: int,
+    request: Request,
+) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).delete_observation_species(
+                observation_id, entry_id
+            )
         except DomainError as exc:
             raise HTTPException(exc.status_code, exc.message) from exc
 
@@ -327,4 +764,11 @@ def get_media(asset_id: int, request: Request, thumbnail: bool = False) -> FileR
             raise HTTPException(500, str(exc)) from exc
         if not path.is_file():
             raise HTTPException(404, "媒体文件已丢失")
-        return FileResponse(path, media_type=asset.mime_type)
+        return FileResponse(
+            path,
+            media_type=asset.mime_type,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+            },
+        )

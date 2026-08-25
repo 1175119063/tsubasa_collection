@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>远征日志 · 翼·时光记</title><link rel="stylesheet" href="/static/styles.css?v=20260819-4" /><link rel="stylesheet" href="/static/v2.css?v=20260819-11" /><link rel="stylesheet" href="/static/assistant.css?v=20260825-4" />
+  </head>
+  <body class="v2-page" data-page="trips">
+    <div class="v2-grain" aria-hidden="true"></div>
+    <header class="v2-topbar">
+      <a class="v2-brand" href="/"><span class="v2-brand-seal"><img src="/static/assets/wing-chronicle-logo.png?v=20260816-1" alt="" aria-hidden="true" /></span><span><strong>翼·时光记</strong><small>EXPLORER'S FIELD JOURNAL</small></span></a>
+      <nav class="v2-topnav"><a href="/">探索营地</a><a href="/dex">鸟类调查册</a><a href="/observations">田野记录</a><a href="/locations">区域档案</a><a class="is-active" href="/trips">远征日志</a></nav>
+      <a class="v2-stable-link" href="/legacy/trips">旧版备用入口</a>
+    </header>
+    <main class="v2-archive-layout">
+      <aside class="v2-archive-sidebar"><div class="v2-book-tab">EXPEDITION LOG</div><p class="v2-kicker">外出调查卷宗</p><h1>远征日志</h1><p class="v2-filter-intro">将同一次外出中的照片装订为旅程，回顾到访区域、持续时间与获得的物种情报。</p>
+        <label for="v2-trip-year">年份</label><select id="v2-trip-year"><option value="">全部年份</option></select>
+        <label for="v2-trip-month">月份</label><select id="v2-trip-month"><option value="">全部月份</option></select>
+        <label for="v2-trip-location">调查区域</label><select id="v2-trip-location"><option value="">全部区域</option></select>
+        <label for="v2-trip-sort">装订顺序</label><select id="v2-trip-sort"><option value="asc">从早到晚</option><option value="desc">从晚到早</option></select>
+        <button class="v2-filter-reset" id="v2-trip-reset" type="button">清除检索条件</button>
+        <div class="v2-book-count"><strong id="v2-trip-count">—</strong><span>卷远征日志</span></div>
+      </aside>
+      <section class="v2-archive-content"><header class="v2-dex-header"><div><p class="v2-kicker">外出卷宗</p><h2>沿着路线重温探索</h2></div><button class="v2-new-entry" id="new-trip-button" type="button">＋ 创建远征</button></header><div id="v2-trip-groups" class="v2-record-groups"><p class="v2-loading">正在装订远征日志…</p></div><div class="v2-empty" id="v2-trip-empty" hidden><strong>没有符合条件的远征</strong><span>换一个月份或区域试试。</span></div></section>
+    </main>
+    <dialog class="v2-archive-dialog" id="v2-trip-dialog"><button class="v2-dossier-close" type="button" aria-label="关闭">×</button><div id="v2-trip-detail"></div></dialog>
+    <dialog class="v2-home-cover-dialog" id="v2-trip-cover-dialog"><header><div><p class="v2-kicker">远征封面</p><h2>更换封面</h2></div><button class="v2-dossier-close" type="button" aria-label="关闭">×</button></header><div class="v2-home-cover-toolbar"><p id="v2-trip-cover-status">请选择一笔观察记录。</p></div><div class="v2-home-cover-grid" id="v2-trip-cover-grid"></div></dialog>
+    <dialog id="trip-form-dialog" class="record-dialog trip-form-dialog"><form id="trip-form"><header class="dialog-header"><div><p class="eyebrow">TRIP ARCHIVE</p><h2 id="trip-form-title">创建观鸟行程</h2></div><button type="button" class="icon-button" data-close-trip-form>×</button></header><div class="form-scroll"><fieldset><legend><span>01</span> 远征名称、时间与地点</legend><div class="form-grid"><label class="full-field">远征名称<input name="name" type="text" maxlength="180" placeholder="例如：兴隆山春季观鸟；留空时使用主要地点名称" /></label><div class="full-field"><span class="field-label">远征地点与行程顺序</span><p class="field-hint">勾选多个地点，指定一个主要地点，并用箭头调整到访顺序。</p><div id="trip-location-selection" class="trip-location-selection"></div></div><label>开始时间<input name="started_at" type="datetime-local" step="60" required /></label><label>结束时间<input name="ended_at" type="datetime-local" step="60" required /></label><label class="full-field">行程备注<textarea name="notes" rows="5" placeholder="天气、路线、同行者或器材等，可不填"></textarea></label></div></fieldset></div><footer class="dialog-footer"><span id="trip-form-status"></span><button type="submit" class="primary-button">保存行程</button></footer></form></dialog>
+    <dialog id="trip-observation-edit-dialog" class="record-dialog trip-observation-edit-dialog"><header class="dialog-header"><div><p class="eyebrow">EDIT OBSERVATIONS</p><h2>编辑观察</h2></div><button type="button" class="icon-button" data-close-trip-observation-edit>×</button></header><div id="trip-observation-edit-list" class="form-scroll"></div><footer class="dialog-footer"><button type="button" class="secondary-button" data-close-trip-observation-edit>完成</button></footer></dialog>
+    <dialog id="trip-link-dialog" class="record-dialog trip-link-dialog"><form id="trip-link-form"><header class="dialog-header"><div><p class="eyebrow">LINK OBSERVATIONS</p><h2>关联观察记录</h2></div><button type="button" class="icon-button" data-close-trip-link>×</button></header><div class="form-scroll"><p class="section-note">这里只显示尚未关联行程、时间符合且地点相同或尚未关联地点的观察。</p><div id="trip-link-list" class="location-link-list"></div></div><footer class="dialog-footer"><span id="trip-link-status"></span><button type="submit" class="primary-button">保存关联</button></footer></form></dialog>
+    <div class="v2-editor-scaffold" aria-hidden="true"><span id="trip-total"></span><select id="trip-year-filter"></select><select id="trip-month-filter"></select><select id="trip-location-filter"></select><select id="trip-sort"><option value="asc">asc</option><option value="desc">desc</option></select><button id="trip-filter-reset"></button><div id="trip-empty"></div><button id="empty-new-trip"></button><div id="trip-filter-empty"></div><div id="trip-groups"></div><dialog id="trip-detail-dialog"><button data-close-trip-detail></button><div id="trip-detail-content"></div></dialog></div>
+    <script src="/static/core.js?v=20260815-2" defer></script><script src="/static/v2-pages.js?v=20260825-1" defer></script><script src="/static/trips.js?v=20260819-4" defer></script><script src="/static/assistant.js?v=20260825-4" defer></script>
+  </body>
+</html>

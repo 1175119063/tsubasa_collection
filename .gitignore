@@ -18,6 +18,16 @@ htmlcov/
 .env
 *.local.toml
 
+# Windows build and release outputs. Generated bundles may contain local data.
+packaging/build/
+packaging/build-*/
+packaging/dist/
+packaging/dist-*/
+packaging/release/
+packaging/README-data-zh-CN.txt
+packaging/RELEASE-NOTES-v*-zh-CN.txt
+*.zip
+
 # IDE and OS files
 .idea/
 .vscode/

@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>个人图鉴 · 羽迹</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <title>个人图鉴 · 翼·时光记</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260816-22" />
   </head>
   <body>
     <div class="paper-noise"></div>
     <header class="topbar">
       <a class="brand" href="/">
         <span class="brand-mark">羽</span>
-        <span><strong>羽迹</strong><small>个人图鉴</small></span>
+        <span><strong>翼·时光记</strong><small>个人图鉴</small></span>
       </a>
       <div class="top-actions">
         <a class="nav-link" href="/">首页</a>
@@ -63,7 +63,72 @@
       <div id="detail-content"></div>
     </dialog>
 
-    <script src="/static/core.js" defer></script>
-    <script src="/static/dex.js" defer></script>
+    <dialog id="profile-dialog" class="record-dialog profile-dialog">
+      <form id="profile-form">
+        <header class="dialog-header">
+          <div><p class="eyebrow">SPECIES PROFILE</p><h2>修改图鉴</h2></div>
+          <button type="button" class="icon-button" data-close-profile aria-label="关闭">×</button>
+        </header>
+        <div class="form-scroll">
+          <fieldset>
+            <legend><span>01</span> 自定义简介</legend>
+            <label>物种简介
+              <textarea name="introduction" rows="7" maxlength="10000" placeholder="记录辨识经验、观察印象、习性或任何你想留在图鉴中的内容。"></textarea>
+            </label>
+          </fieldset>
+          <fieldset>
+            <legend><span>02</span> 分类纠错</legend>
+            <p class="field-hint">修改共用的分类节点时，同目、同科或同属的其他物种也会同步采用更正后的分类。</p>
+            <div class="profile-taxonomy-grid">
+              <strong>目</strong><label>中文名<input name="order_chinese_name" required maxlength="120" /></label><label>拉丁名<input name="order_scientific_name" required maxlength="120" /></label>
+              <strong>科</strong><label>中文名<input name="family_chinese_name" required maxlength="120" /></label><label>拉丁名<input name="family_scientific_name" required maxlength="120" /></label>
+              <strong>属</strong><label>中文名<input name="genus_chinese_name" required maxlength="120" /></label><label>拉丁名<input name="genus_scientific_name" required maxlength="120" /></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend><span>03</span> 生态画像</legend>
+            <p class="field-hint">选择生态习性与体型；偏好生境可多选，最多三项。</p>
+            <div class="profile-ecology-editor">
+              <section>
+                <h3>生态习性分类</h3>
+                <div id="profile-ecology-options" class="ecology-choice-grid"></div>
+              </section>
+              <section>
+                <h3>体型大小</h3>
+                <div id="profile-body-size-options" class="body-size-choice-grid"></div>
+              </section>
+              <section>
+                <div class="profile-choice-heading"><h3>偏好生境</h3><span id="profile-habitat-status">0 / 3</span></div>
+                <div id="profile-habitat-options" class="habitat-choice-grid"></div>
+              </section>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend><span>04</span> 个体档案</legend>
+            <p class="field-hint">个体档案完全自定义，例如“雄性 · 成鸟 · 繁殖羽”；可以为每个标签关联一笔观察作为照片凭证。</p>
+            <div id="profile-individual-list" class="profile-behavior-list"></div>
+            <button id="add-individual-button" type="button" class="secondary-button">＋ 添加个体标签</button>
+          </fieldset>
+          <fieldset>
+            <legend><span>05</span> 档案照片凭证</legend>
+            <p class="field-hint">亚种档案只能选择内容相符的观察；保存后点击档案标签即可跳转预览。</p>
+            <div id="profile-evidence-list" class="profile-evidence-list"></div>
+          </fieldset>
+          <fieldset>
+            <legend><span>06</span> 行为档案</legend>
+            <p class="field-hint">自定义“飞行、捕食、育雏”等标签，并可选择该物种的一笔观察作为凭证。</p>
+            <div id="profile-behavior-list" class="profile-behavior-list"></div>
+            <button id="add-behavior-button" type="button" class="secondary-button">＋ 添加行为标签</button>
+          </fieldset>
+        </div>
+        <footer class="dialog-footer">
+          <span id="profile-form-status" role="status"></span>
+          <button type="submit" class="primary-button">保存图鉴修改</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <script src="/static/core.js?v=20260815-1" defer></script>
+    <script src="/static/dex.js?v=20260816-13" defer></script>
   </body>
 </html>

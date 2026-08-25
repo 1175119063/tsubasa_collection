@@ -47,6 +47,10 @@ button { cursor: pointer; }
 .primary-button:hover { background: #345345; transform: translateY(-1px); }
 .secondary-button { background: transparent; color: var(--forest); border: 1px solid var(--line); }
 .secondary-button:hover { border-color: var(--forest); }
+.location-detail-actions [data-link-trip] {
+  background: transparent; color: var(--forest); border: 1px solid var(--line); box-shadow: none;
+}
+.location-detail-actions [data-link-trip]:hover { border-color: var(--forest); background: transparent; transform: none; }
 main { max-width: 1440px; margin: 0 auto; padding: 0 clamp(24px, 5vw, 76px) 80px; }
 .top-actions { display: flex; align-items: center; gap: 10px; }
 .nav-link {
@@ -58,6 +62,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 clamp(24px, 5vw, 76px) 80px
 .eyebrow { margin: 0 0 13px; color: var(--brown); font-size: 10px; font-weight: 700; letter-spacing: .24em; }
 h1, h2, h3 { font-family: Georgia, "Songti SC", serif; font-weight: 500; }
 h1 { margin: 0; color: var(--forest); font-size: clamp(44px, 5vw, 72px); line-height: 1.14; letter-spacing: .02em; }
+.home-hero h1 { font-size: clamp(40px, 4.5vw, 64px); }
 .hero-copy { color: var(--muted); line-height: 1.9; max-width: 560px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); background: rgba(250,247,239,.45); }
 .stats article { padding: 30px 12px; text-align: center; border-right: 1px solid var(--line); }
@@ -127,7 +132,7 @@ h1 { margin: 0; color: var(--forest); font-size: clamp(44px, 5vw, 72px); line-he
 }
 .species-card:hover { transform: translateY(-5px); box-shadow: var(--shadow); border-color: rgba(38,61,50,.42); }
 .species-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; filter: saturate(.83) contrast(.96); }
-.card-body { padding: 18px; }
+.card-body { display: block; padding: 18px 24px 20px; }
 .card-number { color: var(--brown); font: 11px Georgia, serif; letter-spacing: .16em; }
 .species-card h3 { margin: 10px 0 3px; color: var(--forest); font-size: 22px; }
 .latin { color: var(--muted); font: italic 13px Georgia, serif; }
@@ -168,9 +173,10 @@ dialog::backdrop { background: rgba(24, 34, 29, .64); backdrop-filter: blur(3px)
 .observation-preview-layout { display: grid; grid-template-columns: 1.12fr .88fr; height: 100%; }
 .observation-preview-photo { display: grid; place-items: center; min-width: 0; background: #17261f; }
 .observation-preview-photo img { width: 100%; height: 100%; object-fit: contain; }
-.observation-preview-info { padding: 42px 38px 36px; overflow: auto; }
+.observation-preview-info { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; }
+.observation-preview-scroll { min-height: 0; padding: 42px 38px 28px; overflow: auto; scrollbar-gutter: stable; }
 .observation-preview-info h2 { margin: 0 0 5px; color: var(--forest); font-size: 36px; }
-.observation-preview-info > .latin { margin-top: 0; }
+.observation-preview-scroll > .latin { margin-top: 0; }
 .observation-facts { margin: 28px 0 0; }
 .observation-facts div { display: grid; grid-template-columns: 82px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .observation-facts dt { color: var(--muted); font-size: 11px; }
@@ -181,12 +187,26 @@ dialog::backdrop { background: rgba(24, 34, 29, .64); backdrop-filter: blur(3px)
 .preview-audio { display: grid; gap: 5px; margin-top: 10px; color: var(--muted); font-size: 11px; }
 .preview-audio audio { width: 100%; height: 34px; }
 .preview-empty { color: var(--muted); font-size: 12px; }
-.preview-primary-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.preview-primary-actions {
+  z-index: 2; display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 15px 38px 18px;
+  border-top: 1px solid var(--line); background: var(--paper); box-shadow: 0 -8px 18px rgba(45,42,31,.08);
+}
+/* Keep a stale, pre-scroll-wrapper script usable during an in-place upgrade. */
+.observation-preview-info:not(:has(.observation-preview-scroll)) {
+  display: block; padding: 42px 38px 28px; overflow: auto;
+}
+.observation-preview-info:not(:has(.observation-preview-scroll)) .preview-primary-actions {
+  position: sticky; bottom: -28px; margin: 24px -38px -28px; padding-inline: 38px;
+}
 .observation-edit-form { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--forest); }
 .observation-edit-form header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .observation-edit-form header h3 { margin: 0; color: var(--forest); font-size: 20px; }
 .observation-edit-form header span { color: var(--muted); font-size: 10px; text-align: right; }
 .observation-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.observation-species-manager { display: grid; gap: 12px; margin-top: 18px; padding: 16px; border: 1px solid rgba(32,60,50,.2); background: rgba(255,255,255,.24); }
+.observation-add-species { display: grid; grid-template-columns: minmax(220px, 1.5fr) minmax(150px, .7fr) auto; align-items: end; gap: 10px; }
+.observation-add-species .secondary-button { min-height: 43px; margin: 0; }
+.observation-edit-actions .danger-button:disabled { opacity: .38; cursor: not-allowed; }
 .observation-edit-form > label { display: block; margin-top: 14px; }
 .observation-edit-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 #observation-edit-status { margin-right: auto; color: var(--brown); font-size: 11px; }
@@ -202,6 +222,33 @@ legend { padding: 0 10px; color: var(--forest); font-family: Georgia, "Songti SC
 legend span { color: var(--gold); margin-right: 8px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .taxonomy-node { padding: 15px; border-left: 3px solid var(--paper-deep); background: rgba(255,255,255,.18); }
+.species-search-field { display: block; margin-bottom: 14px; }
+.species-search-control { position: relative; }
+.species-search-results {
+  position: absolute; top: calc(100% + 4px); right: 0; left: 0; z-index: 8; max-height: 290px; overflow-y: auto;
+  border: 1px solid var(--moss); background: #faf7ef; box-shadow: 0 12px 28px rgba(38,61,50,.18);
+}
+.species-search-result {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px; width: 100%; padding: 12px 16px;
+  color: var(--ink); text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent;
+}
+.species-search-result:last-child { border-bottom: 0; }
+.species-search-result:hover, .species-search-result:focus { background: rgba(102,116,91,.11); }
+.species-search-result span, .species-search-result strong, .species-search-result em, .species-search-result small { display: block; }
+.species-search-result strong { color: var(--forest); font: 600 15px Georgia, "Songti SC", serif; }
+.species-search-result em { margin-top: 2px; color: var(--muted); font-family: Georgia, serif; }
+.species-search-result small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.species-search-result b { flex: 0 0 auto; color: var(--moss); font-size: 11px; }
+.species-search-empty { margin: 0; padding: 15px 16px; color: var(--muted); font-size: 11px; }
+.species-selection-summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 9px; padding: 10px 12px;
+  border-left: 3px solid var(--moss); background: rgba(102,116,91,.09);
+}
+.species-selection-summary[hidden] { display: none; }
+.species-selection-summary span, .species-selection-summary small, .species-selection-summary strong { display: block; }
+.species-selection-summary small { margin-bottom: 2px; color: var(--muted); }
+.species-selection-summary strong { color: var(--forest); font-size: 12px; }
+.species-selection-summary button { flex: 0 0 auto; padding: 6px 9px; color: var(--forest); border: 1px solid var(--line); background: transparent; font-size: 10px; }
 .step-label { color: var(--forest); font-weight: 700; }
 .node-new-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 label { color: #535650; font-size: 12px; }
@@ -212,6 +259,17 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus { border-color: var(--moss); box-shadow: 0 0 0 2px rgba(102,116,91,.12); }
 textarea { resize: vertical; }
 .full-field { grid-column: 1 / -1; }
+.location-map-picker { padding: 16px; background: rgba(238, 231, 213, .56); border: 1px solid var(--line); }
+.location-map-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.location-map-search label span { display: block; margin-bottom: 7px; }
+.location-map-search .secondary-button { min-width: 92px; margin: 0; }
+.location-map-picker .field-hint { margin: 9px 0 12px; }
+#location-map { width: 100%; height: 360px; overflow: hidden; background: #ddd5c3; border: 1px solid var(--line); }
+.location-map-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
+.location-map-result { min-width: 0; padding: 10px 12px; color: var(--forest); text-align: left; background: rgba(255,255,255,.42); border: 1px solid var(--line); cursor: pointer; }
+.location-map-result:hover { border-color: var(--gold); }
+.location-map-result strong, .location-map-result small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.location-map-result strong { font: 500 14px var(--serif); }.location-map-result small { margin-top: 4px; color: #777168; font: 10px var(--sans); }
 .check-field { display: flex; align-items: center; gap: 9px; }
 .check-field input { width: auto; margin: 0; }
 .file-field { padding: 12px; border: 1px dashed var(--line); }
@@ -219,6 +277,9 @@ textarea { resize: vertical; }
 .field-hint { display: block; min-height: 18px; margin-top: 6px; color: var(--muted); line-height: 1.5; }
 #form-status { color: var(--brown); font-size: 12px; }
 .detail-dialog { position: relative; width: min(980px, 94vw); max-height: 92vh; overflow: auto; }
+#detail-dialog { width: min(1320px, 94vw); max-height: none; overflow: visible; }
+#detail-dialog #detail-content { max-height: 92vh; overflow: auto; }
+#detail-dialog .detail-close { top: 14px; right: -21px; }
 .detail-close {
   position: absolute; top: 16px; right: 16px; z-index: 4; display: grid; place-items: center;
   width: 42px; height: 42px; padding: 0; color: white; background: rgba(24,34,29,.72);
@@ -228,11 +289,62 @@ textarea { resize: vertical; }
 .detail-close:hover { background: #111b16; transform: scale(1.06); }
 .detail-hero { position: relative; width: 100%; min-height: 360px; display: grid; grid-template-columns: 1fr 1fr; background: var(--forest); color: var(--white); }
 .detail-hero img { width: 100%; height: 100%; min-height: 360px; object-fit: cover; }
+.species-detail-hero { grid-template-columns: .92fr 1.08fr; min-height: 0; align-items: stretch; }
+.species-detail-hero > img { aspect-ratio: 1 / 1; height: auto; min-height: 0; align-self: start; object-fit: cover; object-position: center; }
+.species-hero-panel { min-width: 0; display: grid; grid-template-columns: minmax(260px, 1fr) minmax(240px, .92fr); }
+.species-hero-panel .detail-title { min-width: 0; padding: 50px 34px; }
+.species-hero-panel .detail-title .eyebrow { margin-bottom: 20px; font-size: 12px; line-height: 1.7; }
+.species-hero-panel .detail-title .latin { margin: 18px 0 0; font-size: 17px; line-height: 1.75; }
+.species-hero-panel .detail-classification { margin-top: 46px; font-size: 14px; line-height: 2; }
+.species-hero-panel .species-status-stack { gap: 13px; margin-top: 20px; font-size: 14px; line-height: 1.9; }
+.species-hero-panel .iucn-badge { min-height: 31px; padding: 6px 13px; font-size: 13px; }
+.species-hero-panel .species-observation-total { margin-top: 24px; font-size: 14px; line-height: 1.9; }
+.species-hero-panel .species-observation-total strong { font-size: 22px; }
+.species-ecology-panel {
+  display: grid; align-content: center; gap: 39px; min-width: 0; padding: 48px 30px;
+  border-left: 1px solid rgba(255,255,255,.16); background: rgba(10,28,21,.16);
+}
+.species-ecology-panel section > p { margin: 0 0 16px; color: rgba(255,255,255,.72); font-size: 14px; line-height: 2; letter-spacing: 0; }
+.ecology-summary-group { display: grid; grid-template-columns: 58px 1fr; column-gap: 13px; align-items: center; }
+.ecology-summary-group > p { grid-column: 1 / -1; }
+.ecology-summary-group strong { color: rgba(255,255,255,.78); font-size: 14px; font-weight: 400; line-height: 2; }
+.ecology-icon {
+  display: inline-grid; place-items: center; width: 58px; height: 58px; flex: 0 0 auto;
+  color: #151b18; background: #fff; border-radius: 50%;
+}
+.ecology-icon svg { width: 43px; height: 43px; overflow: visible; }
+.ecology-icon .ecology-raster-icon { width: 46px; height: 46px; min-height: 0; object-fit: contain; }
+.ecology-icon .ecology-raster-songbird,
+.ecology-icon .ecology-raster-raptor { width: 40px; height: 40px; }
+.ecology-icon .ecology-raster-waterfowl { width: 50px; height: 50px; }
+.ecology-icon svg > * { fill: currentColor; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ecology-icon text { font: 700 43px Georgia, serif; stroke: none; }
+.body-size-summary > div { display: flex; align-items: end; justify-content: space-between; gap: 4px; min-height: 48px; }
+.body-size-bird { display: grid; place-items: end center; width: var(--bird-width); color: #fff; opacity: .2; }
+.body-size-bird .body-size-raster-icon { display: block; width: 100%; height: auto; min-height: 0; filter: invert(1); mix-blend-mode: normal; }
+.body-size-bird.is-selected { opacity: 1; }
+.body-size-bird.is-unknown { opacity: .16; }
+.habitat-summary > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.habitat-summary span { padding: 7px 11px; color: var(--forest); background: rgba(255,255,255,.92); border-radius: 999px; font-size: 14px; line-height: 1.6; }
+.habitat-summary em { color: rgba(255,255,255,.72); font-size: 14px; line-height: 2; font-style: normal; }
 .detail-title { padding: 56px 42px; align-self: center; }
 .detail-title .eyebrow { color: #d1b483; }
 .detail-title h2 { margin: 0 0 6px; font-size: 42px; }
 .detail-title .latin { color: rgba(255,255,255,.65); }
 .detail-classification { margin-top: 35px; color: rgba(255,255,255,.72); font-size: 12px; line-height: 1.8; }
+.species-status-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; margin-top: 13px; color: rgba(255,255,255,.72); font-size: 12px; }
+.iucn-badge { display: inline-flex; align-items: center; min-height: 27px; padding: 5px 11px; color: #fff; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .04em; box-shadow: 0 2px 8px rgba(0,0,0,.16); }
+.iucn-ex { background: #181818; }
+.iucn-ew { background: #653b6b; }
+.iucn-cr { background: #bd342d; }
+.iucn-en { background: #d87524; }
+.iucn-vu { background: #c79a18; }
+.iucn-nt { background: #7da65a; }
+.iucn-lc { background: #32704a; }
+.iucn-ne { background: #777d7a; }
+.species-observation-total { margin: 14px 0 0; color: rgba(255,255,255,.78); font-size: 12px; }
+.species-observation-total strong { color: #fff; font: 20px Georgia, serif; }
+.species-detail-footer { display: flex; justify-content: flex-end; margin-top: 42px; padding-top: 22px; border-top: 1px solid var(--line); }
 .location-detail-dialog { width: min(1080px, 94vw); }
 .trip-detail-dialog { width: min(1080px, 94vw); }
 .trip-detail-cover { display: grid; place-items: center; min-height: 360px; overflow: hidden; background: #17261f; }
@@ -277,10 +389,52 @@ textarea { resize: vertical; }
 .detail-body { padding: 34px 42px 50px; }
 .detail-section { margin-top: 30px; }
 .detail-section h3 { color: var(--forest); border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.species-introduction p { color: var(--muted); line-height: 1.85; white-space: pre-wrap; }
 .badge-list { display: flex; flex-wrap: wrap; gap: 10px; }
 .archive-badge { border: 1px solid var(--line); background: rgba(250,247,239,.7); padding: 9px 12px; font-size: 12px; }
 .archive-badge.done { color: var(--forest); border-color: rgba(38,61,50,.45); }
 .archive-badge.pending { color: #9a978d; border-style: dashed; }
+.archive-proof-link { text-decoration: none; transition: .18s ease; }
+.archive-proof-link:hover { color: var(--white); background: var(--forest); transform: translateY(-1px); }
+.profile-dialog { width: min(980px, 94vw); }
+.profile-ecology-editor { display: grid; gap: 22px; margin-top: 18px; }
+.profile-ecology-editor section { padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.profile-ecology-editor section:last-child { padding-bottom: 0; border-bottom: 0; }
+.profile-ecology-editor h3 { margin: 0 0 12px; color: var(--forest); font-size: 15px; }
+.ecology-choice-grid { display: grid; grid-template-columns: repeat(7, minmax(72px, 1fr)); gap: 8px; }
+.ecology-choice, .body-size-choice { position: relative; display: grid; justify-items: center; gap: 6px; cursor: pointer; }
+.ecology-choice input, .body-size-choice input, .habitat-choice input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ecology-choice .ecology-icon { width: 52px; height: 52px; overflow: hidden; color: var(--muted); border: 1px solid var(--line); background: rgba(255,255,255,.55); }
+.ecology-choice .ecology-icon svg { width: 38px; height: 38px; }
+.ecology-choice .ecology-raster-songbird { width: 34px; height: 34px; }
+.ecology-choice .ecology-raster-scansorial { width: 44px; height: 44px; }
+.ecology-choice strong, .body-size-choice strong { color: var(--muted); font-size: 10px; font-weight: 500; }
+.ecology-choice input:checked + .ecology-icon { color: #151b18; border: 3px solid var(--gold); background: #fff; box-shadow: 0 4px 12px rgba(38,61,50,.2); }
+.ecology-choice input:checked ~ strong { color: var(--forest); font-weight: 700; }
+.body-size-choice-grid { display: grid; grid-template-columns: 68px repeat(5, 1fr); gap: 8px; align-items: end; }
+.body-size-choice { min-height: 83px; align-content: end; padding: 8px 5px; border: 1px solid transparent; }
+.body-size-choice > span { display: grid; place-items: center; width: var(--bird-width); opacity: .32; }
+.body-size-choice .body-size-raster-icon { display: block; width: 100%; height: auto; filter: none; mix-blend-mode: normal; }
+.body-size-choice input:checked ~ span { opacity: 1; }
+.body-size-choice input:checked ~ strong { color: var(--forest); font-weight: 700; }
+.body-size-choice:has(input:checked) { border-color: rgba(38,61,50,.4); background: rgba(255,255,255,.32); }
+.body-size-unknown { align-content: center; color: var(--muted); font-size: 10px; }
+.profile-choice-heading { display: flex; align-items: center; justify-content: space-between; }
+.profile-choice-heading h3 { margin-bottom: 12px; }
+#profile-habitat-status { color: var(--muted); font-size: 10px; }
+#profile-habitat-status.is-error { color: #88483e; }
+.habitat-choice-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.habitat-choice { position: relative; cursor: pointer; }
+.habitat-choice span { display: inline-block; padding: 8px 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.3); font-size: 10px; }
+.habitat-choice input:checked + span { color: #fff; border-color: var(--forest); background: var(--forest); }
+.profile-taxonomy-grid { display: grid; grid-template-columns: 44px 1fr 1fr; gap: 12px; align-items: end; }
+.profile-taxonomy-grid strong { align-self: center; color: var(--forest); font: 20px Georgia, "Songti SC", serif; }
+.profile-evidence-list, .profile-behavior-list { display: grid; gap: 12px; margin: 15px 0; }
+.profile-evidence-row { display: grid; grid-template-columns: minmax(150px, .55fr) 1fr; gap: 15px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); }
+.profile-evidence-row select { margin: 0; }
+.profile-behavior-row { display: grid; grid-template-columns: .7fr 1fr auto; gap: 12px; align-items: end; padding: 13px; border: 1px solid var(--line); background: rgba(250,247,239,.35); }
+.behavior-remove-button { margin: 0 0 9px; padding: 5px; white-space: nowrap; }
+#profile-form-status { color: var(--brown); font-size: 11px; }
 .observation-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
 .observation-card { border: 1px solid var(--line); background: rgba(250,247,239,.55); }
 .observation-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
@@ -297,12 +451,32 @@ textarea { resize: vertical; }
 .cover-button:disabled { cursor: default; color: var(--brown); border-color: rgba(176,141,87,.42); background: rgba(176,141,87,.09); }
 .observation-card.is-current-cover { border-color: var(--gold); box-shadow: inset 0 0 0 1px rgba(176,141,87,.24); }
 .danger-button { display: block; margin-top: 5px; color: #88483e; border: 0; background: none; padding: 6px 0 0; font-size: 11px; }
+.trip-observation-edit-dialog { width: min(760px, 94vw); max-height: 88vh; }
+.trip-edit-observation-list { display: grid; gap: 10px; }
+.trip-edit-observation-item {
+  display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 14px; padding: 10px;
+  border: 1px solid var(--line); background: rgba(255,255,255,.24);
+}
+.trip-edit-observation-item img { width: 76px; height: 60px; object-fit: cover; }
+.trip-edit-observation-item strong, .trip-edit-observation-item small { display: block; }
+.trip-edit-observation-item strong { color: var(--forest); font: 500 16px Georgia, "Songti SC", serif; }
+.trip-edit-observation-item small { margin-top: 5px; color: var(--muted); font-size: 11px; }
+.trip-edit-observation-item .danger-button { margin: 0; padding: 7px 10px; border: 1px solid rgba(136,72,62,.38); }
+.trip-location-selection { display: grid; gap: 8px; margin-top: 10px; }
+.trip-location-row { display: grid; grid-template-columns: 34px 72px minmax(180px, 1fr) 38px 38px 62px; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.35); }
+.trip-location-row > span strong, .trip-location-row > span small { display: block; }.trip-location-row > span small { color: var(--muted); }
+.trip-location-row button { min-height: 34px; border: 1px solid var(--line); background: transparent; }.trip-location-row button:disabled { opacity: .35; }
+.trip-location-order { color: var(--brown); font-family: Georgia, serif; }
+.trip-location-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; }.trip-location-add .secondary-button { margin: 0; }
+.trip-route-list { display: flex; flex-wrap: wrap; gap: 8px; }.trip-route-list a { display: flex; gap: 9px; padding: 10px 13px; color: var(--forest); text-decoration: none; border: 1px solid var(--line); }
 @media (max-width: 760px) {
   .hero { grid-template-columns: 1fr; gap: 30px; padding: 60px 0; }
   .stats { max-width: 100%; }
   .section-heading { align-items: stretch; gap: 18px; flex-direction: column; }
   .search-box { width: 100%; }
-  .home-portals, .form-grid, .node-new-grid, .detail-hero, .filter-panel { grid-template-columns: 1fr; }
+  .home-portals, .form-grid, .node-new-grid, .detail-hero, .filter-panel, .location-map-results { grid-template-columns: 1fr; }
+  .location-map-search { grid-template-columns: 1fr; }.location-map-search .secondary-button { width: 100%; }
+  #location-map { height: 300px; }
   .location-summary-stats, .month-bar-row { grid-template-columns: 1fr; }
   .trip-summary-stats { grid-template-columns: repeat(2, 1fr); }
   .trip-card { grid-template-columns: 110px 1fr; }
@@ -313,12 +487,46 @@ textarea { resize: vertical; }
   .observation-preview-dialog { width: 94vw; height: 90vh; overflow: auto; }
   .observation-preview-layout { grid-template-columns: 1fr; height: auto; }
   .observation-preview-photo { height: 42vh; }
-  .observation-preview-info { padding: 30px 24px 36px; overflow: visible; }
+  .observation-preview-info { display: block; overflow: visible; }
+  .observation-preview-scroll { padding: 30px 24px 24px; overflow: visible; }
+  .preview-primary-actions { padding: 15px 24px 20px; }
   .observation-edit-grid { grid-template-columns: 1fr; }
+  .observation-add-species { grid-template-columns: 1fr; }
+  .trip-edit-observation-item { grid-template-columns: 60px 1fr; }
+  .trip-location-row { grid-template-columns: 30px 1fr 34px 34px; }.trip-location-row > label { grid-column: 2; }.trip-location-row > span { grid-column: 1 / -1; }.trip-location-row [data-remove-trip-location] { grid-column: 4; }
+  .trip-edit-observation-item img { width: 60px; height: 52px; }
+  .trip-edit-observation-item .danger-button { grid-column: 2; justify-self: start; }
+  .profile-taxonomy-grid, .profile-evidence-row, .profile-behavior-row { grid-template-columns: 1fr; }
+  .profile-taxonomy-grid strong { margin-top: 10px; }
+  .behavior-remove-button { justify-self: start; }
   .detail-hero img { min-height: 260px; }
+  #detail-dialog { width: 94vw; overflow: auto; }
+  #detail-dialog #detail-content { max-height: none; overflow: visible; }
+  #detail-dialog .detail-close { position: fixed; top: 16px; right: 16px; }
+  .species-hero-panel { grid-template-columns: 1fr; }
+  .species-ecology-panel { border-top: 1px solid rgba(255,255,255,.16); border-left: 0; }
+  .ecology-choice-grid { grid-template-columns: repeat(4, 1fr); }
+  .body-size-choice-grid { grid-template-columns: repeat(3, 1fr); }
   .topbar { padding-inline: 20px; }
   .top-actions { gap: 2px; }
   .nav-link { padding-inline: 7px; }
   .top-actions .primary-button { display: none; }
   .record-grid-large { grid-template-columns: 1fr; }
 }
+.additional-species-entry {
+  margin: 0 0 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(66, 83, 63, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.48);
+}
+.additional-species-entry > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+.additional-species-entry > header span { display: grid; }
+.additional-species-entry > header small { font-style: italic; opacity: 0.7; }
+.additional-species-entry > header button { color: #8a382f; }

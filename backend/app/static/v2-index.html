@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>探索营地 · 翼·时光记</title>
+    <link rel="stylesheet" href="/static/v2.css?v=20260825-4" />
+    <link rel="stylesheet" href="/static/assistant.css?v=20260825-4" />
+  </head>
+  <body class="v2-page" data-page="home">
+    <div class="v2-grain" aria-hidden="true"></div>
+    <header class="v2-topbar">
+      <a class="v2-brand" href="/">
+        <span class="v2-brand-seal"><img src="/static/assets/wing-chronicle-logo.png?v=20260816-1" alt="" aria-hidden="true" /></span>
+        <span><strong>翼·时光记</strong><small>EXPLORER'S FIELD JOURNAL</small></span>
+      </a>
+      <nav class="v2-topnav" aria-label="主要导航">
+        <a class="is-active" href="/">探索营地</a>
+        <a href="/dex">鸟类调查册</a>
+        <a href="/observations">田野记录</a>
+        <a href="/locations">区域档案</a>
+        <a href="/trips">远征日志</a>
+      </nav>
+      <a class="v2-stable-link" href="/legacy">旧版备用入口</a>
+    </header>
+
+    <main class="v2-home">
+      <section class="v2-camp-hero">
+        <div class="v2-hero-photo" id="featured-photo" aria-hidden="true"></div>
+        <div class="v2-hero-shade"></div>
+        <div class="v2-hero-copy">
+          <p class="v2-kicker">PERSONAL EXPEDITION ARCHIVE · 个人探索档案</p>
+          <h1>记录只属于你的探索<br /><em>收集每一支散落的飞羽</em></h1>
+          <p>每次相遇都是一页新情报。把照片、足迹与时间装订成一本持续生长的自然调查手册。</p>
+          <div class="v2-hero-actions">
+            <a class="v2-button v2-button-primary" href="/dex">打开鸟类调查册</a>
+            <a class="v2-button v2-button-ghost" href="/observations?new=1">登记新发现</a>
+            <button class="v2-button v2-button-ghost" id="change-home-cover" type="button">选择首页封面</button>
+            <button class="v2-button v2-button-ghost" id="create-backup" type="button">完整备份资料库</button>
+          </div>
+        </div>
+        <aside class="v2-featured-tag" id="featured-tag">
+          <span>最新收录</span><strong>正在读取馆藏…</strong><i></i>
+        </aside>
+      </section>
+
+      <section class="v2-camp-board" aria-label="探索概览">
+        <div class="v2-board-heading">
+          <div><p class="v2-kicker">CAMP NOTICE BOARD</p><h2>探索者营地</h2></div>
+          <p>从这里继续未完的调查，或翻阅已经装订成册的足迹。</p>
+        </div>
+
+        <div class="v2-stat-strip">
+          <article><span>已确认物种</span><strong id="v2-species-count">—</strong><small>SPECIES</small></article>
+          <article><span>田野记录</span><strong id="v2-observation-count">—</strong><small>RECORDS</small></article>
+          <article><span>照片凭证</span><strong id="v2-photo-count">—</strong><small>PHOTOS</small></article>
+          <article><span>声音标本</span><strong id="v2-audio-count">—</strong><small>AUDIO</small></article>
+        </div>
+
+        <div class="v2-board-grid">
+          <a class="v2-quest-card v2-quest-primary" href="/dex">
+            <span class="v2-card-rune">Ⅰ</span><p>FIELD GUIDE</p><h3>鸟类调查册</h3>
+            <small>翻阅已确认物种、生态画像与照片凭证</small><b>进入调查册 →</b>
+          </a>
+          <a class="v2-quest-card" href="/observations">
+            <span class="v2-card-rune">Ⅱ</span><p>FIELD NOTES</p><h3>田野记录</h3>
+            <small>按时间回看每一次相遇与拍摄详情</small><b>翻阅记录 →</b>
+          </a>
+          <a class="v2-quest-card" href="/locations">
+            <span class="v2-card-rune">Ⅲ</span><p>REGION MAP</p><h3>区域档案</h3>
+            <small>整理反复到访的湿地、森林与城市角落</small><b>查看区域 →</b>
+          </a>
+          <a class="v2-quest-card" href="/trips">
+            <span class="v2-card-rune">Ⅳ</span><p>EXPEDITION LOG</p><h3>远征日志</h3>
+            <small>把同一次外出中的发现编入一段旅程</small><b>查看远征 →</b>
+          </a>
+        </div>
+      </section>
+
+      <section class="v2-latest-section">
+        <div class="v2-section-title"><div><p class="v2-kicker">LATEST DISCOVERIES</p><h2>最近装订的图鉴页</h2></div><a href="/dex">查看全部</a></div>
+        <div class="v2-discovery-row" id="latest-species"><p class="v2-loading">正在整理调查手记…</p></div>
+      </section>
+
+      <section class="v2-api-section" aria-labelledby="api-section-title">
+        <div class="v2-api-heading">
+          <div><p class="v2-kicker">ARCANE CONNECTIONS</p><h2 id="api-section-title">API 管理</h2></div>
+          <p>集中保管地图与飞羽精灵使用的外部服务。密钥不会显示在页面中，也不会写入备份。</p>
+        </div>
+        <div class="v2-api-overview">
+          <article><span>地图服务</span><strong>高德地图</strong><small id="api-amap-summary">正在检查配置…</small></article>
+          <article><span>精灵对话</span><strong id="api-llm-provider">正在检查</strong><small id="api-llm-summary">正在读取模型配置…</small></article>
+          <button class="v2-api-manage" id="open-api-manager" type="button"><span>配置册</span><strong>管理 API 与模型</strong><small>打开安全配置界面 →</small></button>
+        </div>
+      </section>
+    </main>
+
+    <dialog class="v2-home-cover-dialog" id="home-cover-dialog">
+      <header>
+        <div><p class="v2-kicker">CAMP COVER ARCHIVE</p><h2>选择首页封面</h2></div>
+        <button type="button" id="close-home-cover" aria-label="关闭">×</button>
+      </header>
+      <div class="v2-home-cover-toolbar">
+        <label for="home-cover-search">搜索已有观察记录</label>
+        <input id="home-cover-search" type="search" placeholder="输入物种名、馆藏编号、地点或日期" autocomplete="off" />
+        <p id="home-cover-status">正在整理照片档案……</p>
+      </div>
+      <div class="v2-home-cover-grid" id="home-cover-grid"></div>
+      <footer>
+        <button class="v2-button v2-button-ghost" id="reset-home-cover" type="button">恢复自动选择最新记录</button>
+      </footer>
+    </dialog>
+
+    <dialog class="v2-home-cover-dialog" id="backup-dialog">
+      <header>
+        <div><p class="v2-kicker">ARCHIVE SAFETY COPY</p><h2>资料库完整备份</h2></div>
+        <button type="button" id="close-backup" aria-label="关闭">×</button>
+      </header>
+      <div class="v2-home-cover-toolbar">
+        <p>备份包含一致性数据库快照、全部照片、缩略图和录音。文件保存在程序旁的 backups 目录中。</p>
+        <p id="backup-status">准备创建备份。</p>
+      </div>
+      <footer>
+        <button class="v2-button v2-button-primary" id="confirm-backup" type="button">立即创建完整备份</button>
+        <a class="v2-button v2-button-ghost" id="download-backup" hidden>下载备份</a>
+      </footer>
+    </dialog>
+
+    <dialog class="v2-home-cover-dialog v2-api-dialog" id="api-manager-dialog">
+      <header>
+        <div><p class="v2-kicker">ARCANE CONNECTIONS</p><h2>API 与模型配置册</h2></div>
+        <button type="button" id="close-api-manager" aria-label="关闭">×</button>
+      </header>
+      <div class="v2-api-dialog-body">
+        <p class="v2-api-security-note"><strong>本机安全说明</strong>API Key 使用 Windows DPAPI 加密，并受本机文件权限保护。页面只显示末四位提示；迁移到其他电脑后需要重新填写。启用外部模型时，精灵对话内容及回答该问题所需的最小馆藏摘要会发送到你配置的服务商。</p>
+
+        <section class="v2-api-config-card">
+          <div class="v2-api-config-title"><span>01 · MAP SERVICE</span><h3>高德地图</h3><small id="api-amap-hint">尚未读取</small></div>
+          <div class="v2-api-fields">
+            <label class="v2-api-wide"><span>Web 服务 API Key</span><input id="api-amap-key" type="password" maxlength="200" autocomplete="new-password" spellcheck="false" placeholder="留空则保留当前密钥" /></label>
+            <label class="v2-api-check"><input id="api-amap-clear" type="checkbox" /><span>清除已保存的 Key</span></label>
+          </div>
+          <div class="v2-api-actions"><button class="v2-button v2-button-primary" id="save-amap-api" type="button">保存地图配置</button><button class="v2-button v2-api-secondary" id="test-amap-api" type="button">测试连接</button><p id="api-amap-status" role="status"></p></div>
+        </section>
+
+        <section class="v2-api-config-card">
+          <div class="v2-api-config-title"><span>02 · FEATHER CHAT MODEL</span><h3>飞羽精灵对话模型</h3><small id="api-llm-hint">尚未读取</small></div>
+          <div class="v2-api-fields">
+            <label><span>模型提供方</span><select id="api-llm-provider-select"><option value="local">本地 Ollama</option><option value="openai_compatible">外部 OpenAI 兼容服务</option></select></label>
+            <label><span>模型名称</span><input id="api-llm-model" type="text" maxlength="200" spellcheck="false" placeholder="例如 qwen-plus" /></label>
+            <label class="v2-api-wide"><span>Base URL</span><input id="api-llm-base-url" type="url" maxlength="500" spellcheck="false" placeholder="例如 https://api.example.com/v1" /></label>
+            <label class="v2-api-wide"><span>API Key</span><input id="api-llm-key" type="password" maxlength="1000" autocomplete="new-password" spellcheck="false" placeholder="留空则保留当前密钥" /></label>
+            <label class="v2-api-check"><input id="api-llm-clear" type="checkbox" /><span>清除已保存的 Key</span></label>
+          </div>
+          <p class="v2-api-routing-note">外部模型仅用于开放式“精灵对话”；物种字段提取、田野筛选和页面说明仍由本地模型处理。</p>
+          <div class="v2-api-actions"><button class="v2-button v2-button-primary" id="save-llm-api" type="button">保存模型配置</button><button class="v2-button v2-api-secondary" id="test-llm-api" type="button">测试外部连接</button><p id="api-llm-status" role="status"></p></div>
+        </section>
+
+        <section class="v2-api-future"><span>FUTURE SLOTS</span><p>以后接入的天气、物种名录或其他服务，也会统一收纳在这本配置册中。</p></section>
+      </div>
+    </dialog>
+
+    <footer class="v2-footer"><span>翼·时光记 · 探索者田野日志</span><span>所有资料仍保存在本地</span></footer>
+    <script src="/static/core.js?v=20260815-2" defer></script>
+    <script src="/static/v2.js?v=20260825-4" defer></script>
+    <script src="/static/assistant.js?v=20260825-4" defer></script>
+  </body>
+</html>

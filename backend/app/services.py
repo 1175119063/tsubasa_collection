@@ -9,32 +9,50 @@ from fastapi import UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .enums import LifeStage, MediaKind, PhotoType, Sex
+from .enums import (
+    BodySize,
+    EcologicalGroup,
+    EvidenceDimension,
+    LifeStage,
+    MediaKind,
+    PhotoType,
+    Sex,
+)
 from .media_store import ImportedMedia, MediaStore
 from .models import (
     BirdingLocation,
     BirdingTrip,
+    EvidenceSelection,
     Family,
     Genus,
+    HomeDisplayPreference,
     LocationCover,
     MediaAsset,
     Observation,
     ObservationAudio,
     ObservationLocationLink,
+    ObservationSpecies,
     ObservationTripLink,
     Species,
     SpeciesAudio,
+    SpeciesBehaviorTag,
     SpeciesDisplayPreference,
+    SpeciesEcologyProfile,
+    SpeciesHabitatPreference,
+    SpeciesIndividualTag,
     Subspecies,
     TaxonomicOrder,
+    TripLocation,
 )
 from .schemas import (
     LocationInput,
     LocationObservationSelectionInput,
     NewSpeciesInput,
     ObservationInput,
+    ObservationSpeciesInput,
     ObservationUpdateInput,
     SpeciesAudioInput,
+    SpeciesProfileUpdateInput,
     TaxonNodeInput,
     TripInput,
     TripObservationSelectionInput,
@@ -99,6 +117,41 @@ class BirdService:
             )
             self.session.add(observation)
             self.session.flush()
+            observation.species_entries.append(
+                ObservationSpecies(
+                    species=species,
+                    subspecies=subspecies,
+                    photo_type=payload.photo_type,
+                    sex=payload.sex,
+                    life_stage=payload.life_stage,
+                    is_primary=True,
+                )
+            )
+            for entry_payload in payload.additional_species:
+                entry_species = self.session.get(Species, entry_payload.species_id)
+                if entry_species is None:
+                    raise DomainError("附加物种不存在", 404)
+                entry_subspecies = None
+                if entry_payload.subspecies_id is not None:
+                    entry_subspecies = self.session.get(
+                        Subspecies, entry_payload.subspecies_id
+                    )
+                    if (
+                        entry_subspecies is None
+                        or entry_subspecies.species_id != entry_species.id
+                    ):
+                        raise DomainError("附加物种所选亚种不属于该物种", 422)
+                observation.species_entries.append(
+                    ObservationSpecies(
+                        species=entry_species,
+                        subspecies=entry_subspecies,
+                        photo_type=entry_payload.photo_type,
+                        sex=entry_payload.sex,
+                        life_stage=entry_payload.life_stage,
+                        notes=entry_payload.notes or None,
+                        is_primary=False,
+                    )
+                )
 
             location = self._resolve_observation_location(payload)
             if location is not None:
@@ -240,6 +293,45 @@ class BirdService:
             raise DomainError(f"属 {data.scientific_name} 已属于其他科", 409)
         return node
 
+    def _upsert_profile_order(self, data: TaxonNodeInput) -> TaxonomicOrder:
+        key = normalized_name(data.scientific_name)
+        node = self.session.scalar(
+            select(TaxonomicOrder).where(TaxonomicOrder.scientific_name_key == key)
+        )
+        if node is None:
+            node = TaxonomicOrder(scientific_name_key=key)
+            self.session.add(node)
+        node.chinese_name = data.chinese_name
+        node.scientific_name = data.scientific_name
+        self.session.flush()
+        return node
+
+    def _upsert_profile_family(
+        self, data: TaxonNodeInput, order: TaxonomicOrder
+    ) -> Family:
+        key = normalized_name(data.scientific_name)
+        node = self.session.scalar(select(Family).where(Family.scientific_name_key == key))
+        if node is None:
+            node = Family(scientific_name_key=key)
+            self.session.add(node)
+        node.order = order
+        node.chinese_name = data.chinese_name
+        node.scientific_name = data.scientific_name
+        self.session.flush()
+        return node
+
+    def _upsert_profile_genus(self, data: TaxonNodeInput, family: Family) -> Genus:
+        key = normalized_name(data.scientific_name)
+        node = self.session.scalar(select(Genus).where(Genus.scientific_name_key == key))
+        if node is None:
+            node = Genus(scientific_name_key=key)
+            self.session.add(node)
+        node.family = family
+        node.chinese_name = data.chinese_name
+        node.scientific_name = data.scientific_name
+        self.session.flush()
+        return node
+
     def _resolve_subspecies(self, species: Species, payload: ObservationInput) -> Subspecies | None:
         if payload.photo_type is PhotoType.GROUP:
             return None
@@ -306,11 +398,20 @@ class BirdService:
             .options(
                 selectinload(Species.genus).selectinload(Genus.family).selectinload(Family.order),
                 selectinload(Species.observations).selectinload(Observation.photo_asset),
+                selectinload(Species.observation_entries)
+                .selectinload(ObservationSpecies.observation)
+                .selectinload(Observation.photo_asset),
+                selectinload(Species.observation_entries).selectinload(
+                    ObservationSpecies.subspecies
+                ),
+                selectinload(Species.observation_entries)
+                .selectinload(ObservationSpecies.observation)
+                .selectinload(Observation.photo_asset),
                 selectinload(Species.display_preference),
             )
             .order_by(Species.id)
         ).all()
-        return [self._species_summary(item) for item in species_list if item.observations]
+        return [self._species_summary(item) for item in species_list if item.observation_entries]
 
     def taxonomy_tree(self) -> list[dict]:
         orders = self.session.scalars(
@@ -350,7 +451,10 @@ class BirdService:
         ]
 
     def _species_summary(self, species: Species) -> dict:
-        observations = sorted(species.observations, key=lambda item: (item.observed_at, item.id))
+        observations = sorted(
+            (entry.observation for entry in species.observation_entries),
+            key=lambda item: (item.observed_at, item.id),
+        )
         cover = self._selected_observation(
             observations,
             species.display_preference.cover_observation_id if species.display_preference else None,
@@ -373,7 +477,7 @@ class BirdService:
             ),
             "observation_count": len(observations),
             "cover_asset_id": cover.photo_asset_id,
-            "cover_url": f"/api/media/{cover.photo_asset_id}?thumbnail=true",
+            "cover_url": self._media_url(cover.photo_asset, thumbnail=True),
             "first_observed_at": observations[0].observed_at.isoformat(timespec="minutes"),
         }
 
@@ -398,12 +502,27 @@ class BirdService:
                 .selectinload(BirdingTrip.location),
                 selectinload(Species.audio_links).selectinload(SpeciesAudio.asset),
                 selectinload(Species.display_preference),
+                selectinload(Species.ecology_profile),
+                selectinload(Species.habitat_preferences),
+                selectinload(Species.evidence_selections),
+                selectinload(Species.behavior_tags).selectinload(
+                    SpeciesBehaviorTag.observation
+                ),
+                selectinload(Species.individual_tags).selectinload(
+                    SpeciesIndividualTag.observation
+                ),
             )
         )
-        if species is None or not species.observations:
+        if species is None or not species.observation_entries:
             raise DomainError("物种不存在", 404)
 
-        observations = sorted(species.observations, key=lambda item: (item.observed_at, item.id))
+        entries_by_observation = {
+            entry.observation_id: entry for entry in species.observation_entries
+        }
+        observations = sorted(
+            (entry.observation for entry in species.observation_entries),
+            key=lambda item: (item.observed_at, item.id),
+        )
         preference = species.display_preference
         cover = self._selected_observation(
             observations, preference.cover_observation_id if preference else None
@@ -417,8 +536,9 @@ class BirdService:
         seasons: dict[str, dict] = {}
         sexes: dict[str, dict] = {}
         life_stages: dict[str, dict] = {}
-        captured_subspecies: set[int] = set()
+        captured_subspecies: dict[int, dict] = {}
         for item in observations:
+            species_entry = entries_by_observation[item.id]
             proof = self._proof(item)
             countries.setdefault(
                 item.country_code,
@@ -430,14 +550,49 @@ class BirdService:
                 {"code": item.admin1_code, "name": item.admin1_name, **proof},
             )
             seasons.setdefault(item.season.value, {"value": item.season.value, **proof})
-            if item.sex is not None and item.sex is not Sex.UNKNOWN:
-                sexes.setdefault(item.sex.value, {"value": item.sex.value, **proof})
-            if item.life_stage is not None and item.life_stage is not LifeStage.UNKNOWN:
-                life_stages.setdefault(
-                    item.life_stage.value, {"value": item.life_stage.value, **proof}
+            if species_entry.sex is not None and species_entry.sex is not Sex.UNKNOWN:
+                sexes.setdefault(
+                    species_entry.sex.value,
+                    {"value": species_entry.sex.value, **proof},
                 )
-            if item.subspecies_id is not None:
-                captured_subspecies.add(item.subspecies_id)
+            if (
+                species_entry.life_stage is not None
+                and species_entry.life_stage is not LifeStage.UNKNOWN
+            ):
+                life_stages.setdefault(
+                    species_entry.life_stage.value,
+                    {"value": species_entry.life_stage.value, **proof},
+                )
+            if species_entry.subspecies_id is not None:
+                captured_subspecies.setdefault(species_entry.subspecies_id, proof)
+
+        selected_evidence = {
+            (item.dimension, item.value_key): item.observation_id
+            for item in species.evidence_selections
+        }
+        observations_by_id = {item.id: item for item in observations}
+        for value, entry in sexes.items():
+            entry.update(
+                self._selected_archive_proof(
+                    entry,
+                    selected_evidence,
+                    EvidenceDimension.SEX,
+                    value,
+                    observations_by_id,
+                    species.id,
+                )
+            )
+        for value, entry in life_stages.items():
+            entry.update(
+                self._selected_archive_proof(
+                    entry,
+                    selected_evidence,
+                    EvidenceDimension.LIFE_STAGE,
+                    value,
+                    observations_by_id,
+                    species.id,
+                )
+            )
 
         result = self._species_summary(species)
         result.update(
@@ -456,6 +611,22 @@ class BirdService:
                         "scientific_name": species.genus.scientific_name,
                     },
                 },
+                "introduction": species.notes,
+                "ecology": {
+                    "group": (
+                        species.ecology_profile.ecological_group.value
+                        if species.ecology_profile
+                        else EcologicalGroup.UNKNOWN.value
+                    ),
+                    "body_size": (
+                        species.ecology_profile.body_size.value
+                        if species.ecology_profile
+                        else BodySize.UNKNOWN.value
+                    ),
+                    "habitats": sorted(
+                        item.habitat.value for item in species.habitat_preferences
+                    ),
+                },
                 "has_subspecies": species.has_subspecies,
                 "subspecies": [
                     {
@@ -463,6 +634,18 @@ class BirdService:
                         "chinese_name": item.chinese_name,
                         "scientific_name": item.scientific_name,
                         "captured": item.id in captured_subspecies,
+                        **(
+                            self._selected_archive_proof(
+                                captured_subspecies[item.id],
+                                selected_evidence,
+                                EvidenceDimension.SUBSPECIES,
+                                str(item.id),
+                                observations_by_id,
+                                species.id,
+                            )
+                            if item.id in captured_subspecies
+                            else {}
+                        ),
                     }
                     for item in sorted(species.subspecies, key=lambda value: value.scientific_name)
                 ],
@@ -481,7 +664,74 @@ class BirdService:
                     "sexes": list(sexes.values()),
                     "life_stages": list(life_stages.values()),
                 },
-                "observations": [self._observation_dict(item) for item in observations],
+                "observations": [
+                    self._observation_dict(item, species_id=species.id)
+                    for item in observations
+                ],
+                "behaviors": [
+                    {
+                        "id": item.id,
+                        "label": item.label,
+                        "linked": item.observation_id is not None,
+                        **(
+                            self._proof(item.observation)
+                            if item.observation is not None
+                            else {}
+                        ),
+                    }
+                    for item in sorted(
+                        species.behavior_tags,
+                        key=lambda value: (value.created_at, value.id),
+                    )
+                ],
+                "individuals": [
+                    *[
+                        {
+                            "id": f"observed-{item['value']}",
+                            "label": item["label"],
+                            "linked": item.get("observation_id") is not None,
+                            **(
+                                {"observation_id": item["observation_id"]}
+                                if item.get("observation_id") is not None
+                                else {}
+                            ),
+                        }
+                        for item in [
+                            *[
+                                {
+                                    "value": value,
+                                    "label": f"性别 · {value}",
+                                    **entry,
+                                }
+                                for value, entry in sexes.items()
+                            ],
+                            *[
+                                {
+                                    "value": value,
+                                    "label": f"生命阶段 · {value}",
+                                    **entry,
+                                }
+                                for value, entry in life_stages.items()
+                            ],
+                        ]
+                    ],
+                    *[
+                        {
+                            "id": item.id,
+                            "label": item.label,
+                            "linked": item.observation_id is not None,
+                            **(
+                                self._proof(item.observation)
+                                if item.observation is not None
+                                else {}
+                            ),
+                        }
+                        for item in sorted(
+                            species.individual_tags,
+                            key=lambda value: (value.created_at, value.id),
+                        )
+                    ],
+                ],
                 "species_audio": [
                     {
                         "id": item.id,
@@ -494,7 +744,7 @@ class BirdService:
                         ),
                         "locality": item.locality,
                         "asset_id": item.asset_id,
-                        "url": f"/api/media/{item.asset_id}",
+                        "url": self._media_url(item.asset),
                     }
                     for item in species.audio_links
                 ],
@@ -502,19 +752,150 @@ class BirdService:
         )
         return result
 
+    def update_species_profile(
+        self, species_id: int, payload: SpeciesProfileUpdateInput
+    ) -> dict:
+        species = self.session.scalar(
+            select(Species)
+            .where(Species.id == species_id)
+            .options(
+                selectinload(Species.genus)
+                .selectinload(Genus.family)
+                .selectinload(Family.order),
+                selectinload(Species.observations),
+                selectinload(Species.observation_entries).selectinload(
+                    ObservationSpecies.observation
+                ),
+                selectinload(Species.subspecies),
+                selectinload(Species.evidence_selections),
+                selectinload(Species.behavior_tags),
+                selectinload(Species.individual_tags),
+                selectinload(Species.ecology_profile),
+                selectinload(Species.habitat_preferences),
+            )
+        )
+        if species is None or not species.observation_entries:
+            raise DomainError("物种不存在", 404)
+
+        observations_by_id = {
+            entry.observation_id: entry.observation for entry in species.observation_entries
+        }
+        for selection in payload.evidence_selections:
+            observation = observations_by_id.get(selection.observation_id)
+            if observation is None:
+                raise DomainError("所选档案凭证不属于该物种", 422)
+            if not self._observation_matches_archive(
+                observation, selection.dimension, selection.value_key, species.id
+            ):
+                raise DomainError("所选观察与对应档案项不一致", 422)
+        for behavior in payload.behaviors:
+            if (
+                behavior.observation_id is not None
+                and behavior.observation_id not in observations_by_id
+            ):
+                raise DomainError("行为标签只能关联该物种的观察记录", 422)
+
+        individual_keys = [normalized_name(item.label) for item in payload.individuals]
+        if len(individual_keys) != len(set(individual_keys)):
+            raise DomainError("涓綋鏍囩涓嶈兘閲嶅", 422)
+        for individual in payload.individuals:
+            if (
+                individual.observation_id is not None
+                and individual.observation_id not in observations_by_id
+            ):
+                raise DomainError("涓綋鏍囩鍙兘鍏宠仈璇ョ墿绉嶇殑瑙傚療璁板綍", 422)
+
+        old_genus_id = species.genus_id
+        old_family_id = species.genus.family_id
+        old_order_id = species.genus.family.order_id
+        order = self._upsert_profile_order(payload.order)
+        family = self._upsert_profile_family(payload.family, order)
+        genus = self._upsert_profile_genus(payload.genus, family)
+        species.genus = genus
+        species.notes = payload.introduction or None
+        if species.ecology_profile is None:
+            species.ecology_profile = SpeciesEcologyProfile(
+                ecological_group=payload.ecological_group,
+                body_size=payload.body_size,
+            )
+        else:
+            species.ecology_profile.ecological_group = payload.ecological_group
+            species.ecology_profile.body_size = payload.body_size
+
+        self.session.execute(
+            delete(EvidenceSelection).where(EvidenceSelection.species_id == species.id)
+        )
+        self.session.execute(
+            delete(SpeciesBehaviorTag).where(SpeciesBehaviorTag.species_id == species.id)
+        )
+        self.session.execute(
+            delete(SpeciesIndividualTag).where(SpeciesIndividualTag.species_id == species.id)
+        )
+        self.session.execute(
+            delete(SpeciesHabitatPreference).where(
+                SpeciesHabitatPreference.species_id == species.id
+            )
+        )
+        self.session.flush()
+        for selection in payload.evidence_selections:
+            self.session.add(
+                EvidenceSelection(
+                    species_id=species.id,
+                    observation_id=selection.observation_id,
+                    dimension=selection.dimension,
+                    value_key=selection.value_key,
+                )
+            )
+        for behavior in payload.behaviors:
+            self.session.add(
+                SpeciesBehaviorTag(
+                    species_id=species.id,
+                    label=behavior.label,
+                    label_key=normalized_name(behavior.label),
+                    observation_id=behavior.observation_id,
+                )
+            )
+        for individual in payload.individuals:
+            self.session.add(
+                SpeciesIndividualTag(
+                    species_id=species.id,
+                    label=individual.label,
+                    label_key=normalized_name(individual.label),
+                    observation_id=individual.observation_id,
+                )
+            )
+        for habitat in payload.preferred_habitats:
+            self.session.add(
+                SpeciesHabitatPreference(species_id=species.id, habitat=habitat)
+            )
+
+        self.session.flush()
+        if (old_genus_id, old_family_id, old_order_id) != (
+            genus.id,
+            family.id,
+            order.id,
+        ):
+            self._prune_taxonomy(old_genus_id, old_family_id, old_order_id)
+        self.session.commit()
+        self.session.expire_all()
+        return self.species_detail(species_id)
+
     def set_species_cover(self, species_id: int, observation_id: int | None) -> dict:
         species = self.session.scalar(
             select(Species)
             .where(Species.id == species_id)
             .options(
                 selectinload(Species.observations),
+                selectinload(Species.observation_entries).selectinload(
+                    ObservationSpecies.observation
+                ),
                 selectinload(Species.display_preference),
             )
         )
-        if species is None or not species.observations:
+        if species is None or not species.observation_entries:
             raise DomainError("物种不存在", 404)
         if observation_id is not None and not any(
-            item.id == observation_id for item in species.observations
+            item.observation_id == observation_id for item in species.observation_entries
         ):
             raise DomainError("所选观察记录不属于该物种", 422)
 
@@ -525,7 +906,10 @@ class BirdService:
         preference.cover_observation_id = observation_id
         self.session.commit()
 
-        observations = sorted(species.observations, key=lambda item: (item.observed_at, item.id))
+        observations = sorted(
+            (entry.observation for entry in species.observation_entries),
+            key=lambda item: (item.observed_at, item.id),
+        )
         selected = self._selected_observation(observations, observation_id)
         return {
             "species_id": species_id,
@@ -558,6 +942,7 @@ class BirdService:
             district=payload.district or None,
             center_latitude=payload.center_latitude,
             center_longitude=payload.center_longitude,
+            coordinate_system=payload.coordinate_system,
             radius_meters=payload.radius_meters,
             notes=payload.notes or None,
         )
@@ -593,6 +978,7 @@ class BirdService:
                 .selectinload(Observation.photo_asset),
                 selectinload(BirdingLocation.cover).selectinload(LocationCover.asset),
                 selectinload(BirdingLocation.trips),
+                selectinload(BirdingLocation.trip_links),
             )
             .order_by(BirdingLocation.id)
         ).all()
@@ -618,6 +1004,12 @@ class BirdService:
                 .selectinload(ObservationAudio.asset),
                 selectinload(BirdingLocation.cover).selectinload(LocationCover.asset),
                 selectinload(BirdingLocation.trips),
+                selectinload(BirdingLocation.trip_links)
+                .selectinload(TripLocation.trip)
+                .selectinload(BirdingTrip.location),
+                selectinload(BirdingLocation.trip_links)
+                .selectinload(TripLocation.trip)
+                .selectinload(BirdingTrip.observation_links),
                 selectinload(BirdingLocation.observation_links)
                 .selectinload(ObservationLocationLink.observation)
                 .selectinload(Observation.trip_link)
@@ -639,20 +1031,26 @@ class BirdService:
             month = observation.observed_at.strftime("%Y-%m")
             monthly[month]["visit_days"].add(observation.observed_at.date().isoformat())
             monthly[month]["observation_count"] += 1
-            entry = species.setdefault(
-                observation.species_id,
-                {
-                    "id": observation.species_id,
-                    "chinese_name": observation.species.chinese_name,
-                    "scientific_name": observation.species.scientific_name,
-                    "observation_count": 0,
-                    "thumbnail_url": (
-                        f"/api/media/{observation.photo_asset_id}?thumbnail=true"
-                    ),
-                },
-            )
-            entry["observation_count"] += 1
+            for species_entry in observation.species_entries:
+                entry = species.setdefault(
+                    species_entry.species_id,
+                    {
+                        "id": species_entry.species_id,
+                        "chinese_name": species_entry.species.chinese_name,
+                        "scientific_name": species_entry.species.scientific_name,
+                        "observation_count": 0,
+                        "thumbnail_url": self._media_url(
+                            observation.photo_asset, thumbnail=True
+                        ),
+                    },
+                )
+                entry["observation_count"] += 1
         result = self._location_summary(location)
+        related_trips = sorted(
+            (link.trip for link in location.trip_links),
+            key=lambda item: (item.started_at, item.id),
+            reverse=True,
+        )
         result.update(
             {
                 "monthly_activity": [
@@ -665,6 +1063,18 @@ class BirdService:
                 ],
                 "species": list(species.values()),
                 "observations": [self._observation_dict(item) for item in observations],
+                "trips": [
+                    {
+                        "id": trip.id,
+                        "catalog_number": trip.catalog_number,
+                        "name": trip.name or trip.location.name,
+                        "started_at": trip.started_at.isoformat(timespec="minutes"),
+                        "ended_at": trip.ended_at.isoformat(timespec="minutes"),
+                        "observation_count": len(trip.observation_links),
+                        "is_primary_location": trip.location_id == location.id,
+                    }
+                    for trip in related_trips
+                ],
             }
         )
         return result
@@ -697,6 +1107,7 @@ class BirdService:
         location.district = payload.district or None
         location.center_latitude = payload.center_latitude
         location.center_longitude = payload.center_longitude
+        location.coordinate_system = payload.coordinate_system
         location.radius_meters = payload.radius_meters
         location.notes = payload.notes or None
         self.session.commit()
@@ -730,24 +1141,42 @@ class BirdService:
         return self.location_detail(location_id)
 
     def create_trip(self, payload: TripInput) -> dict:
-        location = self.session.get(BirdingLocation, payload.location_id)
-        if location is None:
-            raise DomainError("观鸟地点不存在", 404)
+        locations = self._trip_payload_locations(payload)
+        primary = next(item for item in locations if item.id == payload.primary_location_id)
         trip = BirdingTrip(
-            location=location,
+            name=payload.name or None,
+            location=primary,
             started_at=payload.started_at,
             ended_at=payload.ended_at,
             notes=payload.notes or None,
         )
+        trip.location_links = [
+            TripLocation(
+                location=location,
+                visit_order=index,
+                is_primary=location.id == payload.primary_location_id,
+            )
+            for index, location in enumerate(locations, 1)
+        ]
         self.session.add(trip)
         self.session.commit()
         return self.trip_detail(trip.id)
+
+    def _trip_payload_locations(self, payload: TripInput) -> list[BirdingLocation]:
+        locations = self.session.scalars(
+            select(BirdingLocation).where(BirdingLocation.id.in_(payload.location_ids))
+        ).all()
+        by_id = {item.id: item for item in locations}
+        if len(by_id) != len(payload.location_ids):
+            raise DomainError("远征地点中存在无效地点", 404)
+        return [by_id[location_id] for location_id in payload.location_ids]
 
     def list_trips(self) -> list[dict]:
         trips = self.session.scalars(
             select(BirdingTrip)
             .options(
                 selectinload(BirdingTrip.location),
+                selectinload(BirdingTrip.location_links).selectinload(TripLocation.location),
                 selectinload(BirdingTrip.observation_links)
                 .selectinload(ObservationTripLink.observation)
                 .selectinload(Observation.species)
@@ -767,6 +1196,7 @@ class BirdService:
             .where(BirdingTrip.id == trip_id)
             .options(
                 selectinload(BirdingTrip.location),
+                selectinload(BirdingTrip.location_links).selectinload(TripLocation.location),
                 selectinload(BirdingTrip.observation_links)
                 .selectinload(ObservationTripLink.observation)
                 .selectinload(Observation.species)
@@ -796,19 +1226,20 @@ class BirdService:
         )
         species: dict[int, dict] = {}
         for observation in observations:
-            entry = species.setdefault(
-                observation.species_id,
-                {
-                    "id": observation.species_id,
-                    "chinese_name": observation.species.chinese_name,
-                    "scientific_name": observation.species.scientific_name,
-                    "observation_count": 0,
-                    "thumbnail_url": (
-                        f"/api/media/{observation.photo_asset_id}?thumbnail=true"
-                    ),
-                },
-            )
-            entry["observation_count"] += 1
+            for species_entry in observation.species_entries:
+                entry = species.setdefault(
+                    species_entry.species_id,
+                    {
+                        "id": species_entry.species_id,
+                        "chinese_name": species_entry.species.chinese_name,
+                        "scientific_name": species_entry.species.scientific_name,
+                        "observation_count": 0,
+                        "thumbnail_url": self._media_url(
+                            observation.photo_asset, thumbnail=True
+                        ),
+                    },
+                )
+                entry["observation_count"] += 1
         result = self._trip_summary(trip)
         result.update(
             {
@@ -825,24 +1256,36 @@ class BirdService:
             .options(
                 selectinload(BirdingTrip.observation_links)
                 .selectinload(ObservationTripLink.observation)
-                .selectinload(Observation.location_link)
+                .selectinload(Observation.location_link),
+                selectinload(BirdingTrip.location_links),
             )
         )
         if trip is None:
             raise DomainError("观鸟行程不存在", 404)
-        location = self.session.get(BirdingLocation, payload.location_id)
-        if location is None:
-            raise DomainError("观鸟地点不存在", 404)
+        locations = self._trip_payload_locations(payload)
+        location_ids = {item.id for item in locations}
+        primary = next(item for item in locations if item.id == payload.primary_location_id)
         for link in trip.observation_links:
             observation = link.observation
             if not payload.started_at <= observation.observed_at <= payload.ended_at:
                 raise DomainError("新的行程时间无法包含当前全部关联观察", 422)
             if (
-                observation.location_link is None
-                or observation.location_link.location_id != payload.location_id
+                observation.location_link is not None
+                and observation.location_link.location_id not in location_ids
             ):
-                raise DomainError("新的行程地点与当前关联观察不一致", 422)
-        trip.location = location
+                raise DomainError("新的远征地点无法包含当前全部关联观察", 422)
+        trip.location = primary
+        trip.location_links.clear()
+        self.session.flush()
+        trip.location_links.extend(
+            TripLocation(
+                location=location,
+                visit_order=index,
+                is_primary=location.id == payload.primary_location_id,
+            )
+            for index, location in enumerate(locations, 1)
+        )
+        trip.name = payload.name or None
         trip.started_at = payload.started_at
         trip.ended_at = payload.ended_at
         trip.notes = payload.notes or None
@@ -855,10 +1298,14 @@ class BirdService:
         trip = self.session.scalar(
             select(BirdingTrip)
             .where(BirdingTrip.id == trip_id)
-            .options(selectinload(BirdingTrip.observation_links))
+            .options(
+                selectinload(BirdingTrip.observation_links),
+                selectinload(BirdingTrip.location_links),
+            )
         )
         if trip is None:
             raise DomainError("观鸟行程不存在", 404)
+        location_ids = {link.location_id for link in trip.location_links} or {trip.location_id}
         selected_ids = set(payload.observation_ids)
         observations = (
             self.session.scalars(
@@ -884,9 +1331,9 @@ class BirdService:
                 raise DomainError("所选观察已经属于其他观鸟行程", 409)
             if (
                 observation.location_link is not None
-                and observation.location_link.location_id != trip.location_id
+                and observation.location_link.location_id not in location_ids
             ):
-                raise DomainError("所选观察地点与行程地点不一致", 422)
+                raise DomainError("所选观察地点不属于该远征路线", 422)
         self.session.execute(
             delete(ObservationTripLink).where(
                 ObservationTripLink.trip_id == trip_id,
@@ -949,18 +1396,46 @@ class BirdService:
             (link.observation for link in trip.observation_links),
             key=lambda item: (item.observed_at, item.id),
         )
-        species_ids = {item.species_id for item in observations}
-        genus_ids = {item.species.genus_id for item in observations}
-        family_ids = {item.species.genus.family_id for item in observations}
+        entries = [entry for item in observations for entry in item.species_entries]
+        species_ids = {entry.species_id for entry in entries}
+        genus_ids = {entry.species.genus_id for entry in entries}
+        family_ids = {entry.species.genus.family_id for entry in entries}
         cover = self._selected_trip_observation(observations, trip.cover_observation_id)
+        location_links = sorted(trip.location_links, key=lambda item: item.visit_order)
+        locations = (
+            [
+                {
+                    "id": link.location.id,
+                    "catalog_number": link.location.catalog_number,
+                    "name": link.location.name,
+                    "visit_order": link.visit_order,
+                    "is_primary": link.is_primary,
+                }
+                for link in location_links
+            ]
+            if location_links
+            else [
+                {
+                    "id": trip.location.id,
+                    "catalog_number": trip.location.catalog_number,
+                    "name": trip.location.name,
+                    "visit_order": 1,
+                    "is_primary": True,
+                }
+            ]
+        )
         return {
             "id": trip.id,
             "catalog_number": trip.catalog_number,
+            "name": trip.name or trip.location.name,
+            "custom_name": trip.name,
             "location": {
                 "id": trip.location.id,
                 "catalog_number": trip.location.catalog_number,
                 "name": trip.location.name,
             },
+            "locations": locations,
+            "location_count": len(locations),
             "started_at": trip.started_at.isoformat(timespec="minutes"),
             "ended_at": trip.ended_at.isoformat(timespec="minutes"),
             "duration_minutes": int((trip.ended_at - trip.started_at).total_seconds() / 60),
@@ -970,9 +1445,7 @@ class BirdService:
             "genus_count": len(genus_ids),
             "family_count": len(family_ids),
             "cover_observation_id": cover.id if cover else None,
-            "cover_url": (
-                f"/api/media/{cover.photo_asset_id}?thumbnail=true" if cover else None
-            ),
+            "cover_url": self._media_url(cover.photo_asset, thumbnail=True) if cover else None,
         }
 
     @staticmethod
@@ -1026,7 +1499,7 @@ class BirdService:
         if location is None:
             raise DomainError("观鸟地点不存在", 404)
         if self.session.scalar(
-            select(func.count(BirdingTrip.id)).where(BirdingTrip.location_id == location_id)
+            select(func.count(TripLocation.id)).where(TripLocation.location_id == location_id)
         ):
             raise DomainError("该地点仍有关联的观鸟行程，请先删除行程", 409)
         unlinked_count = len(location.observation_links)
@@ -1043,9 +1516,11 @@ class BirdService:
             key=lambda item: (item.observed_at, item.id),
         )
         visit_days = {item.observed_at.date() for item in observations}
-        species_ids = {item.species_id for item in observations}
+        species_ids = {
+            entry.species_id for item in observations for entry in item.species_entries
+        }
         fallback_cover = observations[-1] if observations else None
-        custom_cover_asset_id = location.cover.asset_id if location.cover else None
+        custom_cover_asset = location.cover.asset if location.cover else None
         return {
             "id": location.id,
             "catalog_number": location.catalog_number,
@@ -1059,12 +1534,13 @@ class BirdService:
             "district": location.district,
             "center_latitude": location.center_latitude,
             "center_longitude": location.center_longitude,
+            "coordinate_system": location.coordinate_system,
             "radius_meters": location.radius_meters,
             "notes": location.notes,
             "observation_count": len(observations),
             "species_count": len(species_ids),
             "visit_day_count": len(visit_days),
-            "trip_count": len(location.trips),
+            "trip_count": len(location.trip_links) or len(location.trips),
             "first_observed_at": (
                 observations[0].observed_at.isoformat(timespec="minutes")
                 if observations
@@ -1076,17 +1552,17 @@ class BirdService:
                 else None
             ),
             "cover_url": (
-                f"/api/media/{custom_cover_asset_id}?thumbnail=true"
-                if custom_cover_asset_id is not None
+                self._media_url(custom_cover_asset, thumbnail=True)
+                if custom_cover_asset is not None
                 else (
-                    f"/api/media/{fallback_cover.photo_asset_id}?thumbnail=true"
+                    self._media_url(fallback_cover.photo_asset, thumbnail=True)
                     if fallback_cover
                     else None
                 )
             ),
             "cover_source": (
                 "custom"
-                if custom_cover_asset_id is not None
+                if custom_cover_asset is not None
                 else ("observation" if fallback_cover else None)
             ),
         }
@@ -1110,6 +1586,59 @@ class BirdService:
         ).all()
         return [self._observation_dict(item) for item in observations]
 
+    def homepage_feature(self) -> dict:
+        preference = self.session.get(HomeDisplayPreference, 1)
+        selected_id = preference.featured_observation_id if preference else None
+        observation = None
+        if selected_id is not None:
+            observation = self._homepage_observation_query().where(
+                Observation.id == selected_id
+            )
+            observation = self.session.scalar(observation)
+
+        selection_mode = "manual" if observation is not None else "latest"
+        if observation is None:
+            observation = self.session.scalar(
+                self._homepage_observation_query().order_by(
+                    Observation.observed_at.desc(), Observation.id.desc()
+                )
+            )
+
+        return {
+            "selection_mode": selection_mode,
+            "observation": self._observation_dict(observation) if observation else None,
+        }
+
+    def set_homepage_feature(self, observation_id: int | None) -> dict:
+        preference = self.session.get(HomeDisplayPreference, 1)
+        if preference is None:
+            preference = HomeDisplayPreference(id=1)
+            self.session.add(preference)
+
+        if observation_id is not None:
+            observation = self.session.get(Observation, observation_id)
+            if observation is None:
+                raise DomainError("观察记录不存在", 404)
+
+        preference.featured_observation_id = observation_id
+        self.session.commit()
+        return self.homepage_feature()
+
+    @staticmethod
+    def _homepage_observation_query():
+        return select(Observation).options(
+            selectinload(Observation.species),
+            selectinload(Observation.subspecies),
+            selectinload(Observation.photo_asset),
+            selectinload(Observation.audio_links).selectinload(ObservationAudio.asset),
+            selectinload(Observation.location_link).selectinload(
+                ObservationLocationLink.location
+            ),
+            selectinload(Observation.trip_link)
+            .selectinload(ObservationTripLink.trip)
+            .selectinload(BirdingTrip.location),
+        )
+
     def update_observation(
         self, observation_id: int, payload: ObservationUpdateInput
     ) -> dict:
@@ -1132,6 +1661,8 @@ class BirdService:
         if observation is None:
             raise DomainError("观察记录不存在", 404)
 
+        entry = next((item for item in observation.species_entries if item.is_primary), None)
+
         if observation.photo_type is PhotoType.GROUP:
             if any(
                 value is not None
@@ -1152,18 +1683,176 @@ class BirdService:
             observation.sex = payload.sex
             observation.life_stage = payload.life_stage
             observation.subspecies = selected_subspecies
+            if entry is not None:
+                entry.sex = payload.sex
+                entry.life_stage = payload.life_stage
+                entry.subspecies = selected_subspecies
 
         observation.notes = payload.notes or None
         self.session.commit()
         return self._observation_dict(observation)
 
-    def _observation_dict(self, item: Observation) -> dict:
+    def update_observation_species(
+        self,
+        observation_id: int,
+        entry_id: int,
+        payload: ObservationUpdateInput,
+    ) -> dict:
+        entry = self.session.scalar(
+            select(ObservationSpecies).where(
+                ObservationSpecies.id == entry_id,
+                ObservationSpecies.observation_id == observation_id,
+            )
+        )
+        if entry is None:
+            raise DomainError("观察中的物种条目不存在", 404)
+        if entry.photo_type is PhotoType.GROUP:
+            if any(
+                value is not None
+                for value in (payload.sex, payload.life_stage, payload.subspecies_id)
+            ):
+                raise DomainError("群体照片只能修改物种备注", 422)
+        else:
+            if payload.sex is None or payload.life_stage is None:
+                raise DomainError("个体照片必须保留性别和生命阶段", 422)
+            selected_subspecies = None
+            if payload.subspecies_id is not None:
+                selected_subspecies = self.session.get(Subspecies, payload.subspecies_id)
+                if (
+                    selected_subspecies is None
+                    or selected_subspecies.species_id != entry.species_id
+                ):
+                    raise DomainError("所选亚种不属于该物种", 422)
+            entry.sex = payload.sex
+            entry.life_stage = payload.life_stage
+            entry.subspecies = selected_subspecies
+        entry.notes = payload.notes or None
+        if entry.is_primary:
+            entry.observation.sex = entry.sex
+            entry.observation.life_stage = entry.life_stage
+            entry.observation.subspecies = entry.subspecies
+        self.session.commit()
+        return self._observation_dict(entry.observation)
+
+    def add_observation_species(
+        self, observation_id: int, payload: ObservationSpeciesInput
+    ) -> dict:
+        observation = self.session.scalar(
+            select(Observation)
+            .where(Observation.id == observation_id)
+            .options(selectinload(Observation.species_entries))
+        )
+        if observation is None:
+            raise DomainError("观察记录不存在", 404)
+        if len(observation.species_entries) >= 10:
+            raise DomainError("一笔观察最多记录 10 个物种", 422)
+        if any(entry.species_id == payload.species_id for entry in observation.species_entries):
+            raise DomainError("这笔观察已经记录了该物种", 422)
+        species = self.session.get(Species, payload.species_id)
+        if species is None:
+            raise DomainError("物种不存在", 404)
+        subspecies = None
+        if payload.subspecies_id is not None:
+            subspecies = self.session.get(Subspecies, payload.subspecies_id)
+            if subspecies is None or subspecies.species_id != species.id:
+                raise DomainError("所选亚种不属于该物种", 422)
+        observation.species_entries.append(
+            ObservationSpecies(
+                species=species,
+                subspecies=subspecies,
+                photo_type=payload.photo_type,
+                sex=payload.sex,
+                life_stage=payload.life_stage,
+                notes=payload.notes or None,
+                is_primary=False,
+            )
+        )
+        self.session.commit()
+        return self._observation_dict(observation)
+
+    def delete_observation_species(self, observation_id: int, entry_id: int) -> dict:
+        entry = self.session.scalar(
+            select(ObservationSpecies)
+            .where(
+                ObservationSpecies.id == entry_id,
+                ObservationSpecies.observation_id == observation_id,
+            )
+            .options(
+                selectinload(ObservationSpecies.species)
+                .selectinload(Species.genus)
+                .selectinload(Genus.family)
+                .selectinload(Family.order),
+                selectinload(ObservationSpecies.species)
+                .selectinload(Species.audio_links)
+                .selectinload(SpeciesAudio.asset),
+            )
+        )
+        if entry is None:
+            raise DomainError("观察中的物种条目不存在", 404)
+        observation = entry.observation
+        if len(observation.species_entries) <= 1:
+            raise DomainError("一笔观察必须至少保留一个物种", 422)
+        if entry.is_primary:
+            replacement = next(
+                item for item in observation.species_entries if item.id != entry.id
+            )
+            replacement.is_primary = True
+            observation.species = replacement.species
+            observation.photo_type = replacement.photo_type
+            observation.sex = replacement.sex
+            observation.life_stage = replacement.life_stage
+            observation.subspecies = replacement.subspecies
+        species = entry.species
+        self.session.delete(entry)
+        self.session.flush()
+        remaining = self.session.scalar(
+            select(func.count(ObservationSpecies.id)).where(
+                ObservationSpecies.species_id == species.id
+            )
+        )
+        removed_species = not remaining
+        asset_ids: set[int] = set()
+        if removed_species:
+            asset_ids.update(link.asset_id for link in species.audio_links)
+            genus_id = species.genus_id
+            family_id = species.genus.family_id
+            order_id = species.genus.family.order_id
+            self.session.delete(species)
+            self.session.flush()
+            self._prune_taxonomy(genus_id, family_id, order_id)
+        self.session.commit()
+        if asset_ids:
+            self._remove_unreferenced_assets(asset_ids)
+        return {
+            "deleted_entry_id": entry_id,
+            "removed_species": removed_species,
+        }
+
+    def _observation_dict(self, item: Observation, species_id: int | None = None) -> dict:
+        entries = sorted(item.species_entries, key=lambda value: (not value.is_primary, value.id))
+        if not entries:
+            entries = [
+                ObservationSpecies(
+                    id=0,
+                    observation_id=item.id,
+                    species=item.species,
+                    subspecies=item.subspecies,
+                    photo_type=item.photo_type,
+                    sex=item.sex,
+                    life_stage=item.life_stage,
+                    is_primary=True,
+                )
+            ]
+        focused_entry = next(
+            (entry for entry in entries if (entry.species_id or entry.species.id) == species_id),
+            entries[0],
+        )
         return {
             "id": item.id,
-            "species_id": item.species_id,
-            "species_name": item.species.chinese_name,
-            "species_scientific_name": item.species.scientific_name,
-            "catalog_number": item.species.catalog_number,
+            "species_id": focused_entry.species_id or focused_entry.species.id,
+            "species_name": focused_entry.species.chinese_name,
+            "species_scientific_name": focused_entry.species.scientific_name,
+            "catalog_number": focused_entry.species.catalog_number,
             "location": (
                 {
                     "id": item.location_link.location.id,
@@ -1177,6 +1866,8 @@ class BirdService:
                 {
                     "id": item.trip_link.trip.id,
                     "catalog_number": item.trip_link.trip.catalog_number,
+                    "name": item.trip_link.trip.name
+                    or item.trip_link.trip.location.name,
                     "started_at": item.trip_link.trip.started_at.isoformat(
                         timespec="minutes"
                     ),
@@ -1196,27 +1887,52 @@ class BirdService:
             "locality": item.locality,
             "season": item.season.value,
             "season_note": item.season_note,
-            "photo_type": item.photo_type.value,
-            "sex": item.sex.value if item.sex else None,
-            "life_stage": item.life_stage.value if item.life_stage else None,
+            "photo_type": focused_entry.photo_type.value,
+            "sex": focused_entry.sex.value if focused_entry.sex else None,
+            "life_stage": focused_entry.life_stage.value if focused_entry.life_stage else None,
             "subspecies": (
                 {
-                    "id": item.subspecies.id,
-                    "chinese_name": item.subspecies.chinese_name,
-                    "scientific_name": item.subspecies.scientific_name,
+                    "id": focused_entry.subspecies.id,
+                    "chinese_name": focused_entry.subspecies.chinese_name,
+                    "scientific_name": focused_entry.subspecies.scientific_name,
                 }
-                if item.subspecies
+                if focused_entry.subspecies
                 else None
             ),
             "notes": item.notes,
+            "species_count": len(entries),
+            "species_entries": [
+                {
+                    "id": entry.id,
+                    "species_id": entry.species_id or entry.species.id,
+                    "catalog_number": entry.species.catalog_number,
+                    "species_name": entry.species.chinese_name,
+                    "species_scientific_name": entry.species.scientific_name,
+                    "photo_type": entry.photo_type.value,
+                    "sex": entry.sex.value if entry.sex else None,
+                    "life_stage": entry.life_stage.value if entry.life_stage else None,
+                    "subspecies": (
+                        {
+                            "id": entry.subspecies.id,
+                            "chinese_name": entry.subspecies.chinese_name,
+                            "scientific_name": entry.subspecies.scientific_name,
+                        }
+                        if entry.subspecies
+                        else None
+                    ),
+                    "notes": entry.notes,
+                    "is_primary": entry.is_primary,
+                }
+                for entry in entries
+            ],
             "photo_asset_id": item.photo_asset_id,
-            "photo_url": f"/api/media/{item.photo_asset_id}",
-            "thumbnail_url": f"/api/media/{item.photo_asset_id}?thumbnail=true",
+            "photo_url": self._media_url(item.photo_asset),
+            "thumbnail_url": self._media_url(item.photo_asset, thumbnail=True),
             "audio": [
                 {
                     "id": link.id,
                     "asset_id": link.asset_id,
-                    "url": f"/api/media/{link.asset_id}",
+                    "url": self._media_url(link.asset),
                 }
                 for link in item.audio_links
             ],
@@ -1227,8 +1943,60 @@ class BirdService:
         return {
             "observation_id": observation.id,
             "asset_id": observation.photo_asset_id,
-            "thumbnail_url": f"/api/media/{observation.photo_asset_id}?thumbnail=true",
+            "photo_url": BirdService._media_url(observation.photo_asset),
+            "thumbnail_url": BirdService._media_url(
+                observation.photo_asset, thumbnail=True
+            ),
         }
+
+    @staticmethod
+    def _media_url(asset: MediaAsset, thumbnail: bool = False) -> str:
+        thumbnail_query = "thumbnail=true&" if thumbnail else ""
+        return f"/api/media/{asset.id}?{thumbnail_query}v={asset.sha256[:16]}"
+
+    def _selected_archive_proof(
+        self,
+        fallback: dict,
+        selections: dict[tuple[EvidenceDimension, str], int],
+        dimension: EvidenceDimension,
+        value_key: str,
+        observations_by_id: dict[int, Observation],
+        species_id: int,
+    ) -> dict:
+        selected_id = selections.get((dimension, value_key))
+        selected = observations_by_id.get(selected_id) if selected_id else None
+        if selected is not None and self._observation_matches_archive(
+            selected, dimension, value_key, species_id
+        ):
+            return self._proof(selected)
+        return fallback
+
+    @staticmethod
+    def _observation_matches_archive(
+        observation: Observation,
+        dimension: EvidenceDimension,
+        value_key: str,
+        species_id: int,
+    ) -> bool:
+        entry = next(
+            (item for item in observation.species_entries if item.species_id == species_id),
+            None,
+        )
+        if entry is None:
+            return False
+        if dimension is EvidenceDimension.SEX:
+            return entry.sex is not None and entry.sex.value == value_key
+        if dimension is EvidenceDimension.LIFE_STAGE:
+            return (
+                entry.life_stage is not None
+                and entry.life_stage.value == value_key
+            )
+        if dimension is EvidenceDimension.SUBSPECIES:
+            return (
+                entry.subspecies_id is not None
+                and str(entry.subspecies_id) == value_key
+            )
+        return False
 
     @staticmethod
     def _selected_observation(
@@ -1246,10 +2014,12 @@ class BirdService:
             .where(Observation.id == observation_id)
             .options(
                 selectinload(Observation.audio_links),
-                selectinload(Observation.species)
+                selectinload(Observation.species_entries)
+                .selectinload(ObservationSpecies.species)
                 .selectinload(Species.audio_links)
                 .selectinload(SpeciesAudio.asset),
-                selectinload(Observation.species)
+                selectinload(Observation.species_entries)
+                .selectinload(ObservationSpecies.species)
                 .selectinload(Species.genus)
                 .selectinload(Genus.family)
                 .selectinload(Family.order),
@@ -1258,28 +2028,39 @@ class BirdService:
         if observation is None:
             raise DomainError("观察记录不存在", 404)
 
-        species = observation.species
         asset_ids = {observation.photo_asset_id}
         asset_ids.update(link.asset_id for link in observation.audio_links)
-        observation_count = self.session.scalar(
-            select(func.count(Observation.id)).where(Observation.species_id == species.id)
-        )
-        removed_species = observation_count == 1
+        species_to_remove = []
+        for entry in observation.species_entries:
+            count = self.session.scalar(
+                select(func.count(ObservationSpecies.id)).where(
+                    ObservationSpecies.species_id == entry.species_id
+                )
+            )
+            if count == 1:
+                species_to_remove.append(entry.species)
+                asset_ids.update(link.asset_id for link in entry.species.audio_links)
 
-        if removed_species:
+        self.session.execute(delete(Observation).where(Observation.id == observation_id))
+        self.session.flush()
+        removed_species_ids = []
+        for species in species_to_remove:
             asset_ids.update(link.asset_id for link in species.audio_links)
             genus_id = species.genus_id
             family_id = species.genus.family_id
             order_id = species.genus.family.order_id
             self.session.execute(delete(Species).where(Species.id == species.id))
             self.session.flush()
+            removed_species_ids.append(species.id)
             self._prune_taxonomy(genus_id, family_id, order_id)
-        else:
-            self.session.execute(delete(Observation).where(Observation.id == observation_id))
 
         self.session.commit()
         self._remove_unreferenced_assets(asset_ids)
-        return {"deleted_observation_id": observation_id, "removed_species": removed_species}
+        return {
+            "deleted_observation_id": observation_id,
+            "removed_species": bool(removed_species_ids),
+            "removed_species_ids": removed_species_ids,
+        }
 
     def _prune_taxonomy(self, genus_id: int, family_id: int, order_id: int) -> None:
         if not self.session.scalar(

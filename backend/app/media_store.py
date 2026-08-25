@@ -17,6 +17,8 @@ from .config import Settings
 from .enums import MediaKind
 from .models import MediaAsset
 
+PHOTO_MAX_BYTES = 10 * 1024 * 1024
+
 
 class MediaValidationError(ValueError):
     pass
@@ -37,6 +39,9 @@ class MediaStore:
         if suffix not in {".jpg", ".jpeg"}:
             raise MediaValidationError("照片仅支持 JPEG/JPG")
         try:
+            upload.file.seek(0, os.SEEK_END)
+            if upload.file.tell() > PHOTO_MAX_BYTES:
+                raise MediaValidationError("照片大小不能超过 10 MB")
             upload.file.seek(0)
             with Image.open(upload.file) as image:
                 if image.format != "JPEG":
@@ -81,7 +86,11 @@ class MediaStore:
         if suffix not in {".jpg", ".jpeg"}:
             raise MediaValidationError("照片仅支持 JPEG/JPG")
 
-        temp_path, sha256, byte_size = await self._copy_to_temp(upload)
+        temp_path, sha256, byte_size = await self._copy_to_temp(
+            upload,
+            max_bytes=PHOTO_MAX_BYTES,
+            too_large_message="照片大小不能超过 10 MB",
+        )
         created_files: list[Path] = []
         try:
             try:
@@ -180,13 +189,21 @@ class MediaStore:
                 path.unlink(missing_ok=True)
             raise
 
-    async def _copy_to_temp(self, upload: UploadFile) -> tuple[Path, str, int]:
+    async def _copy_to_temp(
+        self,
+        upload: UploadFile,
+        *,
+        max_bytes: int | None = None,
+        too_large_message: str = "上传文件过大",
+    ) -> tuple[Path, str, int]:
         temp_path = self.settings.temp_dir / f"{uuid4().hex}.upload"
         hasher = hashlib.sha256()
         byte_size = 0
         try:
             with temp_path.open("wb") as destination:
                 while chunk := await upload.read(1024 * 1024):
+                    if max_bytes is not None and byte_size + len(chunk) > max_bytes:
+                        raise MediaValidationError(too_large_message)
                     destination.write(chunk)
                     hasher.update(chunk)
                     byte_size += len(chunk)
