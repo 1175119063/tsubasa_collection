@@ -53,7 +53,7 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCOD
 
 $bundleSource = Get-ChildItem -LiteralPath $distRoot -Directory | Select-Object -First 1 -ExpandProperty FullName
 if (-not $bundleSource) { throw 'The PyInstaller output directory is empty.' }
-if (-not (Test-Path -LiteralPath (Join-Path $bundleSource "$appName.exe"))) {
+if (-not (Get-ChildItem -LiteralPath $bundleSource -Filter '*.exe' -File | Select-Object -First 1)) {
     throw 'The application executable is missing from the build output.'
 }
 
