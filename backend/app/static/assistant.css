@@ -211,8 +211,14 @@ body.feather-panel-open { overflow: hidden; }
 .feather-tabs button.is-active { color: #fff; background: linear-gradient(120deg, #62509b, #317c79); box-shadow: 0 5px 14px rgba(58, 49, 101, .22); }
 .feather-mode { margin: 14px 24px 25px; padding: 20px; background: rgba(249, 247, 243, .66); border: 1px solid rgba(66, 54, 105, .13); box-shadow: 0 12px 35px rgba(38, 31, 74, .07); }
 .feather-mode h3, .feather-inline h3 { color: #30295f; }
-.feather-mode textarea, .feather-inline textarea { color: #27213f; background: rgba(255,255,255,.74); border-color: rgba(92, 73, 144, .3); border-radius: 3px; outline: none; transition: border-color .18s ease, box-shadow .18s ease; }
-.feather-mode textarea:focus, .feather-inline textarea:focus { border-color: #6f5ca6; box-shadow: 0 0 0 3px rgba(119, 97, 178, .12), 0 0 22px rgba(142, 231, 211, .1); }
+.feather-mode textarea, .feather-inline textarea, .feather-inline input { color: #27213f; background: rgba(255,255,255,.74); border-color: rgba(92, 73, 144, .3); border-radius: 3px; outline: none; transition: border-color .18s ease, box-shadow .18s ease; }
+.feather-mode textarea:focus, .feather-inline textarea:focus, .feather-inline input:focus { border-color: #6f5ca6; box-shadow: 0 0 0 3px rgba(119, 97, 178, .12), 0 0 22px rgba(142, 231, 211, .1); }
+.feather-inline input { width: 100%; margin: 9px 0; padding: 10px; }
+.feather-citations { margin: 12px 0; }
+.feather-citations summary { cursor: pointer; color: #4d4174; }
+.feather-citations article { margin-top: 9px; padding: 9px; background: rgba(255,255,255,.55); }
+.feather-citations article small { display: block; color: #777183; }
+.feather-citations article p { max-height: 120px; overflow: auto; white-space: pre-wrap; }
 .feather-action { background: linear-gradient(120deg, #55438d, #286b69); border-color: transparent; border-radius: 3px; box-shadow: 0 8px 20px rgba(57, 47, 103, .2); }
 .feather-action:hover:not(:disabled) { filter: brightness(1.08); }
 .feather-result { background: rgba(236, 248, 245, .65); border-color: rgba(69, 139, 131, .28); border-left: 3px solid #57aa9d; border-radius: 0 10px 10px 0; box-shadow: 0 8px 24px rgba(38, 31, 74, .06); }

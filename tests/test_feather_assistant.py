@@ -255,6 +255,58 @@ def test_structured_extraction_stays_local_when_external_chat_is_selected() -> N
     assert assistant.external_requests == []
 
 
+def test_taxonomy_research_uses_external_model_but_only_supplied_evidence() -> None:
+    assistant = HybridAssistant([])
+    assistant._request_openai_chat = lambda config, messages, **kwargs: json.dumps(
+        {
+            "order": {
+                "chinese_name": "雀形目",
+                "scientific_name": "Passeriformes",
+                "evidence": "Passeriformes",
+            },
+            "family": {
+                "chinese_name": "鹟科",
+                "scientific_name": "Muscicapidae",
+                "evidence": "Muscicapidae",
+            },
+            "genus": {
+                "chinese_name": None,
+                "scientific_name": "Larvivora",
+                "evidence": "Larvivora cyane",
+            },
+            "species": {
+                "chinese_name": "蓝歌鸲",
+                "scientific_name": "Larvivora cyane",
+                "evidence": "蓝歌鸲 Larvivora cyane",
+            },
+            "subspecies": [],
+            "missing_fields": ["subspecies"],
+            "warnings": ["资料未提供亚种信息"],
+        },
+        ensure_ascii=False,
+    )
+
+    result = assistant.research_species(
+        "蓝歌鸲",
+        "[资料 1] 蓝歌鸲 Larvivora cyane；Passeriformes；Muscicapidae。",
+    )
+
+    assert result.species.scientific_name == "Larvivora cyane"
+    assert result.subspecies == []
+
+
+def test_knowledge_search_plan_can_expand_chinese_name_for_document_lookup() -> None:
+    assistant = HybridAssistant([])
+    assistant._request_openai_chat = lambda *args, **kwargs: json.dumps(
+        {"query_terms": ["蓝歌鸲", "Siberian Blue Robin", "Larvivora cyane"]},
+        ensure_ascii=False,
+    )
+
+    result = assistant.plan_knowledge_search("蓝歌鸲")
+
+    assert "Larvivora cyane" in result.query_terms
+
+
 @pytest.mark.parametrize(
     ("base_url", "expected"),
     [

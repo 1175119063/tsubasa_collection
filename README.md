@@ -73,6 +73,12 @@ http://127.0.0.1:8000
 .\packaging\ollama\setup.ps1
 ```
 
+新增物种表单还提供“查阅本地资料”。把合法取得的 PDF、TXT 或 Markdown 放入
+`data/knowledge/` 后，飞羽精灵会按鸟名检索原文片段，再生成带出处的分类填写建议。
+该功能不内置完整鸟类名录、不自动建立全量分类数据库，也不会直接保存建议；资料不足或无法
+确定亚种时会保留空值。详细使用和资料元数据格式见
+[docs/KNOWLEDGE-LIBRARY.md](docs/KNOWLEDGE-LIBRARY.md)。
+
 模型状态可用 `ollama list` 和 `ollama ps` 检查，详细设置见 [packaging/ollama/README.md](packaging/ollama/README.md)。
 
 ## API 管理与地图

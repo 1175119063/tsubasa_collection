@@ -15,6 +15,8 @@ from .assistant_schemas import (
     AssistantChatInput,
     AssistantHelpInput,
     AssistantSearchInput,
+    AssistantTaxonomyResearchInput,
+    AssistantTaxonomyResearchResponse,
     AssistantTextInput,
     LlmIntegrationInput,
 )
@@ -265,6 +267,72 @@ async def feather_assistant_extract_species(
     except FeatherAssistantError as exc:
         raise assistant_error(exc) from exc
     return result.model_dump()
+
+
+@router.get("/assistant/knowledge")
+def feather_assistant_knowledge(request: Request) -> dict:
+    return request.app.state.knowledge_library.summary()
+
+
+@router.post("/assistant/taxonomy-research")
+async def feather_assistant_taxonomy_research(
+    payload: AssistantTaxonomyResearchInput,
+    request: Request,
+) -> dict:
+    try:
+        passages = await asyncio.to_thread(
+            request.app.state.knowledge_library.search,
+            payload.query,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if not passages:
+        try:
+            plan = await asyncio.to_thread(
+                request.app.state.feather_assistant.plan_knowledge_search,
+                payload.query,
+            )
+        except FeatherAssistantError as exc:
+            raise assistant_error(exc) from exc
+        collected = {}
+        for term in plan.query_terms:
+            for item in await asyncio.to_thread(
+                request.app.state.knowledge_library.search,
+                term,
+            ):
+                collected[(item.source_id, item.locator)] = item
+        passages = sorted(
+            collected.values(),
+            key=lambda item: (-item.score, item.title, item.locator),
+        )[:6]
+    if not passages:
+        raise HTTPException(404, "本地资料中没有找到相关证据，请补充资料或换一个名称。")
+    evidence = "\n\n".join(
+        f"[资料 {index}｜{item.title}｜{item.locator}]\n{item.excerpt}"
+        for index, item in enumerate(passages, start=1)
+    )
+    try:
+        extraction = await asyncio.to_thread(
+            request.app.state.feather_assistant.research_species,
+            payload.query,
+            evidence,
+        )
+    except FeatherAssistantError as exc:
+        raise assistant_error(exc) from exc
+    response = AssistantTaxonomyResearchResponse(
+        query=payload.query,
+        extraction=extraction,
+        citations=[
+            {
+                "source_id": item.source_id,
+                "title": item.title,
+                "locator": item.locator,
+                "excerpt": item.excerpt,
+            }
+            for item in passages
+        ],
+    )
+    return response.model_dump()
 
 
 @router.post("/assistant/search-parse")

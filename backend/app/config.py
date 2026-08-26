@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     def updates_dir(self) -> Path:
         return self.data_dir.parent / "updates"
 
+    @property
+    def knowledge_dir(self) -> Path:
+        return self.data_dir / "knowledge"
+
     def ensure_directories(self) -> None:
         for path in (
             self.data_dir,
@@ -65,5 +69,6 @@ class Settings(BaseSettings):
             self.temp_dir,
             self.backups_dir,
             self.updates_dir,
+            self.knowledge_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)

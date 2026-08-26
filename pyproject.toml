@@ -8,6 +8,7 @@ dependencies = [
     "fastapi",
     "mutagen",
     "pillow",
+    "pypdf",
     "pydantic-settings",
     "python-multipart",
     "sqlalchemy",

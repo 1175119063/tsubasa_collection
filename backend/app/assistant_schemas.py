@@ -37,6 +37,35 @@ class AssistantSpeciesExtraction(BaseModel):
     warnings: list[str] = Field(default_factory=list, max_length=20)
 
 
+class AssistantTaxonomyResearchInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    query: str = Field(min_length=2, max_length=300)
+
+
+class AssistantKnowledgeSearchPlan(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    query_terms: list[str] = Field(min_length=1, max_length=8)
+
+
+class AssistantKnowledgeCitation(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    source_id: str = Field(min_length=1, max_length=260)
+    title: str = Field(min_length=1, max_length=500)
+    locator: str = Field(min_length=1, max_length=100)
+    excerpt: str = Field(min_length=1, max_length=1800)
+
+
+class AssistantTaxonomyResearchResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str
+    extraction: AssistantSpeciesExtraction
+    citations: list[AssistantKnowledgeCitation] = Field(default_factory=list, max_length=8)
+
+
 class AssistantSearchInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 

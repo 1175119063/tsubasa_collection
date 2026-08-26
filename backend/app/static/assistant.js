@@ -138,7 +138,9 @@
     } catch (error) {
       status.textContent = error.message;
     }
-    document.querySelectorAll("#feather-panel .feather-action, #feather-species-extract").forEach((button) => {
+    document.querySelectorAll(
+      "#feather-panel .feather-action, #feather-species-extract, #feather-species-research",
+    ).forEach((button) => {
       button.disabled = !available;
     });
   }
@@ -221,16 +223,49 @@
     inline.className = "feather-inline full-field";
     inline.innerHTML = `
       <span class="feather-inline-badge">FEATHER ASSISTED ENTRY</span>
-      <h3>让飞羽精灵识别分类资料</h3>
-      <p>粘贴资料后，飞羽精灵只提取原文明确出现的名称。识别结果会先预览，不会直接保存。</p>
-      <textarea id="feather-species-source" maxlength="6000" placeholder="粘贴包含目、科、属、种、拉丁学名或亚种信息的资料…"></textarea>
-      <div class="feather-actions"><button class="feather-action" id="feather-species-extract" type="button" disabled>识别分类字段</button></div>
+      <h3>让飞羽精灵查阅本地资料</h3>
+      <p>输入鸟名可检索本地论文与书籍；也可以粘贴一段资料直接识别。结果均先预览，不会直接保存。</p>
+      <input id="feather-species-query" maxlength="300" placeholder="例如：蓝歌鸲" autocomplete="off" />
+      <textarea id="feather-species-source" maxlength="6000" placeholder="或者粘贴包含目、科、属、种、拉丁学名或亚种信息的资料…"></textarea>
+      <div class="feather-actions"><button class="feather-action" id="feather-species-research" type="button" disabled>查阅本地资料</button><button class="feather-action" id="feather-species-extract" type="button" disabled>识别粘贴内容</button></div>
       <div class="feather-result" id="feather-species-result" hidden></div>`;
     fields.prepend(inline);
     const source = document.getElementById("feather-species-source");
+    const query = document.getElementById("feather-species-query");
+    const researchButton = document.getElementById("feather-species-research");
     const button = document.getElementById("feather-species-extract");
     const result = document.getElementById("feather-species-result");
     button.disabled = !available;
+    researchButton.disabled = !available;
+    function renderExtraction(data, citations = []) {
+      extraction = data;
+      const rows = [
+        ["目", data.order], ["科", data.family], ["属", data.genus], ["种", data.species],
+        ["亚种", { chinese_name: data.subspecies.map((item) => item.chinese_name).filter(Boolean).join("、"), scientific_name: data.subspecies.map((item) => item.scientific_name).filter(Boolean).join("、") }],
+      ];
+      const sources = citations.length ? `<details class="feather-citations"><summary>查看 ${citations.length} 条本地资料证据</summary>${citations.map((item) => `<article><b>${esc(item.title)}</b><small>${esc(item.locator)} · ${esc(item.source_id)}</small><p>${esc(item.excerpt)}</p></article>`).join("")}</details>` : "";
+      result.innerHTML = `<strong>填写建议</strong><div class="feather-extraction-grid">${rows.map(([label, item]) => `<span><small>${label}</small><b>${esc([item.chinese_name, item.scientific_name].filter(Boolean).join(" · ") || "资料不足")}</b></span>`).join("")}</div>${data.warnings.length ? `<ul>${data.warnings.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : ""}${sources}<div class="feather-actions"><button class="feather-action" type="button" data-feather-fill-species>填写到表单</button></div>`;
+    }
+    researchButton.addEventListener("click", async () => {
+      if (!available || !query.value.trim()) return;
+      researchButton.disabled = true;
+      researchButton.textContent = "正在查阅…";
+      result.hidden = false;
+      result.innerHTML = "<p>我正在本地书架中寻找能够直接支持分类字段的证据…</p>";
+      try {
+        const response = await Yuhen.api("/api/assistant/taxonomy-research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: query.value }),
+        });
+        renderExtraction(response.extraction, response.citations);
+      } catch (error) {
+        result.innerHTML = `<strong>查阅未完成</strong><p>${esc(error.message)}</p>`;
+      } finally {
+        researchButton.disabled = !available;
+        researchButton.textContent = "查阅本地资料";
+      }
+    });
     button.addEventListener("click", async () => {
       if (!available || !source.value.trim()) return;
       button.disabled = true;
@@ -238,16 +273,12 @@
       result.hidden = false;
       result.innerHTML = "<p>稍等一下，探险家。我正在核对原文里的分类铭文…</p>";
       try {
-        extraction = await Yuhen.api("/api/assistant/species-extract", {
+        const response = await Yuhen.api("/api/assistant/species-extract", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: source.value }),
         });
-        const rows = [
-          ["目", extraction.order], ["科", extraction.family], ["属", extraction.genus], ["种", extraction.species],
-          ["亚种", { chinese_name: extraction.subspecies.map((item) => item.chinese_name).filter(Boolean).join("、"), scientific_name: extraction.subspecies.map((item) => item.scientific_name).filter(Boolean).join("、") }],
-        ];
-        result.innerHTML = `<strong>识别预览</strong><div class="feather-extraction-grid">${rows.map(([label, item]) => `<span><small>${label}</small><b>${esc([item.chinese_name, item.scientific_name].filter(Boolean).join(" · ") || "未识别")}</b></span>`).join("")}</div>${extraction.warnings.length ? `<ul>${extraction.warnings.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : ""}<div class="feather-actions"><button class="feather-action" type="button" data-feather-fill-species>填写到表单</button></div>`;
+        renderExtraction(response);
       } catch (error) {
         result.innerHTML = `<strong>识别失败</strong><p>${esc(error.message)}</p>`;
       } finally {

@@ -13,6 +13,7 @@ from .config import Settings
 from .database import Database
 from .feather_assistant import FeatherAssistant
 from .integration_store import IntegrationStore
+from .knowledge_service import KnowledgeLibrary
 from .media_store import MediaStore
 from .update_service import UpdateService
 
@@ -32,6 +33,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.backup_service = BackupService(app_settings)
         app.state.update_service = UpdateService(app_settings)
         app.state.integration_store = IntegrationStore(app_settings)
+        app.state.knowledge_library = KnowledgeLibrary(app_settings.knowledge_dir)
+        app.state.knowledge_library.ensure_directories()
         app.state.feather_assistant = FeatherAssistant(
             app_settings,
             app.state.integration_store,

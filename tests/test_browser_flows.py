@@ -135,6 +135,54 @@ def test_browser_can_create_observation(browser_app, tmp_path):
     page.locator(".v2-field-card", has_text="白腰文鸟").wait_for()
 
 
+def test_browser_can_research_local_knowledge_and_fill_taxonomy(browser_app):
+    page, base_url, _data_dir = browser_app
+    page.route(
+        "**/api/assistant/status",
+        lambda route: route.fulfill(
+            json={"enabled": True, "available": True, "message": "飞羽精灵已经醒来。"}
+        ),
+    )
+    page.route(
+        "**/api/assistant/taxonomy-research",
+        lambda route: route.fulfill(
+            json={
+                "query": "蓝歌鸲",
+                "extraction": {
+                    "order": {"chinese_name": "雀形目", "scientific_name": "Passeriformes"},
+                    "family": {"chinese_name": "鹟科", "scientific_name": "Muscicapidae"},
+                    "genus": {"chinese_name": None, "scientific_name": "Larvivora"},
+                    "species": {"chinese_name": "蓝歌鸲", "scientific_name": "Larvivora cyane"},
+                    "subspecies": [],
+                    "missing_fields": ["subspecies"],
+                    "warnings": ["资料没有提供可确认的亚种"],
+                },
+                "citations": [
+                    {
+                        "source_id": "paper.pdf",
+                        "title": "Local paper",
+                        "locator": "片段 1",
+                        "excerpt": "Larvivora cyane (Passeriformes: Muscicapidae)",
+                    }
+                ],
+            }
+        ),
+    )
+
+    page.goto(f"{base_url}/observations?new=1")
+    page.locator("#record-dialog").wait_for(state="visible")
+    page.locator("#species-select").select_option("new")
+    research = page.locator("#feather-species-research")
+    research.wait_for(state="visible")
+    assert research.is_enabled()
+    page.locator("#feather-species-query").fill("蓝歌鸲")
+    research.click()
+    page.locator("[data-feather-fill-species]").click()
+
+    assert page.locator('input[name="species_chinese"]').input_value() == "蓝歌鸲"
+    assert page.locator('input[name="species_scientific"]').input_value() == "Larvivora cyane"
+
+
 def test_browser_can_permanently_delete_observation(browser_app):
     page, base_url, _data_dir = browser_app
     post_observation(base_url)
