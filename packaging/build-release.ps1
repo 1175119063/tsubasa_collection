@@ -20,8 +20,8 @@ if (-not $pyInstaller) {
     throw 'PyInstaller was not found in the project environment or PATH.'
 }
 $specPath = Join-Path $packagingRoot 'tsubasa.spec'
-$appName = -join @([char]0x7FFC, [char]0x00B7, [char]0x65F6, [char]0x5149, [char]0x8BB0)
-$blankLabel = -join @([char]0x7A7A, [char]0x767D, [char]0x7248)
+$appName = 'tsubasa'
+$blankLabel = 'blank'
 $blankName = "$appName-Windows-v$Version-$blankLabel"
 $blankDir = Join-Path $releaseRoot $blankName
 $blankZip = Join-Path $releaseRoot "$blankName.zip"
@@ -51,7 +51,8 @@ Write-Host "[1/4] Building Windows application v$Version" -ForegroundColor Cyan
 & $pyInstaller --noconfirm --clean --distpath $distRoot --workpath $buildRoot $specPath
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCODE" }
 
-$bundleSource = Join-Path $distRoot $appName
+$bundleSource = Get-ChildItem -LiteralPath $distRoot -Directory | Select-Object -First 1 -ExpandProperty FullName
+if (-not $bundleSource) { throw 'The PyInstaller output directory is empty.' }
 if (-not (Test-Path -LiteralPath (Join-Path $bundleSource "$appName.exe"))) {
     throw 'The application executable is missing from the build output.'
 }
