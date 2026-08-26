@@ -1,8 +1,8 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "0.2.0"
+  #define MyAppVersion "0.3.0"
 #endif
 #ifndef MySourceDir
-  #define MySourceDir "release\翼·时光记-Windows-v0.2.0-空白版"
+  #define MySourceDir "release\翼·时光记-Windows-v0.3.0-空白版"
 #endif
 
 [Setup]

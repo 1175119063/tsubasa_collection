@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 class Settings(BaseSettings):
     app_name: str = "翼·时光记"
-    app_version: str = "0.2.0"
+    app_version: str = "0.3.0"
     data_dir: Path = PROJECT_ROOT / "data"
     amap_web_service_key: str | None = None
     feather_assistant_enabled: bool = True
