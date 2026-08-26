@@ -13,7 +13,11 @@ if (-not (Test-Path -LiteralPath $pyInstaller)) {
         Select-Object -First 1 -ExpandProperty FullName
 }
 if (-not $pyInstaller) {
-    throw 'PyInstaller was not found in the project Conda environments.'
+    $pyInstallerCommand = Get-Command pyinstaller.exe -ErrorAction SilentlyContinue
+    if ($pyInstallerCommand) { $pyInstaller = $pyInstallerCommand.Source }
+}
+if (-not $pyInstaller) {
+    throw 'PyInstaller was not found in the project environment or PATH.'
 }
 $specPath = Join-Path $packagingRoot 'tsubasa.spec'
 $appName = -join @([char]0x7FFC, [char]0x00B7, [char]0x65F6, [char]0x5149, [char]0x8BB0)
