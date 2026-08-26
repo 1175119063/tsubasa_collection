@@ -1,4 +1,4 @@
-window.Yuhen = {
+window.Tsubasa = {
   labels: {
     spring: "春", summer: "夏", autumn: "秋", winter: "冬", other: "其他",
     male: "雄性", female: "雌性", egg: "卵", chick: "雏鸟", subadult: "亚成", adult: "成鸟",

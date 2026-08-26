@@ -28,5 +28,5 @@ ollama ps
 若不希望启用本地助手，可在 `.env` 中设置：
 
 ```dotenv
-YUHEN_FEATHER_ASSISTANT_ENABLED=false
+TSUBASA_FEATHER_ASSISTANT_ENABLED=false
 ```

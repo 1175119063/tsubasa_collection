@@ -62,7 +62,7 @@ class AmapService:
 
     def _get(self, path: str, parameters: dict[str, str]) -> dict:
         url = f"{self.base_url}/{path}?{urlencode({**parameters, 'key': self.key})}"
-        request = Request(url, headers={"User-Agent": "Yuhen-Field-Journal/0.2"})
+        request = Request(url, headers={"User-Agent": "Tsubasa-Field-Journal/0.2"})
         try:
             with urlopen(request, timeout=8) as response:  # noqa: S310
                 payload = json.loads(response.read().decode("utf-8"))

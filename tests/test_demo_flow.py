@@ -223,7 +223,7 @@ def test_complete_demo_flow_and_species_id_is_never_reused(tmp_path):
         assert "/static/assets/wing-chronicle-logo.png" in locations_page.text
         assert "/static/assets/wing-chronicle-logo.png" in trips_page.text
         home_script = client.get("/static/v2.js").text
-        assert 'Yuhen.api("/api/home/cover")' in home_script
+        assert 'Tsubasa.api("/api/home/cover")' in home_script
         assert "data-home-cover-observation" in home_script
         assert 'id="new-location-button"' in locations_page.text
         assert 'id="location-grid"' in locations_page.text

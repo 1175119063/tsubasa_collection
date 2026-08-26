@@ -1,5 +1,5 @@
 [project]
-name = "yuhen"
+name = "tsubasa"
 version = "0.2.0"
 description = "羽迹：本地鸟类观察记录与个人图鉴"
 requires-python = ">=3.11"

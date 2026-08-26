@@ -12,10 +12,10 @@ function observationSpeciesEntries(item) {
 
 async function loadPage() {
   const [species, observations, taxonomy, locations] = await Promise.all([
-    Yuhen.api("/api/species"),
-    Yuhen.api("/api/observations"),
-    Yuhen.api("/api/taxonomy/tree"),
-    Yuhen.api("/api/locations"),
+    Tsubasa.api("/api/species"),
+    Tsubasa.api("/api/observations"),
+    Tsubasa.api("/api/taxonomy/tree"),
+    Tsubasa.api("/api/locations"),
   ]);
   state.species = species;
   state.observations = observations;
@@ -35,7 +35,7 @@ function populateAdditionalSpeciesSelect() {
   const selectedIds = new Set(state.additionalSpecies.map((item) => String(item.id)));
   select.innerHTML = `<option value="">选择物种</option>${state.species
     .filter((item) => String(item.id) !== primaryId && !selectedIds.has(String(item.id)))
-    .map((item) => `<option value="${item.id}">${Yuhen.escapeHtml(item.chinese_name)} · ${Yuhen.escapeHtml(item.scientific_name)}</option>`)
+    .map((item) => `<option value="${item.id}">${Tsubasa.escapeHtml(item.chinese_name)} · ${Tsubasa.escapeHtml(item.scientific_name)}</option>`)
     .join("")}`;
 }
 
@@ -43,12 +43,12 @@ function renderAdditionalSpecies() {
   const container = byId("additional-species-list");
   container.innerHTML = state.additionalSpecies.length ? state.additionalSpecies.map((item) => `
     <article class="additional-species-entry" data-additional-species="${item.id}">
-      <header><span><strong>${Yuhen.escapeHtml(item.chinese_name)}</strong><small>${Yuhen.escapeHtml(item.scientific_name)}</small></span><button type="button" data-remove-additional-species="${item.id}">移除</button></header>
+      <header><span><strong>${Tsubasa.escapeHtml(item.chinese_name)}</strong><small>${Tsubasa.escapeHtml(item.scientific_name)}</small></span><button type="button" data-remove-additional-species="${item.id}">移除</button></header>
       <div class="form-grid">
         <label>照片类型<select data-additional-photo-type><option value="individual">个体照片</option><option value="group">群体照片</option></select></label>
         <label data-additional-individual>性别<select data-additional-sex><option value="unknown">未知</option><option value="male">雄性</option><option value="female">雌性</option></select></label>
         <label data-additional-individual>生命阶段<select data-additional-life-stage><option value="unknown">未知</option><option value="egg">卵</option><option value="chick">雏鸟</option><option value="subadult">亚成</option><option value="adult">成鸟</option></select></label>
-        <label data-additional-individual>亚种<select data-additional-subspecies><option value="">未知 / 无亚种</option>${(item.subspecies || []).map((subspecies) => `<option value="${subspecies.id}">${Yuhen.escapeHtml(subspecies.chinese_name || subspecies.scientific_name)}</option>`).join("")}</select></label>
+        <label data-additional-individual>亚种<select data-additional-subspecies><option value="">未知 / 无亚种</option>${(item.subspecies || []).map((subspecies) => `<option value="${subspecies.id}">${Tsubasa.escapeHtml(subspecies.chinese_name || subspecies.scientific_name)}</option>`).join("")}</select></label>
         <label class="full-field">该物种备注<textarea data-additional-notes rows="2" placeholder="例如：位于画面右侧、约五只"></textarea></label>
       </div>
     </article>`).join("") : '<p class="field-hint">尚未添加其他物种。</p>';
@@ -59,7 +59,7 @@ async function addAdditionalSpecies() {
   const speciesId = Number(byId("additional-species-select").value);
   if (!speciesId || state.additionalSpecies.length >= 9) return;
   const summary = state.species.find((item) => item.id === speciesId);
-  const detail = await Yuhen.api(`/api/species/${speciesId}`);
+  const detail = await Tsubasa.api(`/api/species/${speciesId}`);
   state.additionalSpecies.push({ ...summary, subspecies: detail.subspecies });
   renderAdditionalSpecies();
 }
@@ -80,7 +80,7 @@ function additionalSpeciesPayload() {
 
 function populateLocationSelectors() {
   const options = state.locations.map((item) =>
-    `<option value="${item.id}">${Yuhen.escapeHtml(item.name)} · ${Yuhen.escapeHtml(item.admin1_name)}</option>`
+    `<option value="${item.id}">${Tsubasa.escapeHtml(item.name)} · ${Tsubasa.escapeHtml(item.admin1_name)}</option>`
   ).join("");
   const recordSelect = byId("location-select");
   const currentRecord = recordSelect.value;
@@ -117,7 +117,7 @@ function renderLocationSearchResults() {
   const matches = matchingLocations(query);
   results.innerHTML = matches.length ? matches.slice(0, 10).map((item) => `
     <button type="button" class="species-search-result location-search-result" role="option" data-location-result="${item.id}">
-      <span><strong>${Yuhen.escapeHtml(item.name)}</strong><em>${Yuhen.escapeHtml(item.admin1_name)}</em><small>${Yuhen.escapeHtml(item.catalog_number)} · ${Yuhen.escapeHtml(item.country_name)}</small></span><b>选择</b>
+      <span><strong>${Tsubasa.escapeHtml(item.name)}</strong><em>${Tsubasa.escapeHtml(item.admin1_name)}</em><small>${Tsubasa.escapeHtml(item.catalog_number)} · ${Tsubasa.escapeHtml(item.country_name)}</small></span><b>选择</b>
     </button>
   `).join("") : '<p class="species-search-empty">没有匹配地点。</p>';
   results.hidden = false;
@@ -162,7 +162,7 @@ function renderTaxonomySearch(level) {
   }
   results.innerHTML = matches.length ? matches.slice(0, 10).map((item) => `
     <button type="button" class="species-search-result taxonomy-search-result" role="option" data-taxonomy-level="${level}" data-taxonomy-result="${item.id}">
-      <span><strong>${Yuhen.escapeHtml(item.chinese_name)}</strong><em>${Yuhen.escapeHtml(item.scientific_name)}</em></span><b>选择</b>
+      <span><strong>${Tsubasa.escapeHtml(item.chinese_name)}</strong><em>${Tsubasa.escapeHtml(item.scientific_name)}</em></span><b>选择</b>
     </button>
   `).join("") : '<p class="species-search-empty">没有匹配结果，可以选择新增。</p>';
   results.hidden = false;
@@ -250,18 +250,18 @@ function renderObservations() {
     <button type="button" class="record-tile" data-observation-id="${item.id}">
       <img src="${item.thumbnail_url}" alt="观察照片" loading="lazy" />
       <span class="record-tile-body">
-        <strong>${Yuhen.escapeHtml(observationSpeciesEntries(item).map((entry) => entry.species_name).join("、"))}</strong>
-        <span>${Yuhen.escapeHtml(item.observed_at.replace("T", " "))}</span>
-        <span>${Yuhen.escapeHtml(item.admin1_name)} · ${Yuhen.escapeHtml(item.locality)}</span>
-        ${item.location ? `<span>地点档案 · ${Yuhen.escapeHtml(item.location.name)}</span>` : ""}
-        <span>${Yuhen.labels[item.season] || Yuhen.escapeHtml(item.season)} · ${item.species_count} 个物种</span>
+        <strong>${Tsubasa.escapeHtml(observationSpeciesEntries(item).map((entry) => entry.species_name).join("、"))}</strong>
+        <span>${Tsubasa.escapeHtml(item.observed_at.replace("T", " "))}</span>
+        <span>${Tsubasa.escapeHtml(item.admin1_name)} · ${Tsubasa.escapeHtml(item.locality)}</span>
+        ${item.location ? `<span>地点档案 · ${Tsubasa.escapeHtml(item.location.name)}</span>` : ""}
+        <span>${Tsubasa.labels[item.season] || Tsubasa.escapeHtml(item.season)} · ${item.species_count} 个物种</span>
       </span>
     </button>`).join("")}</div>
     </section>`).join("");
 }
 
 function valueLabel(value, emptyLabel = "未知") {
-  return value ? (Yuhen.labels[value] || value) : emptyLabel;
+  return value ? (Tsubasa.labels[value] || value) : emptyLabel;
 }
 
 function openObservationDetail(observationId) {
@@ -276,25 +276,25 @@ function openObservationDetail(observationId) {
     : `<span class="preview-empty">没有附带录音</span>`;
   byId("observation-detail-content").innerHTML = `
     <article class="observation-preview-layout">
-      <div class="observation-preview-photo"><img src="${item.photo_url}" alt="${Yuhen.escapeHtml(item.species_name)}" /></div>
+      <div class="observation-preview-photo"><img src="${item.photo_url}" alt="${Tsubasa.escapeHtml(item.species_name)}" /></div>
       <div class="observation-preview-info">
         <div class="observation-preview-scroll">
-          <p class="eyebrow">${Yuhen.escapeHtml(item.catalog_number)} · OBSERVATION ${item.id}</p>
-          <h2>${Yuhen.escapeHtml(item.species_name)}</h2>
-          <p class="latin">${Yuhen.escapeHtml(item.species_scientific_name)}</p>
+          <p class="eyebrow">${Tsubasa.escapeHtml(item.catalog_number)} · OBSERVATION ${item.id}</p>
+          <h2>${Tsubasa.escapeHtml(item.species_name)}</h2>
+          <p class="latin">${Tsubasa.escapeHtml(item.species_scientific_name)}</p>
           <dl class="observation-facts">
-            <div><dt>拍摄时间</dt><dd>${Yuhen.escapeHtml(item.observed_at.replace("T", " "))}</dd></div>
-            <div><dt>拍摄地点</dt><dd>${Yuhen.escapeHtml(item.country_name)} · ${Yuhen.escapeHtml(item.admin1_name)} · ${Yuhen.escapeHtml(item.locality)}</dd></div>
-            <div><dt>地点档案</dt><dd>${item.location ? `<a href="/locations?location=${item.location.id}">${Yuhen.escapeHtml(item.location.name)}</a>` : "未关联"}</dd></div>
-            <div><dt>所属行程</dt><dd>${item.trip ? `<a href="/trips?trip=${item.trip.id}">${Yuhen.escapeHtml(item.trip.catalog_number)} · ${Yuhen.escapeHtml(item.trip.name)}</a>` : "未关联"}</dd></div>
+            <div><dt>拍摄时间</dt><dd>${Tsubasa.escapeHtml(item.observed_at.replace("T", " "))}</dd></div>
+            <div><dt>拍摄地点</dt><dd>${Tsubasa.escapeHtml(item.country_name)} · ${Tsubasa.escapeHtml(item.admin1_name)} · ${Tsubasa.escapeHtml(item.locality)}</dd></div>
+            <div><dt>地点档案</dt><dd>${item.location ? `<a href="/locations?location=${item.location.id}">${Tsubasa.escapeHtml(item.location.name)}</a>` : "未关联"}</dd></div>
+            <div><dt>所属行程</dt><dd>${item.trip ? `<a href="/trips?trip=${item.trip.id}">${Tsubasa.escapeHtml(item.trip.catalog_number)} · ${Tsubasa.escapeHtml(item.trip.name)}</a>` : "未关联"}</dd></div>
             <div><dt>经纬度</dt><dd>${item.latitude}, ${item.longitude}</dd></div>
-            <div><dt>季节</dt><dd>${Yuhen.escapeHtml(valueLabel(item.season))}</dd></div>
+            <div><dt>季节</dt><dd>${Tsubasa.escapeHtml(valueLabel(item.season))}</dd></div>
             <div><dt>照片类型</dt><dd>${individual ? "个体照片" : "群体照片"}</dd></div>
-            ${individual ? `<div><dt>性别</dt><dd>${Yuhen.escapeHtml(valueLabel(item.sex))}</dd></div>
-            <div><dt>生命阶段</dt><dd>${Yuhen.escapeHtml(valueLabel(item.life_stage))}</dd></div>
-            <div><dt>亚种</dt><dd>${Yuhen.escapeHtml(subspecies)}</dd></div>` : ""}
+            ${individual ? `<div><dt>性别</dt><dd>${Tsubasa.escapeHtml(valueLabel(item.sex))}</dd></div>
+            <div><dt>生命阶段</dt><dd>${Tsubasa.escapeHtml(valueLabel(item.life_stage))}</dd></div>
+            <div><dt>亚种</dt><dd>${Tsubasa.escapeHtml(subspecies)}</dd></div>` : ""}
           </dl>
-          <section class="preview-notes"><h3>备注</h3><p>${Yuhen.escapeHtml(item.notes || "无备注")}</p></section>
+          <section class="preview-notes"><h3>备注</h3><p>${Tsubasa.escapeHtml(item.notes || "无备注")}</p></section>
           <section class="preview-audio-list"><h3>录音</h3>${audio}</section>
           <div id="observation-edit-container"></div>
         </div>
@@ -309,7 +309,7 @@ function openObservationDetail(observationId) {
 
 function enumOptions(values, selected) {
   return values.map((value) =>
-    `<option value="${value}" ${value === selected ? "selected" : ""}>${Yuhen.escapeHtml(valueLabel(value))}</option>`
+    `<option value="${value}" ${value === selected ? "selected" : ""}>${Tsubasa.escapeHtml(valueLabel(value))}</option>`
   ).join("");
 }
 
@@ -319,24 +319,24 @@ async function showObservationEditor(observationId, requestedEntryId = null) {
   const entries = observationSpeciesEntries(item);
   const entry = entries.find((value) => value.id === Number(requestedEntryId)) || entries[0];
   const individual = entry.photo_type === "individual";
-  const speciesDetail = individual ? await Yuhen.api(`/api/species/${entry.species_id}`) : null;
+  const speciesDetail = individual ? await Tsubasa.api(`/api/species/${entry.species_id}`) : null;
   const subspeciesOptions = speciesDetail
     ? speciesDetail.subspecies.map((subspecies) => {
       const selected = entry.subspecies?.id === subspecies.id ? "selected" : "";
       const label = `${subspecies.chinese_name ? `${subspecies.chinese_name} · ` : ""}${subspecies.scientific_name}`;
-      return `<option value="${subspecies.id}" ${selected}>${Yuhen.escapeHtml(label)}</option>`;
+      return `<option value="${subspecies.id}" ${selected}>${Tsubasa.escapeHtml(label)}</option>`;
     }).join("")
     : "";
   const existingSpeciesIds = new Set(entries.map((value) => value.species_id));
   const addSpeciesOptions = state.species.filter((value) => !existingSpeciesIds.has(value.id)).map((value) =>
-    `<option value="${value.id}">${Yuhen.escapeHtml(value.chinese_name)} · ${Yuhen.escapeHtml(value.scientific_name)}</option>`
+    `<option value="${value.id}">${Tsubasa.escapeHtml(value.chinese_name)} · ${Tsubasa.escapeHtml(value.scientific_name)}</option>`
   ).join("");
   const container = byId("observation-edit-container");
   container.innerHTML = `
     <form id="observation-edit-form" class="observation-edit-form">
       <header><h3>修改观察记录</h3><span>照片、时间与地点不可修改</span></header>
       <section class="observation-species-manager">
-        <label>正在编辑的物种<select data-edit-species-entry>${entries.map((value) => `<option value="${value.id}" ${value.id === entry.id ? "selected" : ""}>${Yuhen.escapeHtml(value.species_name)}${value.is_primary ? " · 主记录" : ""}</option>`).join("")}</select></label>
+        <label>正在编辑的物种<select data-edit-species-entry>${entries.map((value) => `<option value="${value.id}" ${value.id === entry.id ? "selected" : ""}>${Tsubasa.escapeHtml(value.species_name)}${value.is_primary ? " · 主记录" : ""}</option>`).join("")}</select></label>
         <div class="observation-add-species">
           <label>加入其他物种<select data-new-observation-species><option value="">选择尚未记录的物种</option>${addSpeciesOptions}</select></label>
           <label>照片类型<select data-new-species-photo-type><option value="individual">个体照片</option><option value="group">群体照片</option></select></label>
@@ -348,8 +348,8 @@ async function showObservationEditor(observationId, requestedEntryId = null) {
         <label>生命阶段<select name="life_stage">${enumOptions(["unknown", "egg", "chick", "subadult", "adult"], entry.life_stage)}</select></label>
         <label class="full-field">亚种<select name="subspecies_id"><option value="">未知 / 无亚种</option>${subspeciesOptions}</select></label>
       </div>` : `<p class="field-hint">这是群体照片，只能修改备注。</p>`}
-      <label>物种备注<textarea name="entry_notes" rows="3">${Yuhen.escapeHtml(entry.notes || "")}</textarea></label>
-      <label>整笔观察备注<textarea name="notes" rows="4">${Yuhen.escapeHtml(item.notes || "")}</textarea></label>
+      <label>物种备注<textarea name="entry_notes" rows="3">${Tsubasa.escapeHtml(entry.notes || "")}</textarea></label>
+      <label>整笔观察备注<textarea name="notes" rows="4">${Tsubasa.escapeHtml(item.notes || "")}</textarea></label>
       <div class="observation-edit-actions">
         <span id="observation-edit-status" role="status"></span>
         <button type="button" class="danger-button" data-delete-observation-species ${entries.length === 1 ? "disabled title=\"一笔观察必须至少保留一个物种\"" : ""}>删除当前物种信息</button>
@@ -372,7 +372,7 @@ async function showObservationEditor(observationId, requestedEntryId = null) {
     const photoType = editForm.querySelector("[data-new-species-photo-type]").value;
     event.currentTarget.disabled = true;
     try {
-      const updated = await Yuhen.api(`/api/observations/${item.id}/species`, {
+      const updated = await Tsubasa.api(`/api/observations/${item.id}/species`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ species_id: speciesId, photo_type: photoType, sex: photoType === "individual" ? "unknown" : null, life_stage: photoType === "individual" ? "unknown" : null, subspecies_id: null, notes: null }),
@@ -389,8 +389,8 @@ async function showObservationEditor(observationId, requestedEntryId = null) {
     if (event.currentTarget.disabled || !confirm(`从这笔观察中删除“${entry.species_name}”的观察信息吗？照片和其他物种信息会保留。`)) return;
     event.currentTarget.disabled = true;
     try {
-      await Yuhen.api(`/api/observations/${item.id}/species/${entry.id}`, { method: "DELETE" });
-      const observations = await Yuhen.api("/api/observations");
+      await Tsubasa.api(`/api/observations/${item.id}/species/${entry.id}`, { method: "DELETE" });
+      const observations = await Tsubasa.api("/api/observations");
       state.observations = observations;
       const updated = observations.find((value) => value.id === item.id);
       await showObservationEditor(item.id, updated.species_entries[0].id);
@@ -415,13 +415,13 @@ async function showObservationEditor(observationId, requestedEntryId = null) {
           : null,
         notes: data.get("entry_notes") || null,
       };
-      const speciesUpdated = await Yuhen.api(`/api/observations/${item.id}/species/${entry.id}`, {
+      const speciesUpdated = await Tsubasa.api(`/api/observations/${item.id}/species/${entry.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const primary = speciesUpdated.species_entries.find((value) => value.is_primary) || speciesUpdated.species_entries[0];
-      const updated = await Yuhen.api(`/api/observations/${item.id}`, {
+      const updated = await Tsubasa.api(`/api/observations/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sex: primary.photo_type === "individual" ? primary.sex : null, life_stage: primary.photo_type === "individual" ? primary.life_stage : null, subspecies_id: primary.photo_type === "individual" ? (primary.subspecies?.id || null) : null, notes: data.get("notes") || null }),
@@ -464,9 +464,9 @@ function renderSpeciesSearchResults(matches, query) {
   results.innerHTML = matches.length ? matches.slice(0, 10).map((item) => `
     <button type="button" class="species-search-result" role="option" data-species-result="${item.id}">
       <span>
-        <strong>${Yuhen.escapeHtml(item.chinese_name)}</strong>
-        <em>${Yuhen.escapeHtml(item.scientific_name)}</em>
-        <small>${Yuhen.escapeHtml(item.catalog_number)} · ${Yuhen.escapeHtml(item.family_name)} · ${Yuhen.escapeHtml(item.genus_name)}</small>
+        <strong>${Tsubasa.escapeHtml(item.chinese_name)}</strong>
+        <em>${Tsubasa.escapeHtml(item.scientific_name)}</em>
+        <small>${Tsubasa.escapeHtml(item.catalog_number)} · ${Tsubasa.escapeHtml(item.family_name)} · ${Tsubasa.escapeHtml(item.genus_name)}</small>
       </span>
       <b>选择</b>
     </button>
@@ -504,7 +504,7 @@ function populateSpeciesSelect() {
   const query = byId("species-search").value.normalize("NFKC").trim().toLocaleLowerCase();
   const matches = matchingSpecies(query);
   select.innerHTML = `<option value="new">＋ 建立新物种</option>${matches.map((item) =>
-    `<option value="${item.id}">${Yuhen.escapeHtml(item.catalog_number)} · ${Yuhen.escapeHtml(item.chinese_name)}</option>`
+    `<option value="${item.id}">${Tsubasa.escapeHtml(item.catalog_number)} · ${Tsubasa.escapeHtml(item.chinese_name)}</option>`
   ).join("")}`;
   if ([...select.options].some((option) => option.value === current)) select.value = current;
   renderSpeciesSearchResults(matches, query);
@@ -518,7 +518,7 @@ function populateSpeciesSelect() {
 
 function optionMarkup(items) {
   return items.map((item) =>
-    `<option value="${item.id}">${Yuhen.escapeHtml(item.chinese_name)} · ${Yuhen.escapeHtml(item.scientific_name)}</option>`
+    `<option value="${item.id}">${Tsubasa.escapeHtml(item.chinese_name)} · ${Tsubasa.escapeHtml(item.scientific_name)}</option>`
   ).join("");
 }
 
@@ -611,7 +611,7 @@ async function populateSubspecies() {
       item.scientific_name,
     )));
   } else if (speciesId) {
-    const detail = await Yuhen.api(`/api/species/${speciesId}`);
+    const detail = await Tsubasa.api(`/api/species/${speciesId}`);
     detail.subspecies.forEach((item) => select.add(new Option(
       `${item.chinese_name ? `${item.chinese_name} · ` : ""}${item.scientific_name}`,
       item.id,
@@ -692,7 +692,7 @@ async function readPhotoTime(file) {
   const body = new FormData();
   body.append("photo", file);
   try {
-    const result = await Yuhen.api("/api/media/exif-time", { method: "POST", body });
+    const result = await Tsubasa.api("/api/media/exif-time", { method: "POST", body });
     if (byId("photo-input").files[0] !== file) return;
     if (result.observed_at) {
       byId("observed-at").value = result.observed_at;
@@ -717,7 +717,7 @@ form.addEventListener("submit", async (event) => {
     body.append("payload", JSON.stringify(payload));
     body.append("photo", files.get("photo"));
     for (const file of files.getAll("audio")) if (file.size) body.append("audio", file);
-    const result = await Yuhen.api("/api/observations", { method: "POST", body });
+    const result = await Tsubasa.api("/api/observations", { method: "POST", body });
     status.textContent = `${result.catalog_number} 已入藏`;
     if (isV2Editor) {
       setTimeout(() => { window.location.href = `/observations?observation=${result.observation_id}`; }, 450);
@@ -901,4 +901,4 @@ loadPage()
   })
   .catch((error) => { byId("observation-empty").hidden = false; byId("observation-empty").textContent = error.message; });
 
-window.YuhenObservationEditor = { openRecord, showObservationEditor };
+window.TsubasaObservationEditor = { openRecord, showObservationEditor };

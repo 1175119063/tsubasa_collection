@@ -72,13 +72,13 @@ function ecologyPanel(ecology = {}) {
       `<span class="body-size-bird ${size === value ? "is-selected" : ""} ${size === "unknown" ? "is-unknown" : ""}" style="--bird-width:${28 + index * 5}px" title="${label}">${bodySizeIcon()}</span>`
     ).join("")}</div></section>
     <section class="habitat-summary"><p>偏好生境</p><div>${habitats.length
-      ? habitats.map((value) => `<span>${habitatTypes.find(([key]) => key === value)?.[1] || Yuhen.escapeHtml(value)}</span>`).join("")
+      ? habitats.map((value) => `<span>${habitatTypes.find(([key]) => key === value)?.[1] || Tsubasa.escapeHtml(value)}</span>`).join("")
       : `<em>尚未填写</em>`}</div></section>
   </aside>`;
 }
 
 async function loadDex() {
-  state.species = await Yuhen.api("/api/species");
+  state.species = await Tsubasa.api("/api/species");
   populateDexFilters();
   renderSpecies();
 }
@@ -95,7 +95,7 @@ function uniqueTaxa(items, idKey, nameKey, scientificKey) {
 
 function taxonOptions(items) {
   return items.map((item) =>
-    `<option value="${item.id}">${Yuhen.escapeHtml(item.name)} · ${Yuhen.escapeHtml(item.scientificName)}</option>`
+    `<option value="${item.id}">${Tsubasa.escapeHtml(item.name)} · ${Tsubasa.escapeHtml(item.scientificName)}</option>`
   ).join("");
 }
 
@@ -129,7 +129,7 @@ function updateSpeciesFilter() {
     && (!genusId || String(item.genus_id) === genusId)
   );
   speciesSelect.innerHTML = `<option value="">全部种</option>${candidates.map((item) =>
-    `<option value="${item.id}">${Yuhen.escapeHtml(item.chinese_name)} · ${Yuhen.escapeHtml(item.scientific_name)}</option>`
+    `<option value="${item.id}">${Tsubasa.escapeHtml(item.chinese_name)} · ${Tsubasa.escapeHtml(item.scientific_name)}</option>`
   ).join("")}`;
   if (candidates.some((item) => String(item.id) === previousSpecies)) speciesSelect.value = previousSpecies;
 }
@@ -152,11 +152,11 @@ function renderSpecies() {
   byId("dex-filter-empty").hidden = state.species.length === 0 || filtered.length !== 0;
   byId("species-grid").innerHTML = filtered.map((item) => `
     <button class="species-card" data-species-id="${item.id}">
-      <img src="${item.cover_url}" alt="${Yuhen.escapeHtml(item.chinese_name)}" loading="lazy" />
-      <span class="card-body"><span class="card-number">${Yuhen.escapeHtml(item.catalog_number)}</span>
-        <h3>${Yuhen.escapeHtml(item.chinese_name)}</h3>
-        <span class="latin">${Yuhen.escapeHtml(item.scientific_name)}</span>
-        <span class="card-meta"><span>${Yuhen.escapeHtml(item.family_name)}</span><span>${item.observation_count} 笔记录</span></span>
+      <img src="${item.cover_url}" alt="${Tsubasa.escapeHtml(item.chinese_name)}" loading="lazy" />
+      <span class="card-body"><span class="card-number">${Tsubasa.escapeHtml(item.catalog_number)}</span>
+        <h3>${Tsubasa.escapeHtml(item.chinese_name)}</h3>
+        <span class="latin">${Tsubasa.escapeHtml(item.scientific_name)}</span>
+        <span class="card-meta"><span>${Tsubasa.escapeHtml(item.family_name)}</span><span>${item.observation_count} 笔记录</span></span>
       </span>
     </button>`).join("");
   document.querySelectorAll(".species-card[data-species-id]").forEach((button) =>
@@ -165,7 +165,7 @@ function renderSpecies() {
 }
 
 function archiveBadge(item, text, pending = false) {
-  const label = Yuhen.escapeHtml(text);
+  const label = Tsubasa.escapeHtml(text);
   if (item.observation_id) {
     return `<a class="archive-badge done archive-proof-link" href="/observations?observation=${item.observation_id}" title="预览照片凭证">${label}</a>`;
   }
@@ -175,7 +175,7 @@ function archiveBadge(item, text, pending = false) {
 function individualDisplayLabel(item) {
   if (!String(item.id).startsWith("observed-")) return item.label;
   const [prefix, value] = item.label.split(" · ");
-  return `${prefix} · ${Yuhen.labels[value] || value}`;
+  return `${prefix} · ${Tsubasa.labels[value] || value}`;
 }
 
 function uniqueIndividuals(items) {
@@ -186,13 +186,13 @@ function uniqueIndividuals(items) {
   return [...values.values()];
 }
 
-function badgeList(items, format = (item) => item.name || Yuhen.labels[item.value] || item.value) {
+function badgeList(items, format = (item) => item.name || Tsubasa.labels[item.value] || item.value) {
   if (!items.length) return `<span class="archive-badge pending">尚无记录</span>`;
   return items.map((item) => archiveBadge(item, format(item))).join("");
 }
 
 async function setCover(speciesId, observationId) {
-  await Yuhen.api(`/api/species/${speciesId}/cover`, {
+  await Tsubasa.api(`/api/species/${speciesId}/cover`, {
     method: "PUT", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ observation_id: Number(observationId) }),
   });
@@ -201,10 +201,10 @@ async function setCover(speciesId, observationId) {
 }
 
 async function openDetail(speciesId) {
-  const detail = await Yuhen.api(`/api/species/${speciesId}`);
+  const detail = await Tsubasa.api(`/api/species/${speciesId}`);
   state.currentDetail = detail;
   const individuals = uniqueIndividuals(detail.individuals || []);
-  const china = detail.china_protection_status ? Yuhen.labels[detail.china_protection_status] : "无";
+  const china = detail.china_protection_status ? Tsubasa.labels[detail.china_protection_status] : "无";
   const behaviors = detail.behaviors.length
     ? detail.behaviors.map((item) => archiveBadge(item, `${item.label}${item.linked ? "" : " · 待关联"}`, !item.linked)).join("")
     : `<span class="archive-badge pending">尚无行为标签</span>`;
@@ -217,11 +217,11 @@ async function openDetail(speciesId) {
     : `<span class="archive-badge">无亚种</span>`;
   byId("detail-content").innerHTML = `
     <section class="detail-hero species-detail-hero">
-      <img src="${detail.cover.photo_url}" alt="${Yuhen.escapeHtml(detail.chinese_name)}" />
+      <img src="${detail.cover.photo_url}" alt="${Tsubasa.escapeHtml(detail.chinese_name)}" />
       <div class="species-hero-panel">
-        <div class="detail-title"><p class="eyebrow">${Yuhen.escapeHtml(detail.catalog_number)}</p>
-          <h2>${Yuhen.escapeHtml(detail.chinese_name)}</h2><p class="latin">${Yuhen.escapeHtml(detail.scientific_name)}</p>
-          <div class="detail-classification">${Yuhen.escapeHtml(detail.classification.order.chinese_name)} · ${Yuhen.escapeHtml(detail.classification.family.chinese_name)} · ${Yuhen.escapeHtml(detail.classification.genus.chinese_name)}</div>
+        <div class="detail-title"><p class="eyebrow">${Tsubasa.escapeHtml(detail.catalog_number)}</p>
+          <h2>${Tsubasa.escapeHtml(detail.chinese_name)}</h2><p class="latin">${Tsubasa.escapeHtml(detail.scientific_name)}</p>
+          <div class="detail-classification">${Tsubasa.escapeHtml(detail.classification.order.chinese_name)} · ${Tsubasa.escapeHtml(detail.classification.family.chinese_name)} · ${Tsubasa.escapeHtml(detail.classification.genus.chinese_name)}</div>
           <div class="species-status-stack">
             <span>中国保护等级：${china}</span>
             <span class="iucn-badge iucn-${detail.iucn_status.toLowerCase()}">${detail.iucn_status} ${iucnLabels[detail.iucn_status] || ""}</span>
@@ -232,8 +232,8 @@ async function openDetail(speciesId) {
       </div>
     </section>
     <div class="detail-body">
-      <section class="detail-section species-introduction"><h3>自定义简介</h3><p>${Yuhen.escapeHtml(detail.introduction || "尚未填写物种简介。")} </p></section>
-      <section class="detail-section"><h3>初次遇见</h3><p>${Yuhen.escapeHtml(detail.first_encounter.observed_at.replace("T", " "))} · ${Yuhen.escapeHtml(detail.first_encounter.admin1_name)} ${Yuhen.escapeHtml(detail.first_encounter.locality)}</p></section>
+      <section class="detail-section species-introduction"><h3>自定义简介</h3><p>${Tsubasa.escapeHtml(detail.introduction || "尚未填写物种简介。")} </p></section>
+      <section class="detail-section"><h3>初次遇见</h3><p>${Tsubasa.escapeHtml(detail.first_encounter.observed_at.replace("T", " "))} · ${Tsubasa.escapeHtml(detail.first_encounter.admin1_name)} ${Tsubasa.escapeHtml(detail.first_encounter.locality)}</p></section>
       <section class="detail-section"><h3>地理档案</h3><div class="badge-list">${badgeList(detail.collected.countries)} ${badgeList(detail.collected.admin1_regions)}</div></section>
       <section class="detail-section"><h3>季节档案</h3><div class="badge-list">${badgeList(detail.collected.seasons)}</div></section>
       <section class="detail-section"><h3>个体档案</h3><div class="badge-list">${badgeList(detail.collected.sexes)} ${badgeList(detail.collected.life_stages)}</div></section>
@@ -243,7 +243,7 @@ async function openDetail(speciesId) {
         const currentCover = item.id === detail.cover.observation_id;
         return `<article class="observation-card ${currentCover ? "is-current-cover" : ""}">
           <img src="${item.thumbnail_url}" alt="观察照片" />
-          <div class="observation-info">${Yuhen.escapeHtml(item.observed_at.replace("T", " "))}<br />${Yuhen.escapeHtml(item.admin1_name)} · ${Yuhen.escapeHtml(item.locality)}<br />${Yuhen.labels[item.season] || item.season}<br />
+          <div class="observation-info">${Tsubasa.escapeHtml(item.observed_at.replace("T", " "))}<br />${Tsubasa.escapeHtml(item.admin1_name)} · ${Tsubasa.escapeHtml(item.locality)}<br />${Tsubasa.labels[item.season] || item.season}<br />
             <span class="observation-card-actions">
               <button class="cover-button" data-cover-observation="${item.id}" ${currentCover ? "disabled" : ""}>${currentCover ? "当前图鉴封面" : "设为图鉴封面"}</button>
               <a class="observation-preview-link" href="/observations?observation=${item.id}">预览这笔观察</a>
@@ -267,7 +267,7 @@ async function openDetail(speciesId) {
   document.querySelectorAll("[data-delete-observation]").forEach((button) =>
     button.addEventListener("click", async () => {
       if (!confirm("删除将立即永久生效；若这是最后一笔观察，整个物种档案也会被删除。确定继续吗？")) return;
-      const result = await Yuhen.api(`/api/observations/${button.dataset.deleteObservation}`, { method: "DELETE" });
+      const result = await Tsubasa.api(`/api/observations/${button.dataset.deleteObservation}`, { method: "DELETE" });
       detailDialog.close();
       await loadDex();
       if (!result.removed_species) await openDetail(speciesId);
@@ -277,7 +277,7 @@ async function openDetail(speciesId) {
 
 function observationOption(item, selectedId) {
   const selected = item.id === selectedId ? "selected" : "";
-  return `<option value="${item.id}" ${selected}>${Yuhen.escapeHtml(item.observed_at.replace("T", " "))} · ${Yuhen.escapeHtml(item.locality)}</option>`;
+  return `<option value="${item.id}" ${selected}>${Tsubasa.escapeHtml(item.observed_at.replace("T", " "))} · ${Tsubasa.escapeHtml(item.locality)}</option>`;
 }
 
 function matchingObservations(detail, dimension, valueKey) {
@@ -292,8 +292,8 @@ function matchingObservations(detail, dimension, valueKey) {
 function evidenceEditorRow(detail, dimension, valueKey, label, selectedId) {
   const options = matchingObservations(detail, dimension, valueKey)
     .map((item) => observationOption(item, selectedId)).join("");
-  return `<label class="profile-evidence-row"><span>${Yuhen.escapeHtml(label)}</span>
-    <select data-evidence-dimension="${dimension}" data-evidence-value="${Yuhen.escapeHtml(valueKey)}">${options}</select>
+  return `<label class="profile-evidence-row"><span>${Tsubasa.escapeHtml(label)}</span>
+    <select data-evidence-dimension="${dimension}" data-evidence-value="${Tsubasa.escapeHtml(valueKey)}">${options}</select>
   </label>`;
 }
 
@@ -301,7 +301,7 @@ function behaviorRow(detail, behavior = {}) {
   const rowId = ++state.behaviorCounter;
   const options = detail.observations.map((item) => observationOption(item, behavior.observation_id)).join("");
   return `<div class="profile-behavior-row" data-behavior-row="${rowId}">
-    <label>行为标签<input data-behavior-label maxlength="80" required value="${Yuhen.escapeHtml(behavior.label || "")}" placeholder="例如：飞行" /></label>
+    <label>行为标签<input data-behavior-label maxlength="80" required value="${Tsubasa.escapeHtml(behavior.label || "")}" placeholder="例如：飞行" /></label>
     <label>照片凭证<select data-behavior-observation><option value="">暂不关联</option>${options}</select></label>
     <button type="button" class="danger-button behavior-remove-button" data-remove-behavior="${rowId}">删除标签</button>
   </div>`;
@@ -311,7 +311,7 @@ function individualRow(detail, individual = {}) {
   const rowId = ++state.individualCounter;
   const options = detail.observations.map((item) => observationOption(item, individual.observation_id)).join("");
   return `<div class="profile-behavior-row" data-individual-row="${rowId}">
-    <label>个体标签<input data-individual-label maxlength="120" required value="${Yuhen.escapeHtml(individualDisplayLabel(individual) || "")}" placeholder="例如：雄性 · 成鸟 · 繁殖羽" /></label>
+    <label>个体标签<input data-individual-label maxlength="120" required value="${Tsubasa.escapeHtml(individualDisplayLabel(individual) || "")}" placeholder="例如：雄性 · 成鸟 · 繁殖羽" /></label>
     <label>照片凭证<select data-individual-observation><option value="">暂不关联</option>${options}</select></label>
     <button type="button" class="danger-button behavior-remove-button" data-remove-individual="${rowId}">删除标签</button>
   </div>`;
@@ -355,10 +355,10 @@ function openProfileEditor() {
   renderEcologyEditor(detail.ecology);
   const rows = [];
   detail.collected.sexes.forEach((item) => rows.push(evidenceEditorRow(
-    detail, "sex", item.value, `性别 · ${Yuhen.labels[item.value] || item.value}`, item.observation_id
+    detail, "sex", item.value, `性别 · ${Tsubasa.labels[item.value] || item.value}`, item.observation_id
   )));
   detail.collected.life_stages.forEach((item) => rows.push(evidenceEditorRow(
-    detail, "life_stage", item.value, `生命阶段 · ${Yuhen.labels[item.value] || item.value}`, item.observation_id
+    detail, "life_stage", item.value, `生命阶段 · ${Tsubasa.labels[item.value] || item.value}`, item.observation_id
   )));
   rows.length = 0;
   detail.subspecies.filter((item) => item.captured).forEach((item) => rows.push(evidenceEditorRow(
@@ -440,7 +440,7 @@ profileForm.addEventListener("submit", async (event) => {
       behaviors,
       individuals,
     };
-    await Yuhen.api(`/api/species/${detail.id}/profile`, {
+    await Tsubasa.api(`/api/species/${detail.id}/profile`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
     profileDialog.close();
@@ -474,13 +474,13 @@ byId("dex-filter-reset").addEventListener("click", () => {
   renderSpecies();
 });
 
-window.YuhenDexEditor = {
+window.TsubasaDexEditor = {
   async openProfile(speciesId) {
-    state.currentDetail = await Yuhen.api(`/api/species/${speciesId}`);
+    state.currentDetail = await Tsubasa.api(`/api/species/${speciesId}`);
     openProfileEditor();
   },
   async setCover(speciesId, observationId) {
-    await Yuhen.api(`/api/species/${speciesId}/cover`, {
+    await Tsubasa.api(`/api/species/${speciesId}/cover`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ observation_id: Number(observationId) }),
     });

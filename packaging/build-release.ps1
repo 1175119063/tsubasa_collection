@@ -6,8 +6,16 @@ $packagingRoot = $PSScriptRoot
 $releaseRoot = Join-Path $packagingRoot 'release'
 $distRoot = Join-Path $packagingRoot ("dist-v$Version")
 $buildRoot = Join-Path $packagingRoot ("build-v$Version")
-$pyInstaller = Join-Path $projectRoot '.conda\envs\yuhen\Scripts\pyinstaller.exe'
-$specPath = Join-Path $packagingRoot 'yuhen.spec'
+$pyInstaller = Join-Path $projectRoot '.conda\envs\tsubasa\Scripts\pyinstaller.exe'
+if (-not (Test-Path -LiteralPath $pyInstaller)) {
+    $pyInstaller = Get-ChildItem -LiteralPath (Join-Path $projectRoot '.conda\envs') `
+        -Filter 'pyinstaller.exe' -File -Recurse -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty FullName
+}
+if (-not $pyInstaller) {
+    throw 'PyInstaller was not found in the project Conda environments.'
+}
+$specPath = Join-Path $packagingRoot 'tsubasa.spec'
 $appName = -join @([char]0x7FFC, [char]0x00B7, [char]0x65F6, [char]0x5149, [char]0x8BB0)
 $blankLabel = -join @([char]0x7A7A, [char]0x767D, [char]0x7248)
 $blankName = "$appName-Windows-v$Version-$blankLabel"

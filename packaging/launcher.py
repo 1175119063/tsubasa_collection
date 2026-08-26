@@ -21,9 +21,9 @@ if BACKEND_DIR.exists():
     sys.path.insert(0, str(BACKEND_DIR))
 
 if getattr(sys, "frozen", False):
-    os.environ["YUHEN_DATA_DIR"] = str(ROOT / "data")
+    os.environ["TSUBASA_DATA_DIR"] = str(ROOT / "data")
 else:
-    os.environ.setdefault("YUHEN_DATA_DIR", str(ROOT / "data"))
+    os.environ.setdefault("TSUBASA_DATA_DIR", str(ROOT / "data"))
 
 
 def open_browser(url: str) -> None:

@@ -3,7 +3,7 @@
 
   const page = document.body.dataset.page;
   const byId = (id) => document.getElementById(id);
-  const esc = (value) => Yuhen.escapeHtml(value == null ? "" : String(value));
+  const esc = (value) => Tsubasa.escapeHtml(value == null ? "" : String(value));
   const ecologyLabels = {
     unknown: "情报不足", raptor: "猛禽", songbird: "鸣禽", landfowl: "陆禽",
     scansorial: "攀禽", wader: "涉禽", waterfowl: "游禽",
@@ -87,7 +87,7 @@
     byId("home-cover-status").textContent = "正在整理照片档案……";
     byId("home-cover-grid").innerHTML = "";
     try {
-      homeState.observations = await Yuhen.api("/api/observations");
+      homeState.observations = await Tsubasa.api("/api/observations");
       renderHomeCoverChoices();
     } catch (error) {
       byId("home-cover-status").textContent = error.message;
@@ -97,7 +97,7 @@
   async function selectHomepageFeature(observationId) {
     try {
       byId("home-cover-status").textContent = "正在保存首页封面……";
-      const feature = await Yuhen.api("/api/home/cover", {
+      const feature = await Tsubasa.api("/api/home/cover", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ observation_id: observationId }),
@@ -151,7 +151,7 @@
       restoreStatus.textContent = "正在校验数据库、文件哈希和媒体引用，请不要关闭软件……";
       try {
         const body = new FormData(); body.append("backup", file);
-        const result = await Yuhen.api("/api/backups/restore", { method: "POST", body });
+        const result = await Tsubasa.api("/api/backups/restore", { method: "POST", body });
         restoreStatus.textContent = `${result.message} 当前状态的安全备份：${result.safety_backup.filename}`;
         setTimeout(() => window.location.reload(), 1200);
       } catch (error) {
@@ -165,7 +165,7 @@
       confirmButton.disabled = true;
       status.textContent = "正在生成一致性数据库快照并归档媒体文件……";
       try {
-        const result = await Yuhen.api("/api/backups", { method: "POST" });
+        const result = await Tsubasa.api("/api/backups", { method: "POST" });
         const sizeMb = (result.size_bytes / 1024 / 1024).toFixed(1);
         status.textContent = `备份完成：${result.filename}（${sizeMb} MB）`;
         download.href = result.download_url;
@@ -183,10 +183,10 @@
     byId("check-update").addEventListener("click", async () => {
       const button = byId("check-update"); button.disabled = true;
       try {
-        const status = await Yuhen.api("/api/updates/status");
+        const status = await Tsubasa.api("/api/updates/status");
         if (!status.update_available) { alert(status.message); return; }
         if (!confirm(`${status.message}\n${status.notes || ""}\n\n现在下载经过 SHA-256 校验的安装包吗？`)) return;
-        const result = await Yuhen.api("/api/updates/download", { method: "POST" });
+        const result = await Tsubasa.api("/api/updates/download", { method: "POST" });
         const link = document.createElement("a"); link.href = result.download_url; link.download = result.filename; link.click();
         alert(`${result.message}\n安装包：${result.filename}`);
       } catch (error) { alert(error.message); }
@@ -239,7 +239,7 @@
   }
 
   async function loadIntegrations(fillDialog = false) {
-    const config = await Yuhen.api("/api/integrations");
+    const config = await Tsubasa.api("/api/integrations");
     renderIntegrationSummary(config);
     if (fillDialog) fillIntegrationDialog(config);
     return config;
@@ -284,7 +284,7 @@
       const button = byId("save-amap-api");
       const status = byId("api-amap-status");
       setApiActionStatus(button, status, "正在保存…", async () => {
-        const config = await Yuhen.api("/api/integrations/amap", {
+        const config = await Tsubasa.api("/api/integrations/amap", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -302,14 +302,14 @@
 
     byId("test-amap-api").addEventListener("click", () => {
       setApiActionStatus(byId("test-amap-api"), byId("api-amap-status"), "正在测试…", async () => {
-        const result = await Yuhen.api("/api/integrations/amap/test", { method: "POST" });
+        const result = await Tsubasa.api("/api/integrations/amap/test", { method: "POST" });
         return result.message;
       });
     });
 
     byId("save-llm-api").addEventListener("click", () => {
       setApiActionStatus(byId("save-llm-api"), byId("api-llm-status"), "正在保存…", async () => {
-        const config = await Yuhen.api("/api/integrations/llm", {
+        const config = await Tsubasa.api("/api/integrations/llm", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -331,7 +331,7 @@
 
     byId("test-llm-api").addEventListener("click", () => {
       setApiActionStatus(byId("test-llm-api"), byId("api-llm-status"), "正在测试…", async () => {
-        const result = await Yuhen.api("/api/integrations/llm/test", { method: "POST" });
+        const result = await Tsubasa.api("/api/integrations/llm/test", { method: "POST" });
         return result.message;
       });
     });
@@ -344,9 +344,9 @@
   async function loadHome() {
     try {
       const [stats, species, feature] = await Promise.all([
-        Yuhen.api("/api/stats"),
-        Yuhen.api("/api/species"),
-        Yuhen.api("/api/home/cover"),
+        Tsubasa.api("/api/stats"),
+        Tsubasa.api("/api/species"),
+        Tsubasa.api("/api/home/cover"),
       ]);
       byId("v2-species-count").textContent = stats.species_count;
       byId("v2-observation-count").textContent = stats.observation_count;
@@ -403,7 +403,7 @@
   function archiveList(items, label) {
     if (!items || !items.length) return `<span class="v2-intel-missing">${label}情报不足</span>`;
     return items.map((item) => {
-      const text = item.name || Yuhen.labels[item.value] || item.value || item.label;
+      const text = item.name || Tsubasa.labels[item.value] || item.value || item.label;
       return item.observation_id
         ? `<a href="/observations?observation=${item.observation_id}" class="v2-intel-chip">${esc(text)}</a>`
         : `<span class="v2-intel-chip is-static">${esc(text)}${item.linked === false ? " · 待关联" : ""}</span>`;
@@ -448,7 +448,7 @@
     byId("v2-dossier-content").innerHTML = "<p class=\"v2-loading v2-dossier-loading\">正在调取调查档案…</p>";
     if (!dialog.open) dialog.showModal();
     try {
-      const detail = await Yuhen.api(`/api/species/${speciesId}`);
+      const detail = await Tsubasa.api(`/api/species/${speciesId}`);
       const progress = dossierProgress(detail);
       const recent = [...detail.observations].sort((a, b) => b.observed_at.localeCompare(a.observed_at)).slice(0, 4);
       byId("v2-dossier-content").innerHTML = `
@@ -487,7 +487,7 @@
 
   async function loadDex() {
     try {
-      dexState.species = await Yuhen.api("/api/species");
+      dexState.species = await Tsubasa.api("/api/species");
       fillSelect(byId("v2-order-filter"), [...new Set(dexState.species.map((item) => item.order_name))].sort(), "全部目");
       updateDexFilters();
       renderDex();
@@ -509,20 +509,20 @@
     byId("v2-dossier").addEventListener("click", async (event) => {
       if (event.target === byId("v2-dossier")) { byId("v2-dossier").close(); return; }
       const edit = event.target.closest("[data-v2-edit-species]");
-      if (edit && window.YuhenDexEditor) { await window.YuhenDexEditor.openProfile(Number(edit.dataset.v2EditSpecies)); return; }
+      if (edit && window.TsubasaDexEditor) { await window.TsubasaDexEditor.openProfile(Number(edit.dataset.v2EditSpecies)); return; }
       const cover = event.target.closest("[data-v2-species-cover]");
-      if (cover) { await Yuhen.api(`/api/species/${dexState.currentSpeciesId}/cover`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_id: Number(cover.dataset.v2SpeciesCover) }) }); await openDossier(dexState.currentSpeciesId); return; }
+      if (cover) { await Tsubasa.api(`/api/species/${dexState.currentSpeciesId}/cover`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_id: Number(cover.dataset.v2SpeciesCover) }) }); await openDossier(dexState.currentSpeciesId); return; }
       const remove = event.target.closest("[data-v2-delete-species-observation]");
-      if (remove && confirm("删除将立即永久生效；若这是最后一笔观察，整个物种档案也会被删除。确定继续吗？")) { const result = await Yuhen.api(`/api/observations/${remove.dataset.v2DeleteSpeciesObservation}`, { method: "DELETE" }); if (result.removed_species) { window.location.href = "/dex"; } else { await openDossier(dexState.currentSpeciesId); } return; }
+      if (remove && confirm("删除将立即永久生效；若这是最后一笔观察，整个物种档案也会被删除。确定继续吗？")) { const result = await Tsubasa.api(`/api/observations/${remove.dataset.v2DeleteSpeciesObservation}`, { method: "DELETE" }); if (result.removed_species) { window.location.href = "/dex"; } else { await openDossier(dexState.currentSpeciesId); } return; }
       const audio = event.target.closest("[data-v2-add-species-audio]");
       if (audio) { dexState.currentSpeciesId = Number(audio.dataset.v2AddSpeciesAudio); byId("species-audio-form").reset(); byId("species-audio-status").textContent = ""; byId("species-audio-dialog").showModal(); }
       const removeAudio = event.target.closest("[data-v2-delete-species-audio]");
-      if (removeAudio && confirm("永久删除这段独立物种录音吗？")) { await Yuhen.api(`/api/species/${dexState.currentSpeciesId}/audio/${removeAudio.dataset.v2DeleteSpeciesAudio}`, { method: "DELETE" }); await openDossier(dexState.currentSpeciesId); }
+      if (removeAudio && confirm("永久删除这段独立物种录音吗？")) { await Tsubasa.api(`/api/species/${dexState.currentSpeciesId}/audio/${removeAudio.dataset.v2DeleteSpeciesAudio}`, { method: "DELETE" }); await openDossier(dexState.currentSpeciesId); }
     });
     document.querySelectorAll("[data-close-species-audio]").forEach((button) => button.addEventListener("click", () => byId("species-audio-dialog").close()));
     byId("species-audio-form").addEventListener("submit", async (event) => {
       event.preventDefault(); const form = event.currentTarget; const status = byId("species-audio-status"); const submit = form.querySelector("button[type=submit]"); submit.disabled = true; status.textContent = "正在保存录音…";
-      try { const data = new FormData(form); const body = new FormData(); body.append("audio", data.get("audio")); body.append("payload", JSON.stringify({ title: data.get("title") || null, notes: data.get("notes") || null, recorded_at: data.get("recorded_at") || null, locality: data.get("locality") || null })); await Yuhen.api(`/api/species/${dexState.currentSpeciesId}/audio`, { method: "POST", body }); byId("species-audio-dialog").close(); await openDossier(dexState.currentSpeciesId); }
+      try { const data = new FormData(form); const body = new FormData(); body.append("audio", data.get("audio")); body.append("payload", JSON.stringify({ title: data.get("title") || null, notes: data.get("notes") || null, recorded_at: data.get("recorded_at") || null, locality: data.get("locality") || null })); await Tsubasa.api(`/api/species/${dexState.currentSpeciesId}/audio`, { method: "POST", body }); byId("species-audio-dialog").close(); await openDossier(dexState.currentSpeciesId); }
       catch (error) { status.textContent = error.message; } finally { submit.disabled = false; }
     });
   }

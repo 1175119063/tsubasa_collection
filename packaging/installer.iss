@@ -9,7 +9,7 @@
 AppId={{3E3440B8-24C9-47C0-98EE-51D2661D2B89}
 AppName=翼·时光记
 AppVersion={#MyAppVersion}
-DefaultDirName={localappdata}\Programs\Yuhen
+DefaultDirName={localappdata}\Programs\Tsubasa
 DefaultGroupName=翼·时光记
 OutputBaseFilename=翼·时光记-Windows-v{#MyAppVersion}-Setup
 Compression=lzma2

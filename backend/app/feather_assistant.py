@@ -469,7 +469,7 @@ year=2024，month=4，species_name="喜鹊"，location_name="兴隆山校区"，
             headers={
                 "Authorization": f"Bearer {config['api_key']}",
                 "Content-Type": "application/json",
-                "User-Agent": "Yuhen-Field-Journal/0.2",
+                "User-Agent": "Tsubasa-Field-Journal/0.2",
             },
             method="POST",
         )

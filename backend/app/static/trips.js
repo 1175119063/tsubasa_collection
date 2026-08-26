@@ -9,14 +9,14 @@ const isV2Editor = document.body.classList.contains("v2-page");
 
 async function loadTrips() {
   [state.trips, state.locations, state.observations] = await Promise.all([
-    Yuhen.api("/api/trips"), Yuhen.api("/api/locations"), Yuhen.api("/api/observations"),
+    Tsubasa.api("/api/trips"), Tsubasa.api("/api/locations"), Tsubasa.api("/api/observations"),
   ]);
   populateTripFilters(); renderTrips();
 }
 
 function locationOptions(selected = "") {
   if (!state.locations.length) return `<option value="">请先在地点浏览中建立地点</option>`;
-  return state.locations.map((item) => `<option value="${item.id}" ${String(item.id) === String(selected) ? "selected" : ""}>${Yuhen.escapeHtml(item.name)} · ${Yuhen.escapeHtml(item.admin1_name)}</option>`).join("");
+  return state.locations.map((item) => `<option value="${item.id}" ${String(item.id) === String(selected) ? "selected" : ""}>${Tsubasa.escapeHtml(item.name)} · ${Tsubasa.escapeHtml(item.admin1_name)}</option>`).join("");
 }
 
 function populateTripFilters() {
@@ -48,7 +48,7 @@ function renderTrips() {
   const groups = new Map(); for (const item of filtered) { const key = item.started_at.slice(0, 7); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(item); }
   byId("trip-total").textContent = filtered.length === state.trips.length ? `${state.trips.length} 次行程` : `显示 ${filtered.length} / ${state.trips.length} 次行程`;
   byId("trip-empty").hidden = state.trips.length !== 0; byId("trip-filter-empty").hidden = state.trips.length === 0 || filtered.length !== 0;
-  byId("trip-groups").innerHTML = [...groups.entries()].map(([key, items]) => `<section class="observation-month-group"><header class="month-heading"><h2>${key.slice(0, 4)}年${Number(key.slice(5, 7))}月</h2><span>${items.length} 次</span></header><div class="trip-grid">${items.map((item) => `<button class="trip-card" data-trip-id="${item.id}">${item.cover_url ? `<img src="${item.cover_url}" alt="" />` : `<span class="trip-card-placeholder">⌁</span>`}<span class="trip-card-body"><span class="card-number">${item.catalog_number}</span><strong>${Yuhen.escapeHtml(item.name)}</strong><small>${Yuhen.escapeHtml(item.location.name)} · ${item.started_at.replace("T", " ")}—${item.ended_at.slice(11)}</small><span class="trip-card-stats"><span><b>${item.species_count}</b> 种</span><span><b>${item.genus_count}</b> 属</span><span><b>${item.family_count}</b> 科</span><span><b>${item.observation_count}</b> 记录</span></span></span></button>`).join("")}</div></section>`).join("");
+  byId("trip-groups").innerHTML = [...groups.entries()].map(([key, items]) => `<section class="observation-month-group"><header class="month-heading"><h2>${key.slice(0, 4)}年${Number(key.slice(5, 7))}月</h2><span>${items.length} 次</span></header><div class="trip-grid">${items.map((item) => `<button class="trip-card" data-trip-id="${item.id}">${item.cover_url ? `<img src="${item.cover_url}" alt="" />` : `<span class="trip-card-placeholder">⌁</span>`}<span class="trip-card-body"><span class="card-number">${item.catalog_number}</span><strong>${Tsubasa.escapeHtml(item.name)}</strong><small>${Tsubasa.escapeHtml(item.location.name)} · ${item.started_at.replace("T", " ")}—${item.ended_at.slice(11)}</small><span class="trip-card-stats"><span><b>${item.species_count}</b> 种</span><span><b>${item.genus_count}</b> 属</span><span><b>${item.family_count}</b> 科</span><span><b>${item.observation_count}</b> 记录</span></span></span></button>`).join("")}</div></section>`).join("");
 }
 
 function openTripForm(trip = null) {
@@ -72,7 +72,7 @@ function renderTripLocationSelection() {
   if (!selection) return;
   const selected = state.editingLocationIds.map((id) => state.locations.find((item) => item.id === id)).filter(Boolean);
   const unselected = state.locations.filter((item) => !state.editingLocationIds.includes(item.id));
-  selection.innerHTML = `${selected.map((item, index) => `<article class="trip-location-row" data-trip-location="${item.id}"><span class="trip-location-order">${String(index + 1).padStart(2, "0")}</span><label><input type="radio" name="primary_location_id" value="${item.id}" ${item.id === state.primaryLocationId ? "checked" : ""} />主要</label><span><strong>${Yuhen.escapeHtml(item.name)}</strong><small>${Yuhen.escapeHtml(item.admin1_name)}</small></span><button type="button" data-move-trip-location="up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-move-trip-location="down" ${index === selected.length - 1 ? "disabled" : ""}>↓</button><button type="button" data-remove-trip-location ${selected.length === 1 ? "disabled" : ""}>移除</button></article>`).join("")}<div class="trip-location-add"><select data-trip-location-add><option value="">选择其他地点</option>${unselected.map((item) => `<option value="${item.id}">${Yuhen.escapeHtml(item.name)} · ${Yuhen.escapeHtml(item.admin1_name)}</option>`).join("")}</select><button type="button" class="secondary-button" data-add-trip-location ${unselected.length ? "" : "disabled"}>加入地点</button></div>`;
+  selection.innerHTML = `${selected.map((item, index) => `<article class="trip-location-row" data-trip-location="${item.id}"><span class="trip-location-order">${String(index + 1).padStart(2, "0")}</span><label><input type="radio" name="primary_location_id" value="${item.id}" ${item.id === state.primaryLocationId ? "checked" : ""} />主要</label><span><strong>${Tsubasa.escapeHtml(item.name)}</strong><small>${Tsubasa.escapeHtml(item.admin1_name)}</small></span><button type="button" data-move-trip-location="up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-move-trip-location="down" ${index === selected.length - 1 ? "disabled" : ""}>↓</button><button type="button" data-remove-trip-location ${selected.length === 1 ? "disabled" : ""}>移除</button></article>`).join("")}<div class="trip-location-add"><select data-trip-location-add><option value="">选择其他地点</option>${unselected.map((item) => `<option value="${item.id}">${Tsubasa.escapeHtml(item.name)} · ${Tsubasa.escapeHtml(item.admin1_name)}</option>`).join("")}</select><button type="button" class="secondary-button" data-add-trip-location ${unselected.length ? "" : "disabled"}>加入地点</button></div>`;
 }
 
 function tripPayload() {
@@ -83,14 +83,14 @@ function tripPayload() {
 }
 
 async function openTripDetail(tripId) {
-  const detail = await Yuhen.api(`/api/trips/${tripId}`); state.activeTripId = detail.id;
+  const detail = await Tsubasa.api(`/api/trips/${tripId}`); state.activeTripId = detail.id;
   const cover = detail.cover_url ? `<img src="${detail.cover_url.replace("thumbnail=true", "thumbnail=false")}" alt="" />` : `<span class="trip-detail-placeholder">⌁</span>`;
-  byId("trip-detail-content").innerHTML = `<section class="detail-hero trip-detail-hero"><div class="trip-detail-cover">${cover}</div><div class="detail-title"><p class="eyebrow">${detail.catalog_number}</p><h2>${Yuhen.escapeHtml(detail.name)}</h2><p>${Yuhen.escapeHtml(detail.location.name)} · ${detail.started_at.replace("T", " ")}—${detail.ended_at.replace("T", " ")}</p><div class="detail-classification">持续 ${durationLabel(detail.duration_minutes)} · ${detail.location_count} 个地点</div></div></section><div class="detail-body">
+  byId("trip-detail-content").innerHTML = `<section class="detail-hero trip-detail-hero"><div class="trip-detail-cover">${cover}</div><div class="detail-title"><p class="eyebrow">${detail.catalog_number}</p><h2>${Tsubasa.escapeHtml(detail.name)}</h2><p>${Tsubasa.escapeHtml(detail.location.name)} · ${detail.started_at.replace("T", " ")}—${detail.ended_at.replace("T", " ")}</p><div class="detail-classification">持续 ${durationLabel(detail.duration_minutes)} · ${detail.location_count} 个地点</div></div></section><div class="detail-body">
     <div class="trip-summary-stats"><article><strong>${detail.species_count}</strong><span>种</span></article><article><strong>${detail.genus_count}</strong><span>属</span></article><article><strong>${detail.family_count}</strong><span>科</span></article><article><strong>${detail.observation_count}</strong><span>观察记录</span></article></div>
-    <section class="detail-section"><h3>行程路线</h3><div class="trip-route-list">${detail.locations.map((item) => `<a href="/locations?location=${item.id}"><b>${String(item.visit_order).padStart(2, "0")}</b><span>${Yuhen.escapeHtml(item.name)}${item.is_primary ? " · 主要地点" : ""}</span></a>`).join("")}</div></section>
-    <section class="detail-section"><h3>行程备注</h3><p>${Yuhen.escapeHtml(detail.notes || "暂无备注")}</p></section>
-    <section class="detail-section"><h3>本次拍摄物种</h3><div class="location-species-list">${detail.species.length ? detail.species.map((item) => `<a href="/dex?species=${item.id}"><img src="${item.thumbnail_url}" alt="" /><span><strong>${Yuhen.escapeHtml(item.chinese_name)}</strong><small>${Yuhen.escapeHtml(item.scientific_name)} · ${item.observation_count} 笔</small></span></a>`).join("") : `<p class="preview-empty">尚未关联观察</p>`}</div></section>
-    <section class="detail-section"><h3>观察记录与封面</h3><p class="section-note">默认使用拍摄时间最早的照片，也可以改选行程中的其他照片。</p><div class="observation-list">${detail.observations.map((item) => { const current = item.id === detail.cover_observation_id; return `<article class="observation-card ${current ? "is-current-cover" : ""}"><img src="${item.thumbnail_url}" alt="" /><div class="observation-info">${Yuhen.escapeHtml(item.species_name)}<br />${item.observed_at.replace("T", " ")}<span class="observation-card-actions"><button class="cover-button" data-trip-cover-observation="${item.id}" ${current ? "disabled" : ""}>${current ? "当前行程封面" : "设为行程封面"}</button><a class="observation-preview-link" href="/observations?observation=${item.id}">预览观察</a></span></div></article>`; }).join("")}</div></section>
+    <section class="detail-section"><h3>行程路线</h3><div class="trip-route-list">${detail.locations.map((item) => `<a href="/locations?location=${item.id}"><b>${String(item.visit_order).padStart(2, "0")}</b><span>${Tsubasa.escapeHtml(item.name)}${item.is_primary ? " · 主要地点" : ""}</span></a>`).join("")}</div></section>
+    <section class="detail-section"><h3>行程备注</h3><p>${Tsubasa.escapeHtml(detail.notes || "暂无备注")}</p></section>
+    <section class="detail-section"><h3>本次拍摄物种</h3><div class="location-species-list">${detail.species.length ? detail.species.map((item) => `<a href="/dex?species=${item.id}"><img src="${item.thumbnail_url}" alt="" /><span><strong>${Tsubasa.escapeHtml(item.chinese_name)}</strong><small>${Tsubasa.escapeHtml(item.scientific_name)} · ${item.observation_count} 笔</small></span></a>`).join("") : `<p class="preview-empty">尚未关联观察</p>`}</div></section>
+    <section class="detail-section"><h3>观察记录与封面</h3><p class="section-note">默认使用拍摄时间最早的照片，也可以改选行程中的其他照片。</p><div class="observation-list">${detail.observations.map((item) => { const current = item.id === detail.cover_observation_id; return `<article class="observation-card ${current ? "is-current-cover" : ""}"><img src="${item.thumbnail_url}" alt="" /><div class="observation-info">${Tsubasa.escapeHtml(item.species_name)}<br />${item.observed_at.replace("T", " ")}<span class="observation-card-actions"><button class="cover-button" data-trip-cover-observation="${item.id}" ${current ? "disabled" : ""}>${current ? "当前行程封面" : "设为行程封面"}</button><a class="observation-preview-link" href="/observations?observation=${item.id}">预览观察</a></span></div></article>`; }).join("")}</div></section>
     <div class="location-detail-actions"><button class="secondary-button" data-edit-trip="${detail.id}">修改行程</button><button class="primary-button" data-link-trip="${detail.id}">关联观察</button><button class="danger-outline-button" data-delete-trip="${detail.id}">删除行程</button></div></div>`;
   if (!tripDetailDialog.open) tripDetailDialog.showModal();
   byId("trip-detail-content").querySelector("[data-link-trip]")?.insertAdjacentHTML("afterend", `<button class="secondary-button" data-edit-trip-observations="${detail.id}">编辑观察</button>`);
@@ -102,12 +102,12 @@ function openTripLink(trip) {
   const unlinked = state.observations.filter((item) => !item.trip);
   const locationIds = new Set((trip.locations || [trip.location]).map((item) => item.id));
   const eligible = unlinked.filter((item) => trip.started_at <= item.observed_at && item.observed_at <= trip.ended_at && (!item.location || locationIds.has(item.location.id)));
-  byId("trip-link-list").innerHTML = eligible.map((item) => `<label class="location-link-item"><input type="checkbox" name="observation_id" value="${item.id}" ${item.trip?.id === trip.id ? "checked" : ""} /><img src="${item.thumbnail_url}" alt="" /><span><strong>${Yuhen.escapeHtml(item.species_name)}</strong><small>${item.observed_at.replace("T", " ")} · ${Yuhen.escapeHtml(item.locality)}</small><em>${item.location ? Yuhen.escapeHtml(item.location.name) : "尚未关联地点；加入后自动关联"}</em></span></label>`).join("") || `<p class="compact-empty">没有符合时间和地点条件的可关联观察。</p>`;
+  byId("trip-link-list").innerHTML = eligible.map((item) => `<label class="location-link-item"><input type="checkbox" name="observation_id" value="${item.id}" ${item.trip?.id === trip.id ? "checked" : ""} /><img src="${item.thumbnail_url}" alt="" /><span><strong>${Tsubasa.escapeHtml(item.species_name)}</strong><small>${item.observed_at.replace("T", " ")} · ${Tsubasa.escapeHtml(item.locality)}</small><em>${item.location ? Tsubasa.escapeHtml(item.location.name) : "尚未关联地点；加入后自动关联"}</em></span></label>`).join("") || `<p class="compact-empty">没有符合时间和地点条件的可关联观察。</p>`;
   byId("trip-link-status").textContent = ""; tripLinkDialog.showModal();
 }
 
-tripForm.addEventListener("submit", async (event) => { event.preventDefault(); const status = byId("trip-form-status"); status.textContent = "正在保存…"; try { const url = state.editingTripId ? `/api/trips/${state.editingTripId}` : "/api/trips"; const detail = await Yuhen.api(url, { method: state.editingTripId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(tripPayload()) }); tripFormDialog.close(); if (isV2Editor) { window.location.href = `/trips?trip=${detail.id}`; return; } await loadTrips(); await openTripDetail(detail.id); } catch (error) { status.textContent = error.message; } });
-byId("trip-link-form").addEventListener("submit", async (event) => { event.preventDefault(); const selectedIds = new FormData(event.currentTarget).getAll("observation_id").map(Number); const ids = [...new Set([...state.linkedObservationIds, ...selectedIds])]; const status = byId("trip-link-status"); status.textContent = "正在保存关联…"; try { await Yuhen.api(`/api/trips/${state.activeTripId}/observations`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_ids: ids }) }); tripLinkDialog.close(); if (isV2Editor) { window.location.href = `/trips?trip=${state.activeTripId}`; return; } await loadTrips(); await openTripDetail(state.activeTripId); } catch (error) { status.textContent = error.message; } });
+tripForm.addEventListener("submit", async (event) => { event.preventDefault(); const status = byId("trip-form-status"); status.textContent = "正在保存…"; try { const url = state.editingTripId ? `/api/trips/${state.editingTripId}` : "/api/trips"; const detail = await Tsubasa.api(url, { method: state.editingTripId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(tripPayload()) }); tripFormDialog.close(); if (isV2Editor) { window.location.href = `/trips?trip=${detail.id}`; return; } await loadTrips(); await openTripDetail(detail.id); } catch (error) { status.textContent = error.message; } });
+byId("trip-link-form").addEventListener("submit", async (event) => { event.preventDefault(); const selectedIds = new FormData(event.currentTarget).getAll("observation_id").map(Number); const ids = [...new Set([...state.linkedObservationIds, ...selectedIds])]; const status = byId("trip-link-status"); status.textContent = "正在保存关联…"; try { await Tsubasa.api(`/api/trips/${state.activeTripId}/observations`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_ids: ids }) }); tripLinkDialog.close(); if (isV2Editor) { window.location.href = `/trips?trip=${state.activeTripId}`; return; } await loadTrips(); await openTripDetail(state.activeTripId); } catch (error) { status.textContent = error.message; } });
 
 byId("trip-location-selection")?.addEventListener("click", (event) => {
   const row = event.target.closest("[data-trip-location]");
@@ -143,15 +143,15 @@ byId("new-trip-button").addEventListener("click", () => openTripForm()); byId("e
 byId("trip-year-filter").addEventListener("change", () => { populateTripMonths(); renderTrips(); }); byId("trip-month-filter").addEventListener("change", renderTrips); byId("trip-location-filter").addEventListener("change", renderTrips); byId("trip-sort").addEventListener("change", renderTrips);
 byId("trip-filter-reset").addEventListener("click", () => { byId("trip-year-filter").value = ""; populateTripMonths(); byId("trip-month-filter").value = ""; byId("trip-location-filter").value = ""; byId("trip-sort").value = "asc"; renderTrips(); });
 document.querySelectorAll("[data-close-trip-form]").forEach((item) => item.addEventListener("click", () => tripFormDialog.close())); document.querySelectorAll("[data-close-trip-detail]").forEach((item) => item.addEventListener("click", () => tripDetailDialog.close())); document.querySelectorAll("[data-close-trip-link]").forEach((item) => item.addEventListener("click", () => tripLinkDialog.close()));
-tripDetailDialog.addEventListener("click", async (event) => { const cover = event.target.closest("[data-trip-cover-observation]"); if (cover) { await Yuhen.api(`/api/trips/${state.activeTripId}/cover`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_id: Number(cover.dataset.tripCoverObservation) }) }); await loadTrips(); await openTripDetail(state.activeTripId); return; } const edit = event.target.closest("[data-edit-trip]"); if (edit) { openTripForm(await Yuhen.api(`/api/trips/${edit.dataset.editTrip}`)); return; } const link = event.target.closest("[data-link-trip]"); if (link) { openTripLink(await Yuhen.api(`/api/trips/${link.dataset.linkTrip}`)); return; } const remove = event.target.closest("[data-delete-trip]"); if (remove && confirm("删除行程只会解除观察关联，不会删除任何观察记录。确定删除吗？")) { await Yuhen.api(`/api/trips/${remove.dataset.deleteTrip}`, { method: "DELETE" }); tripDetailDialog.close(); await loadTrips(); } });
+tripDetailDialog.addEventListener("click", async (event) => { const cover = event.target.closest("[data-trip-cover-observation]"); if (cover) { await Tsubasa.api(`/api/trips/${state.activeTripId}/cover`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_id: Number(cover.dataset.tripCoverObservation) }) }); await loadTrips(); await openTripDetail(state.activeTripId); return; } const edit = event.target.closest("[data-edit-trip]"); if (edit) { openTripForm(await Tsubasa.api(`/api/trips/${edit.dataset.editTrip}`)); return; } const link = event.target.closest("[data-link-trip]"); if (link) { openTripLink(await Tsubasa.api(`/api/trips/${link.dataset.linkTrip}`)); return; } const remove = event.target.closest("[data-delete-trip]"); if (remove && confirm("删除行程只会解除观察关联，不会删除任何观察记录。确定删除吗？")) { await Tsubasa.api(`/api/trips/${remove.dataset.deleteTrip}`, { method: "DELETE" }); tripDetailDialog.close(); await loadTrips(); } });
 
 function renderTripObservationEditor(detail) {
   const list = byId("trip-observation-edit-list");
-  list.innerHTML = detail.observations.length ? `<p class="section-note">这里只能解除关联，不会删除观察记录。解除后，该记录可以重新关联到其他行程。</p><div class="trip-edit-observation-list">${detail.observations.map((item) => `<article class="trip-edit-observation-item"><img src="${item.thumbnail_url}" alt="" /><span><strong>${Yuhen.escapeHtml(item.species_name)}</strong><small>${item.observed_at.replace("T", " ")} · ${Yuhen.escapeHtml(item.locality)}</small></span><button type="button" class="danger-button" data-unlink-observation="${item.id}">解除关联</button></article>`).join("")}</div>` : '<p class="compact-empty">本次行程尚未关联观察记录。</p>';
+  list.innerHTML = detail.observations.length ? `<p class="section-note">这里只能解除关联，不会删除观察记录。解除后，该记录可以重新关联到其他行程。</p><div class="trip-edit-observation-list">${detail.observations.map((item) => `<article class="trip-edit-observation-item"><img src="${item.thumbnail_url}" alt="" /><span><strong>${Tsubasa.escapeHtml(item.species_name)}</strong><small>${item.observed_at.replace("T", " ")} · ${Tsubasa.escapeHtml(item.locality)}</small></span><button type="button" class="danger-button" data-unlink-observation="${item.id}">解除关联</button></article>`).join("")}</div>` : '<p class="compact-empty">本次行程尚未关联观察记录。</p>';
 }
 
 async function openTripObservationEditor() {
-  const detail = await Yuhen.api(`/api/trips/${state.activeTripId}`);
+  const detail = await Tsubasa.api(`/api/trips/${state.activeTripId}`);
   renderTripObservationEditor(detail);
   tripObservationEditDialog.showModal();
 }
@@ -159,9 +159,9 @@ async function openTripObservationEditor() {
 async function unlinkTripObservation(observationId, button) {
   button.disabled = true;
   try {
-    const detail = await Yuhen.api(`/api/trips/${state.activeTripId}`);
+    const detail = await Tsubasa.api(`/api/trips/${state.activeTripId}`);
     const observationIds = detail.observations.filter((item) => item.id !== Number(observationId)).map((item) => item.id);
-    const updated = await Yuhen.api(`/api/trips/${state.activeTripId}/observations`, {
+    const updated = await Tsubasa.api(`/api/trips/${state.activeTripId}/observations`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_ids: observationIds }),
     });
     if (isV2Editor) { window.location.href = `/trips?trip=${state.activeTripId}`; return; }
@@ -184,13 +184,13 @@ tripObservationEditDialog.addEventListener("click", (event) => {
 });
 document.querySelectorAll("[data-close-trip-observation-edit]").forEach((item) => item.addEventListener("click", () => tripObservationEditDialog.close()));
 
-window.YuhenTripEditor = {
+window.TsubasaTripEditor = {
   openTripForm,
   async editTrip(tripId) {
-    openTripForm(await Yuhen.api(`/api/trips/${tripId}`));
+    openTripForm(await Tsubasa.api(`/api/trips/${tripId}`));
   },
   async linkTrip(tripId) {
-    openTripLink(await Yuhen.api(`/api/trips/${tripId}`));
+    openTripLink(await Tsubasa.api(`/api/trips/${tripId}`));
   },
   async editObservations(tripId) {
     state.activeTripId = Number(tripId);

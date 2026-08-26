@@ -20,7 +20,7 @@ class BackupService:
     def create(self) -> dict:
         created_at = datetime.now().astimezone()
         stamp = created_at.strftime("%Y%m%d-%H%M%S-%f")
-        filename = f"yuhen-backup-{stamp}.zip"
+        filename = f"tsubasa-backup-{stamp}.zip"
         destination = self.settings.backups_dir / filename
         self.settings.backups_dir.mkdir(parents=True, exist_ok=True)
 

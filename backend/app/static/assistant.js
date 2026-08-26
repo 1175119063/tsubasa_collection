@@ -2,8 +2,8 @@
   "use strict";
 
   const page = document.body.dataset.page;
-  if (!page || !window.Yuhen) return;
-  const esc = (value) => Yuhen.escapeHtml(value == null ? "" : String(value));
+  if (!page || !window.Tsubasa) return;
+  const esc = (value) => Tsubasa.escapeHtml(value == null ? "" : String(value));
   let available = false;
   let extraction = null;
 
@@ -130,7 +130,7 @@
   async function loadStatus() {
     const status = document.getElementById("feather-status");
     try {
-      const result = await Yuhen.api("/api/assistant/status");
+      const result = await Tsubasa.api("/api/assistant/status");
       available = Boolean(result.available);
       status.textContent = result.message;
       status.classList.toggle("is-online", available);
@@ -169,7 +169,7 @@
     const pending = appendMessage("assistant", pendingText, true);
     try {
       if (chatMode === "search") {
-        const result = await Yuhen.api("/api/assistant/search-parse", {
+        const result = await Tsubasa.api("/api/assistant/search-parse", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: text }),
@@ -180,7 +180,7 @@
       } else {
         chatHistory.push({ role: "user", content: text });
         chatHistory = chatHistory.slice(-12);
-        const result = await Yuhen.api("/api/assistant/chat", {
+        const result = await Tsubasa.api("/api/assistant/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ page, messages: chatHistory }),
@@ -253,7 +253,7 @@
       result.hidden = false;
       result.innerHTML = "<p>我正在本地书架中寻找能够直接支持分类字段的证据…</p>";
       try {
-        const response = await Yuhen.api("/api/assistant/taxonomy-research", {
+        const response = await Tsubasa.api("/api/assistant/taxonomy-research", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: query.value }),
@@ -273,7 +273,7 @@
       result.hidden = false;
       result.innerHTML = "<p>稍等一下，探险家。我正在核对原文里的分类铭文…</p>";
       try {
-        const response = await Yuhen.api("/api/assistant/species-extract", {
+        const response = await Tsubasa.api("/api/assistant/species-extract", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: source.value }),

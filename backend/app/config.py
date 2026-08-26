@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     update_manifest_url: str | None = None
 
     model_config = SettingsConfigDict(
-        env_prefix="YUHEN_",
+        env_prefix="TSUBASA_",
         env_file=PROJECT_ROOT / ".env",
         extra="ignore",
     )

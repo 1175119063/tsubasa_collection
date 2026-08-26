@@ -8,7 +8,7 @@ from app.update_service import UpdateError, UpdateService
 class StubUpdateService(UpdateService):
     manifest = {
         "version": "0.3.0",
-        "installer_url": "https://example.com/yuhen-0.3.0.exe",
+        "installer_url": "https://example.com/tsubasa-0.3.0.exe",
         "sha256": hashlib.sha256(b"installer").hexdigest(),
         "notes": "测试更新",
     }

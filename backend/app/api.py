@@ -563,7 +563,7 @@ def export_observations_csv(request: Request) -> Response:
     return Response(
         content=content,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="yuhen-observations.csv"'},
+        headers={"Content-Disposition": 'attachment; filename="tsubasa-observations.csv"'},
     )
 
 

@@ -23,11 +23,11 @@
     const filtered = filteredLocations(); markers.clearLayers();
     for (const item of filtered) {
       const marker = L.marker([item.center_latitude, item.center_longitude]);
-      marker.bindPopup(`<strong>${Yuhen.escapeHtml(item.name)}</strong><br>${Yuhen.escapeHtml(labels[item.location_type] || item.location_type)} · ${item.species_count} 种 · ${item.observation_count} 笔记录<br><a href="/locations?location=${item.id}">打开区域档案</a>`);
+      marker.bindPopup(`<strong>${Tsubasa.escapeHtml(item.name)}</strong><br>${Tsubasa.escapeHtml(labels[item.location_type] || item.location_type)} · ${item.species_count} 种 · ${item.observation_count} 笔记录<br><a href="/locations?location=${item.id}">打开区域档案</a>`);
       markers.addLayer(marker);
     }
     byId("map-location-count").textContent = filtered.length;
-    byId("map-location-list").innerHTML = filtered.map((item) => `<button type="button" data-map-location="${item.id}"><strong>${Yuhen.escapeHtml(item.name)}</strong><span>${Yuhen.escapeHtml(item.admin1_name)} · ${item.species_count} 种</span></button>`).join("") || "<p>没有符合条件的区域。</p>";
+    byId("map-location-list").innerHTML = filtered.map((item) => `<button type="button" data-map-location="${item.id}"><strong>${Tsubasa.escapeHtml(item.name)}</strong><span>${Tsubasa.escapeHtml(item.admin1_name)} · ${item.species_count} 种</span></button>`).join("") || "<p>没有符合条件的区域。</p>";
     byId("map-status").textContent = filtered.length ? `地图显示 ${filtered.length} 处区域档案。` : "没有符合条件的地图点位。";
     if (fit && filtered.length) map.fitBounds(markers.getBounds(), { padding: [35, 35], maxZoom: 13 });
   }
@@ -41,10 +41,10 @@
     if (item) map.setView([item.center_latitude, item.center_longitude], 13);
   });
 
-  Yuhen.api("/api/locations").then((items) => {
+  Tsubasa.api("/api/locations").then((items) => {
     locations = items;
     const types = [...new Set(items.map((item) => item.location_type))].sort();
-    byId("map-location-type").innerHTML += types.map((type) => `<option value="${type}">${Yuhen.escapeHtml(labels[type] || type)}</option>`).join("");
+    byId("map-location-type").innerHTML += types.map((type) => `<option value="${type}">${Tsubasa.escapeHtml(labels[type] || type)}</option>`).join("");
     render({ fit: true });
   }).catch((error) => { byId("map-status").textContent = error.message; });
 })();

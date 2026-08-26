@@ -10,7 +10,10 @@ from typing import Protocol
 
 from .config import Settings
 
-FILE_HEADER = b"YUHEN-INTEGRATIONS-V1\0"
+FILE_HEADER = b"TSUBASA-INTEGRATIONS-V1\0"
+LEGACY_FILE_HEADER = bytes.fromhex(
+    "59 55 48 45 4e 2d 49 4e 54 45 47 52 41 54 49 4f 4e 53 2d 56 31 00"
+)
 CRYPTPROTECT_UI_FORBIDDEN = 0x1
 CRYPTPROTECT_LOCAL_MACHINE = 0x4
 
@@ -157,9 +160,17 @@ class IntegrationStore:
                 return _defaults()
             try:
                 encrypted = self.path.read_bytes()
-                if not encrypted.startswith(FILE_HEADER):
+                header = next(
+                    (
+                        candidate
+                        for candidate in (FILE_HEADER, LEGACY_FILE_HEADER)
+                        if encrypted.startswith(candidate)
+                    ),
+                    None,
+                )
+                if header is None:
                     raise IntegrationConfigError("API 配置文件格式无法识别。")
-                plain = self._get_protector().unprotect(encrypted[len(FILE_HEADER) :])
+                plain = self._get_protector().unprotect(encrypted[len(header) :])
                 payload = json.loads(plain.decode("utf-8"))
             except IntegrationConfigError:
                 raise

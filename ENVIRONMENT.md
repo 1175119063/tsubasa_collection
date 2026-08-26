@@ -3,26 +3,26 @@
 项目使用 Python 3.11 Conda 环境。当前工作区中的环境位置为：
 
 ```text
-F:\bird_dataset\.conda\envs\yuhen
+F:\bird_dataset\.conda\envs\tsubasa
 ```
 
 在 PowerShell 中激活：
 
 ```powershell
 & 'C:\Users\RAZOR\miniconda3\shell\condabin\conda-hook.ps1'
-conda activate 'F:\bird_dataset\.conda\envs\yuhen'
+conda activate 'F:\bird_dataset\.conda\envs\tsubasa'
 ```
 
 不激活环境也可以直接调用项目解释器：
 
 ```powershell
-& '.\.conda\envs\yuhen\python.exe' --version
+& '.\.conda\envs\tsubasa\python.exe' --version
 ```
 
 在另一台装有 Conda 的 Windows 电脑上重新创建：
 
 ```powershell
-conda env create --prefix '.\.conda\envs\yuhen' --file '.\environment.yml'
+conda env create --prefix '.\.conda\envs\tsubasa' --file '.\environment.yml'
 ```
 
 `.conda` 目录是本机生成环境，不属于项目源代码，也不应放入备份或版本控制。换电脑时使用 `environment.yml` 重新创建即可。
@@ -45,7 +45,7 @@ conda env create --prefix '.\.conda\envs\yuhen' --file '.\environment.yml'
 .\packaging\ollama\setup.ps1
 ```
 
-默认模型服务地址是 `http://127.0.0.1:11434`，应用内模型名是 `feiyu-jingling`。可复制 `.env.example` 中的 `YUHEN_FEATHER_ASSISTANT_*` 配置进行覆盖。Ollama 的模型目录由 Ollama 自己管理，不应复制进项目的 `data` 或资料库备份。
+默认模型服务地址是 `http://127.0.0.1:11434`，应用内模型名是 `feiyu-jingling`。可复制 `.env.example` 中的 `TSUBASA_FEATHER_ASSISTANT_*` 配置进行覆盖。Ollama 的模型目录由 Ollama 自己管理，不应复制进项目的 `data` 或资料库备份。
 
 ## API 管理与外部模型
 
@@ -67,4 +67,4 @@ https://api.example.com/v1
 
 `integrations.dat` 不包含在“完整备份资料库”的 ZIP 中，也不应提交版本控制。换电脑、换 Windows 环境或复制发行包后应重新填写密钥。启用外部模型后，只有开放式“精灵对话”会把对话文本发送给对应服务商；分类字段提取、田野筛选和页面功能说明继续使用本地 Ollama。
 
-高德地图也可以继续通过 `.env` 的 `YUHEN_AMAP_WEB_SERVICE_KEY` 提供。只要在 API 管理中保存新的 Key，就会改用加密配置；主动清除表示明确停用当前 Key，因此不会自动回退到 `.env`。
+高德地图也可以继续通过 `.env` 的 `TSUBASA_AMAP_WEB_SERVICE_KEY` 提供。只要在 API 管理中保存新的 Key，就会改用加密配置；主动清除表示明确停用当前 Key，因此不会自动回退到 `.env`。

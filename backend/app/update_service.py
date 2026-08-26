@@ -50,10 +50,10 @@ class UpdateService:
         if not status.get("update_available"):
             raise UpdateError(status["message"])
         self.settings.updates_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"yuhen-update-v{status['version']}.exe"
+        filename = f"tsubasa-update-v{status['version']}.exe"
         destination = self.settings.updates_dir / filename
         temporary = self.settings.updates_dir / f".{filename}.download"
-        request = Request(status["installer_url"], headers={"User-Agent": "Yuhen-Updater/1"})
+        request = Request(status["installer_url"], headers={"User-Agent": "Tsubasa-Updater/1"})
         hasher = hashlib.sha256()
         total = 0
         try:
@@ -124,7 +124,7 @@ class UpdateService:
     @staticmethod
     def _request_json(url: str) -> dict:
         try:
-            request = Request(url, headers={"User-Agent": "Yuhen-Updater/1"})
+            request = Request(url, headers={"User-Agent": "Tsubasa-Updater/1"})
             with urlopen(request, timeout=15) as response:  # noqa: S310
                 content = response.read(1024 * 1024 + 1)
             if len(content) > 1024 * 1024:

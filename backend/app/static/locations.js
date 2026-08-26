@@ -104,7 +104,7 @@ function fillAddressFields(component = {}) {
 async function reverseMapPoint(latitude, longitude) {
   if (!mapSearchEnabled) return;
   try {
-    const result = await Yuhen.api(`/api/map/reverse?latitude=${latitude}&longitude=${longitude}`);
+    const result = await Tsubasa.api(`/api/map/reverse?latitude=${latitude}&longitude=${longitude}`);
     fillAddressFields(result);
     setMapStatus(`已选择：${result.formatted_address || `${latitude}, ${longitude}`}（WGS-84）`);
   } catch (error) { setMapStatus(`${error.message} 坐标已经写入，可以手动补充行政区。`); }
@@ -135,7 +135,7 @@ async function initializeLocationMap() {
   if (!byId("location-map")) return;
   setMapStatus("正在加载地图……");
   try {
-    const [L, config] = await Promise.all([loadLeaflet(), Yuhen.api("/api/map/config")]);
+    const [L, config] = await Promise.all([loadLeaflet(), Tsubasa.api("/api/map/config")]);
     mapSearchEnabled = Boolean(config.enabled);
     if (!state.locationMap) {
       state.locationMap = L.map("location-map").setView([36.6, 117.06], 11);
@@ -154,16 +154,16 @@ async function searchLocationMap() {
   setMapStatus("正在通过高德搜索地点……");
   try {
     const city = locationForm.elements.city.value.trim();
-    const result = await Yuhen.api(`/api/map/search?query=${encodeURIComponent(query)}${city ? `&city=${encodeURIComponent(city)}` : ""}`);
+    const result = await Tsubasa.api(`/api/map/search?query=${encodeURIComponent(query)}${city ? `&city=${encodeURIComponent(city)}` : ""}`);
     state.mapResults = result.items || [];
-    byId("location-map-results").innerHTML = state.mapResults.map((item, index) => `<button type="button" class="location-map-result" data-location-map-result="${index}"><strong>${Yuhen.escapeHtml(item.name)}</strong><small>${Yuhen.escapeHtml([item.province, item.city, item.district, item.address].filter(Boolean).join(" · "))}</small></button>`).join("");
+    byId("location-map-results").innerHTML = state.mapResults.map((item, index) => `<button type="button" class="location-map-result" data-location-map-result="${index}"><strong>${Tsubasa.escapeHtml(item.name)}</strong><small>${Tsubasa.escapeHtml([item.province, item.city, item.district, item.address].filter(Boolean).join(" · "))}</small></button>`).join("");
     setMapStatus(state.mapResults.length ? `找到 ${state.mapResults.length} 个结果，请选择一个地点。` : "没有找到匹配地点，可以换个关键词或直接点击地图。");
   } catch (error) { setMapStatus(error.message); }
 }
 
 async function loadLocations() {
   [state.locations, state.observations] = await Promise.all([
-    Yuhen.api("/api/locations"), Yuhen.api("/api/observations"),
+    Tsubasa.api("/api/locations"), Tsubasa.api("/api/observations"),
   ]);
   populateTypeFilter();
   renderLocations();
@@ -196,10 +196,10 @@ function renderLocations() {
   byId("location-grid").innerHTML = filtered.map((item) => `
     <button class="location-card" data-location-id="${item.id}">
       ${item.cover_url
-        ? `<img src="${item.cover_url}" alt="${Yuhen.escapeHtml(item.name)}" loading="lazy" />`
+        ? `<img src="${item.cover_url}" alt="${Tsubasa.escapeHtml(item.name)}" loading="lazy" />`
         : `<span class="location-card-placeholder">⌖</span>`}
       <span class="location-card-body"><span class="card-number">${item.catalog_number}</span>
-        <strong>${Yuhen.escapeHtml(item.name)}</strong><small>${locationTypes[item.location_type]} · ${Yuhen.escapeHtml(item.admin1_name)}</small>
+        <strong>${Tsubasa.escapeHtml(item.name)}</strong><small>${locationTypes[item.location_type]} · ${Tsubasa.escapeHtml(item.admin1_name)}</small>
         <span class="location-card-stats"><span><b>${item.species_count}</b> 物种</span><span><b>${item.observation_count}</b> 记录</span><span><b>${item.visit_day_count}</b> 到访日</span><span><b>${item.trip_count}</b> 行程</span></span>
       </span>
     </button>`).join("");
@@ -249,24 +249,24 @@ function monthLabel(value) {
 }
 
 async function openLocationDetail(locationId) {
-  const detail = await Yuhen.api(`/api/locations/${locationId}`);
+  const detail = await Tsubasa.api(`/api/locations/${locationId}`);
   state.activeLocationId = detail.id;
   const maxDays = Math.max(1, ...detail.monthly_activity.map((item) => item.visit_day_count));
   const cover = detail.cover_url
-    ? `<img src="${detail.cover_url.replace("thumbnail=true", "thumbnail=false")}" alt="${Yuhen.escapeHtml(detail.name)}" />`
+    ? `<img src="${detail.cover_url.replace("thumbnail=true", "thumbnail=false")}" alt="${Tsubasa.escapeHtml(detail.name)}" />`
     : `<span class="location-detail-placeholder">⌖</span>`;
   byId("location-detail-content").innerHTML = `
     <section class="detail-hero location-detail-hero"><div class="location-detail-cover">${cover}</div>
-      <div class="detail-title"><p class="eyebrow">${detail.catalog_number}</p><h2>${Yuhen.escapeHtml(detail.name)}</h2>
-        <p>${locationTypes[detail.location_type]} · ${Yuhen.escapeHtml(detail.country_name)} ${Yuhen.escapeHtml(detail.admin1_name)} ${Yuhen.escapeHtml(detail.city || "")} ${Yuhen.escapeHtml(detail.district || "")}</p>
+      <div class="detail-title"><p class="eyebrow">${detail.catalog_number}</p><h2>${Tsubasa.escapeHtml(detail.name)}</h2>
+        <p>${locationTypes[detail.location_type]} · ${Tsubasa.escapeHtml(detail.country_name)} ${Tsubasa.escapeHtml(detail.admin1_name)} ${Tsubasa.escapeHtml(detail.city || "")} ${Tsubasa.escapeHtml(detail.district || "")}</p>
         <div class="detail-classification">中心点 ${detail.center_latitude}, ${detail.center_longitude} · ${detail.coordinate_system === "gcj02" ? "GCJ-02" : "WGS-84"}${detail.radius_meters ? ` · 建议半径 ${detail.radius_meters} 米` : ""}</div></div>
     </section>
     <div class="detail-body">
       <div class="location-summary-stats"><article><strong>${detail.species_count}</strong><span>记录物种</span></article><article><strong>${detail.observation_count}</strong><span>观察记录</span></article><article><strong>${detail.visit_day_count}</strong><span>到访日</span></article><article><strong>${detail.trip_count}</strong><span>观鸟行程</span></article></div>
-      <section class="detail-section"><h3>地点档案</h3><p>${Yuhen.escapeHtml(detail.notes || "暂无地点备注")}</p><p class="section-note">${detail.first_observed_at ? `初次记录 ${detail.first_observed_at.replace("T", " ")} · 最近记录 ${detail.last_observed_at.replace("T", " ")}` : "尚未关联观察记录"}</p></section>
+      <section class="detail-section"><h3>地点档案</h3><p>${Tsubasa.escapeHtml(detail.notes || "暂无地点备注")}</p><p class="section-note">${detail.first_observed_at ? `初次记录 ${detail.first_observed_at.replace("T", " ")} · 最近记录 ${detail.last_observed_at.replace("T", " ")}` : "尚未关联观察记录"}</p></section>
       <section class="detail-section"><h3>时间频率</h3><div class="location-month-chart">${detail.monthly_activity.length ? detail.monthly_activity.map((item) => `<div class="month-bar-row"><span>${monthLabel(item.month)}</span><i><b style="width:${item.visit_day_count / maxDays * 100}%"></b></i><em>${item.visit_day_count} 到访日 · ${item.observation_count} 记录</em></div>`).join("") : `<p class="preview-empty">暂无时间记录</p>`}</div></section>
-      <section class="detail-section"><h3>地点物种</h3><div class="location-species-list">${detail.species.length ? detail.species.map((item) => `<a href="/dex?species=${item.id}"><img src="${item.thumbnail_url}" alt="" /><span><strong>${Yuhen.escapeHtml(item.chinese_name)}</strong><small>${Yuhen.escapeHtml(item.scientific_name)} · ${item.observation_count} 笔</small></span></a>`).join("") : `<p class="preview-empty">尚未记录物种</p>`}</div></section>
-      <section class="detail-section"><h3>观察记录</h3><div class="record-grid">${detail.observations.map((item) => `<a class="record-tile" href="/observations?observation=${item.id}"><img src="${item.thumbnail_url}" alt="" /><span class="record-tile-body"><strong>${Yuhen.escapeHtml(item.species_name)}</strong><span>${item.observed_at.replace("T", " ")}</span><span>${Yuhen.escapeHtml(item.locality)}</span></span></a>`).join("")}</div></section>
+      <section class="detail-section"><h3>地点物种</h3><div class="location-species-list">${detail.species.length ? detail.species.map((item) => `<a href="/dex?species=${item.id}"><img src="${item.thumbnail_url}" alt="" /><span><strong>${Tsubasa.escapeHtml(item.chinese_name)}</strong><small>${Tsubasa.escapeHtml(item.scientific_name)} · ${item.observation_count} 笔</small></span></a>`).join("") : `<p class="preview-empty">尚未记录物种</p>`}</div></section>
+      <section class="detail-section"><h3>观察记录</h3><div class="record-grid">${detail.observations.map((item) => `<a class="record-tile" href="/observations?observation=${item.id}"><img src="${item.thumbnail_url}" alt="" /><span class="record-tile-body"><strong>${Tsubasa.escapeHtml(item.species_name)}</strong><span>${item.observed_at.replace("T", " ")}</span><span>${Tsubasa.escapeHtml(item.locality)}</span></span></a>`).join("")}</div></section>
       <div class="location-detail-actions"><button class="secondary-button" data-upload-location-cover="${detail.id}">${detail.cover_source === "custom" ? "更换自定义封面" : "上传自定义封面"}</button><button class="secondary-button" data-edit-location="${detail.id}">修改地点</button><button class="secondary-button" data-link-location="${detail.id}">关联已有观察</button><span id="location-cover-status"></span><button class="danger-outline-button" data-delete-location="${detail.id}">删除地点</button></div>
     </div>`;
   if (!locationDetailDialog.open) locationDetailDialog.showModal();
@@ -277,8 +277,8 @@ function openLocationLink(locationId) {
   byId("location-link-list").innerHTML = state.observations.map((item) => {
     const checked = item.location?.id === state.activeLocationId ? "checked" : "";
     const elsewhere = item.location && item.location.id !== state.activeLocationId
-      ? `当前：${Yuhen.escapeHtml(item.location.name)}` : "";
-    return `<label class="location-link-item"><input type="checkbox" name="observation_id" value="${item.id}" ${checked} /><img src="${item.thumbnail_url}" alt="" /><span><strong>${Yuhen.escapeHtml(item.species_name)}</strong><small>${item.observed_at.replace("T", " ")} · ${Yuhen.escapeHtml(item.locality)}</small><em>${elsewhere}</em></span></label>`;
+      ? `当前：${Tsubasa.escapeHtml(item.location.name)}` : "";
+    return `<label class="location-link-item"><input type="checkbox" name="observation_id" value="${item.id}" ${checked} /><img src="${item.thumbnail_url}" alt="" /><span><strong>${Tsubasa.escapeHtml(item.species_name)}</strong><small>${item.observed_at.replace("T", " ")} · ${Tsubasa.escapeHtml(item.locality)}</small><em>${elsewhere}</em></span></label>`;
   }).join("") || `<p class="compact-empty">尚无可关联的观察记录。</p>`;
   byId("location-link-status").textContent = "";
   locationLinkDialog.showModal();
@@ -290,7 +290,7 @@ locationForm.addEventListener("submit", async (event) => {
   status.textContent = "正在保存…";
   try {
     const url = state.editingLocationId ? `/api/locations/${state.editingLocationId}` : "/api/locations";
-    const detail = await Yuhen.api(url, { method: state.editingLocationId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(locationPayload()) });
+    const detail = await Tsubasa.api(url, { method: state.editingLocationId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(locationPayload()) });
     locationFormDialog.close();
     if (isV2Editor) { window.location.href = `/locations?location=${detail.id}`; return; }
     await loadLocations(); await openLocationDetail(detail.id);
@@ -302,7 +302,7 @@ byId("location-link-form").addEventListener("submit", async (event) => {
   const ids = [...new FormData(event.currentTarget).getAll("observation_id")].map(Number);
   const status = byId("location-link-status"); status.textContent = "正在保存关联…";
   try {
-    await Yuhen.api(`/api/locations/${state.activeLocationId}/observations`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_ids: ids }) });
+    await Tsubasa.api(`/api/locations/${state.activeLocationId}/observations`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_ids: ids }) });
     locationLinkDialog.close();
     if (isV2Editor) { window.location.href = `/locations?location=${state.activeLocationId}`; return; }
     await loadLocations(); await openLocationDetail(state.activeLocationId);
@@ -337,10 +337,10 @@ document.querySelectorAll("[data-close-location-link]").forEach((item) => item.a
 locationDetailDialog.addEventListener("click", async (event) => {
   const cover = event.target.closest("[data-upload-location-cover]");
   if (cover) { state.activeLocationId = Number(cover.dataset.uploadLocationCover); byId("location-cover-input").click(); return; }
-  const edit = event.target.closest("[data-edit-location]"); if (edit) { const detail = await Yuhen.api(`/api/locations/${edit.dataset.editLocation}`); openLocationForm(detail); return; }
+  const edit = event.target.closest("[data-edit-location]"); if (edit) { const detail = await Tsubasa.api(`/api/locations/${edit.dataset.editLocation}`); openLocationForm(detail); return; }
   const link = event.target.closest("[data-link-location]"); if (link) { openLocationLink(link.dataset.linkLocation); return; }
   const remove = event.target.closest("[data-delete-location]");
-  if (remove && confirm("删除地点只会解除观察关联，不会删除任何观察记录。确定删除吗？")) { await Yuhen.api(`/api/locations/${remove.dataset.deleteLocation}`, { method: "DELETE" }); locationDetailDialog.close(); await loadLocations(); }
+  if (remove && confirm("删除地点只会解除观察关联，不会删除任何观察记录。确定删除吗？")) { await Tsubasa.api(`/api/locations/${remove.dataset.deleteLocation}`, { method: "DELETE" }); locationDetailDialog.close(); await loadLocations(); }
 });
 
 byId("location-cover-input").addEventListener("change", async (event) => {
@@ -350,17 +350,17 @@ byId("location-cover-input").addEventListener("change", async (event) => {
   if (status) status.textContent = "正在上传封面…";
   const body = new FormData(); body.append("photo", file);
   try {
-    await Yuhen.api(`/api/locations/${state.activeLocationId}/cover`, { method: "POST", body });
+    await Tsubasa.api(`/api/locations/${state.activeLocationId}/cover`, { method: "POST", body });
     event.target.value = "";
     if (isV2Editor) { window.location.href = `/locations?location=${state.activeLocationId}`; return; }
     await loadLocations(); await openLocationDetail(state.activeLocationId);
   } catch (error) { if (status) status.textContent = error.message; event.target.value = ""; }
 });
 
-window.YuhenLocationEditor = {
+window.TsubasaLocationEditor = {
   openLocationForm,
   async editLocation(locationId) {
-    openLocationForm(await Yuhen.api(`/api/locations/${locationId}`));
+    openLocationForm(await Tsubasa.api(`/api/locations/${locationId}`));
   },
   openLocationLink,
   uploadCover(locationId) {

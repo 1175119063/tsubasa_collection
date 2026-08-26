@@ -3,7 +3,7 @@
 
   const page = document.body.dataset.page;
   const byId = (id) => document.getElementById(id);
-  const esc = (value) => Yuhen.escapeHtml(value == null ? "" : String(value));
+  const esc = (value) => Tsubasa.escapeHtml(value == null ? "" : String(value));
   const locationTypes = {
     wetland_park: "湿地公园", forest_park: "森林公园", urban_park: "城市公园",
     nature_reserve: "自然保护区", reservoir: "水库", farmland: "农田",
@@ -78,7 +78,7 @@
     const names = entries.map((entry) => entry.species_name);
     const title = names.length > 2 ? `${names.slice(0, 2).join("、")}等 ${names.length} 种` : names.join("、");
     const count = item.species_count || entries.length;
-    return `<button class="v2-field-card" data-v2-observation="${item.id}"><span class="v2-field-photo"><img src="${esc(item.thumbnail_url)}" alt="${esc(title)}" loading="lazy" /><i>OBSERVATION ${item.id}</i></span><span class="v2-field-copy"><strong>${esc(title)}</strong><em>${count} 条物种记录</em><span>${dateTime(item.observed_at)}</span><small>${esc(item.location?.name || item.locality)}</small><b>${esc(Yuhen.labels[item.season] || item.season)} · ${count > 1 ? "多物种照片" : (item.photo_type === "group" ? "群体照片" : "个体照片")}</b></span></button>`;
+    return `<button class="v2-field-card" data-v2-observation="${item.id}"><span class="v2-field-photo"><img src="${esc(item.thumbnail_url)}" alt="${esc(title)}" loading="lazy" /><i>OBSERVATION ${item.id}</i></span><span class="v2-field-copy"><strong>${esc(title)}</strong><em>${count} 条物种记录</em><span>${dateTime(item.observed_at)}</span><small>${esc(item.location?.name || item.locality)}</small><b>${esc(Tsubasa.labels[item.season] || item.season)} · ${count > 1 ? "多物种照片" : (item.photo_type === "group" ? "群体照片" : "个体照片")}</b></span></button>`;
   }
 
   function populateObservationFilters() {
@@ -119,8 +119,8 @@
     const storedIndex = state.activeObservationSpecies.get(id) || 0;
     const index = Math.max(0, Math.min(requestedIndex ?? storedIndex, entries.length - 1));
     const entry = entries[index];
-    const sexLabel = entry.sex === "unknown" || !entry.sex ? "性别未知" : (Yuhen.labels[entry.sex] || entry.sex);
-    const lifeStageLabel = entry.life_stage === "unknown" || !entry.life_stage ? "生命阶段未知" : (Yuhen.labels[entry.life_stage] || entry.life_stage);
+    const sexLabel = entry.sex === "unknown" || !entry.sex ? "性别未知" : (Tsubasa.labels[entry.sex] || entry.sex);
+    const lifeStageLabel = entry.life_stage === "unknown" || !entry.life_stage ? "生命阶段未知" : (Tsubasa.labels[entry.life_stage] || entry.life_stage);
     const individualInfo = entry.photo_type === "group" ? "群体照片" : `${sexLabel} · ${lifeStageLabel}`;
     const subspecies = entry.subspecies
       ? [entry.subspecies.chinese_name, entry.subspecies.scientific_name].filter(Boolean).join(" · ")
@@ -131,7 +131,7 @@
     if (!dialog.open) dialog.showModal();
   }
   async function loadObservations() {
-    state.observations = await Yuhen.api("/api/observations"); populateObservationFilters();
+    state.observations = await Tsubasa.api("/api/observations"); populateObservationFilters();
     const requestedLocation = new URLSearchParams(location.search).get("location");
     state.observationTripId = Number(new URLSearchParams(location.search).get("trip")) || null;
     if (requestedLocation && [...byId("v2-observation-location").options].some((option) => option.value === requestedLocation)) byId("v2-observation-location").value = requestedLocation;
@@ -153,13 +153,13 @@
       }
       const edit = event.target.closest("[data-v2-edit-observation]");
       if (edit) {
-        if (!window.YuhenObservationEditor) return;
+        if (!window.TsubasaObservationEditor) return;
         edit.disabled = true;
         try {
           const observationId = Number(edit.dataset.v2EditObservation);
           const entries = observationSpeciesEntries(state.observations.find((entry) => entry.id === observationId));
           const selectedEntry = entries[state.activeObservationSpecies.get(observationId) || 0];
-          await window.YuhenObservationEditor.showObservationEditor(observationId, selectedEntry?.id);
+          await window.TsubasaObservationEditor.showObservationEditor(observationId, selectedEntry?.id);
         }
         catch (error) { alert(error.message); }
         finally { edit.disabled = false; }
@@ -167,13 +167,13 @@
       }
       const remove = event.target.closest("[data-v2-delete-observation]");
       if (remove && confirm("这会永久删除该观察及其照片、录音；若它是物种的最后一笔记录，物种档案也会一并删除。确定继续吗？")) {
-        await Yuhen.api(`/api/observations/${remove.dataset.v2DeleteObservation}`, { method: "DELETE" });
+        await Tsubasa.api(`/api/observations/${remove.dataset.v2DeleteObservation}`, { method: "DELETE" });
         window.location.href = "/observations";
       }
       const removeEntry = event.target.closest("[data-v2-remove-species-entry]");
       if (removeEntry && confirm("只从这笔观察中移除该物种，不会删除照片或其他物种。确定继续吗？")) {
-        await Yuhen.api(`/api/observations/${removeEntry.dataset.observationId}/species/${removeEntry.dataset.v2RemoveSpeciesEntry}`, { method: "DELETE" });
-        state.observations = await Yuhen.api("/api/observations");
+        await Tsubasa.api(`/api/observations/${removeEntry.dataset.observationId}/species/${removeEntry.dataset.v2RemoveSpeciesEntry}`, { method: "DELETE" });
+        state.observations = await Tsubasa.api("/api/observations");
         populateObservationFilters();
         renderObservations();
         openObservation(Number(removeEntry.dataset.observationId));
@@ -195,7 +195,7 @@
   async function openLocation(id) {
     const dialog = byId("v2-location-dialog"); if (!dialog.open) dialog.showModal(); byId("v2-location-detail").innerHTML = "<p class=\"v2-loading v2-dossier-loading\">正在调取区域档案…</p>";
     try {
-      const item = await Yuhen.api(`/api/locations/${id}`); const max = Math.max(1, ...item.monthly_activity.map((entry) => entry.visit_day_count));
+      const item = await Tsubasa.api(`/api/locations/${id}`); const max = Math.max(1, ...item.monthly_activity.map((entry) => entry.visit_day_count));
       const observations = [...item.observations].reverse().slice(0, 8);
       const moreObservations = item.observations.length ? `<a class="v2-detail-evidence v2-evidence-more" href="/observations?location=${item.id}"><span><strong>查看更多</strong><small>检视该区域全部 ${item.observation_count} 笔记录 →</small></span></a>` : "";
       const trips = item.trips.length ? item.trips.map((trip) => `<a class="v2-location-trip" href="/trips?trip=${trip.id}"><small>${esc(trip.catalog_number)}${trip.is_primary_location ? " · 主要地点" : " · 途经地点"}</small><strong>${esc(trip.name)}</strong><span>${dateTime(trip.started_at)} — ${dateTime(trip.ended_at)}</span><em>${trip.observation_count} 笔观察</em></a>`).join("") : "<p class=\"v2-detail-empty\">尚未关联远征记录。</p>";
@@ -213,17 +213,17 @@
     } catch (error) { byId("v2-location-detail").innerHTML = `<p class="v2-loading v2-dossier-loading">${esc(error.message)}</p>`; }
   }
   async function loadLocations() {
-    state.locations = await Yuhen.api("/api/locations");
+    state.locations = await Tsubasa.api("/api/locations");
     byId("v2-location-type").innerHTML = `<option value="">全部类型</option>${Object.entries(locationTypes).map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}`; renderLocations();
     byId("v2-location-search").addEventListener("input", renderLocations); byId("v2-location-type").addEventListener("change", renderLocations);
     byId("v2-location-reset").addEventListener("click", () => { byId("v2-location-search").value = ""; byId("v2-location-type").value = ""; renderLocations(); }); wireDialog(byId("v2-location-dialog"));
     byId("v2-location-dialog").addEventListener("click", async (event) => {
-      const editor = window.YuhenLocationEditor;
+      const editor = window.TsubasaLocationEditor;
       const edit = event.target.closest("[data-v2-edit-location]"); if (edit && editor) { await editor.editLocation(Number(edit.dataset.v2EditLocation)); return; }
       const cover = event.target.closest("[data-v2-location-cover]"); if (cover && editor) { editor.uploadCover(Number(cover.dataset.v2LocationCover)); return; }
       const link = event.target.closest("[data-v2-link-location]"); if (link && editor) { editor.openLocationLink(Number(link.dataset.v2LinkLocation)); return; }
       const remove = event.target.closest("[data-v2-delete-location]");
-      if (remove && confirm("删除区域只会解除观察关联，不会删除任何观察记录。确定删除吗？")) { await Yuhen.api(`/api/locations/${remove.dataset.v2DeleteLocation}`, { method: "DELETE" }); window.location.href = "/locations"; }
+      if (remove && confirm("删除区域只会解除观察关联，不会删除任何观察记录。确定删除吗？")) { await Tsubasa.api(`/api/locations/${remove.dataset.v2DeleteLocation}`, { method: "DELETE" }); window.location.href = "/locations"; }
     });
     const requested = new URLSearchParams(location.search).get("location"); if (requested) openLocation(Number(requested));
   }
@@ -247,7 +247,7 @@
   async function openTrip(id) {
     const dialog = byId("v2-trip-dialog"); if (!dialog.open) dialog.showModal(); byId("v2-trip-detail").innerHTML = "<p class=\"v2-loading v2-dossier-loading\">正在调取远征卷宗…</p>";
     try {
-      const item = await Yuhen.api(`/api/trips/${id}`);
+      const item = await Tsubasa.api(`/api/trips/${id}`);
       const allObservations = item.observations;
       state.activeTripId = item.id;
       state.tripCoverChoices = allObservations;
@@ -271,24 +271,24 @@
     } catch (error) { byId("v2-trip-detail").innerHTML = `<p class="v2-loading v2-dossier-loading">${esc(error.message)}</p>`; }
   }
   async function loadTrips() {
-    state.trips = await Yuhen.api("/api/trips"); populateTripFilters(); renderTrips();
+    state.trips = await Tsubasa.api("/api/trips"); populateTripFilters(); renderTrips();
     byId("v2-trip-year").addEventListener("change", () => { populateTripMonths(); renderTrips(); }); ["v2-trip-month", "v2-trip-location", "v2-trip-sort"].forEach((id) => byId(id).addEventListener("change", renderTrips));
     byId("v2-trip-reset").addEventListener("click", () => { ["v2-trip-year", "v2-trip-month", "v2-trip-location"].forEach((id) => { byId(id).value = ""; }); byId("v2-trip-sort").value = "asc"; populateTripMonths(); renderTrips(); }); wireDialog(byId("v2-trip-dialog"));
     byId("v2-trip-dialog").addEventListener("click", async (event) => {
-      const editor = window.YuhenTripEditor;
+      const editor = window.TsubasaTripEditor;
       const edit = event.target.closest("[data-v2-edit-trip]"); if (edit && editor) { await editor.editTrip(Number(edit.dataset.v2EditTrip)); return; }
       const link = event.target.closest("[data-v2-link-trip]"); if (link && editor) { await editor.linkTrip(Number(link.dataset.v2LinkTrip)); return; }
       const editObservations = event.target.closest("[data-v2-edit-trip-observations]"); if (editObservations && editor) { await editor.editObservations(Number(editObservations.dataset.v2EditTripObservations)); return; }
-      const changeCover = event.target.closest("[data-v2-change-trip-cover]"); if (changeCover) { const item = await Yuhen.api(`/api/trips/${changeCover.dataset.v2ChangeTripCover}`); openTripCoverPicker(item); return; }
-      const remove = event.target.closest("[data-v2-delete-trip]"); if (remove && confirm("删除远征只会解除观察关联，不会删除任何观察记录。确定删除吗？")) { await Yuhen.api(`/api/trips/${remove.dataset.v2DeleteTrip}`, { method: "DELETE" }); window.location.href = "/trips"; }
+      const changeCover = event.target.closest("[data-v2-change-trip-cover]"); if (changeCover) { const item = await Tsubasa.api(`/api/trips/${changeCover.dataset.v2ChangeTripCover}`); openTripCoverPicker(item); return; }
+      const remove = event.target.closest("[data-v2-delete-trip]"); if (remove && confirm("删除远征只会解除观察关联，不会删除任何观察记录。确定删除吗？")) { await Tsubasa.api(`/api/trips/${remove.dataset.v2DeleteTrip}`, { method: "DELETE" }); window.location.href = "/trips"; }
     });
     const coverDialog = byId("v2-trip-cover-dialog"); wireDialog(coverDialog);
     byId("v2-trip-cover-grid").addEventListener("click", async (event) => {
       const choice = event.target.closest("[data-v2-trip-cover-choice]"); if (!choice || choice.disabled) return;
       byId("v2-trip-cover-status").textContent = "正在更换远征封面……";
       try {
-        await Yuhen.api(`/api/trips/${state.activeTripId}/cover`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_id: Number(choice.dataset.v2TripCoverChoice) }) });
-        coverDialog.close(); state.trips = await Yuhen.api("/api/trips"); populateTripFilters(); renderTrips(); await openTrip(state.activeTripId);
+        await Tsubasa.api(`/api/trips/${state.activeTripId}/cover`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observation_id: Number(choice.dataset.v2TripCoverChoice) }) });
+        coverDialog.close(); state.trips = await Tsubasa.api("/api/trips"); populateTripFilters(); renderTrips(); await openTrip(state.activeTripId);
       } catch (error) { byId("v2-trip-cover-status").textContent = error.message; }
     });
     const requested = new URLSearchParams(location.search).get("trip"); if (requested) openTrip(Number(requested));
