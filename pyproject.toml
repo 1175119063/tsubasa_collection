@@ -15,6 +15,9 @@ dependencies = [
     "uvicorn[standard]",
 ]
 
+[tool.setuptools]
+packages = []
+
 [project.optional-dependencies]
 dev = ["httpx", "playwright", "pytest", "ruff"]
 
