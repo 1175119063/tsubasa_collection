@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (for example 0.3.0)"
+        required: true
+        default: "0.3.0"
 
 permissions:
   contents: write
@@ -22,7 +28,7 @@ jobs:
       - name: Build portable Windows package
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $version = if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { '${{ inputs.version }}' } else { $env:GITHUB_REF_NAME -replace '^v', '' }
           .\packaging\build-release.ps1 -Version $version
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -40,7 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then version="${{ inputs.version }}"; else version="${GITHUB_REF_NAME#v}"; fi
           bundle="翼·时光记-macOS-Docker-v${version}"
           mkdir -p "packaging/release/${bundle}"
           cp pyproject.toml packaging/macos/Dockerfile packaging/macos/docker-compose.yml packaging/macos/README-zh-CN.md "packaging/release/${bundle}/"
