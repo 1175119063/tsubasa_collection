@@ -1,0 +1,21 @@
+#app {
+  min-height: 100vh;
+}
+
+.vue-migration-note {
+  width: min(760px, calc(100% - 40px));
+  margin: 80px auto;
+  padding: 34px;
+  border: 1px solid rgba(181, 142, 64, 0.48);
+  background: rgba(248, 240, 218, 0.94);
+  box-shadow: 0 20px 50px rgba(14, 42, 34, 0.2);
+  color: #183f34;
+}
+
+.vue-migration-note h1 {
+  margin: 8px 0 14px;
+}
+
+.vue-migration-note p {
+  line-height: 1.8;
+}

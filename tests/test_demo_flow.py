@@ -166,6 +166,17 @@ def test_complete_demo_flow_and_species_id_is_never_reused(tmp_path):
         preview_observations_page = client.get("/preview/observations")
         preview_locations_page = client.get("/preview/locations")
         preview_trips_page = client.get("/preview/trips")
+        vue_pages = [
+            client.get(path)
+            for path in (
+                "/vue",
+                "/vue/dex",
+                "/vue/observations",
+                "/vue/locations",
+                "/vue/map",
+                "/vue/trips",
+            )
+        ]
         legacy_page = client.get("/legacy")
         legacy_observations_page = client.get("/legacy/observations")
         legacy_dex_page = client.get("/legacy/dex")
@@ -180,6 +191,9 @@ def test_complete_demo_flow_and_species_id_is_never_reused(tmp_path):
         assert preview_observations_page.status_code == 200
         assert preview_locations_page.status_code == 200
         assert preview_trips_page.status_code == 200
+        assert all(page.status_code == 200 for page in vue_pages)
+        assert all('<div id="app"></div>' in page.text for page in vue_pages)
+        assert all("/static/vue/assets/" in page.text for page in vue_pages)
         legacy_pages = [
             legacy_page,
             legacy_observations_page,

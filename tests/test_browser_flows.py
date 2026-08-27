@@ -67,6 +67,31 @@ def post_observation(base_url: str) -> dict:
     return response.json()
 
 
+def post_location(base_url: str, name: str = "Test Wetland") -> dict:
+    response = httpx.post(
+        f"{base_url}/api/locations",
+        json={
+            "name": name,
+            "location_type": "wetland_park",
+            "country_code": "CN",
+            "country_name": "China",
+            "admin1_code": "CN-ZJ",
+            "admin1_name": "Zhejiang",
+            "city": "Hangzhou",
+            "district": None,
+            "center_latitude": 30.2741,
+            "center_longitude": 120.1551,
+            "coordinate_system": "wgs84",
+            "radius_meters": 3000,
+            "notes": None,
+            "link_matching_records": False,
+        },
+        timeout=20,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 @pytest.fixture
 def browser_app(tmp_path):
     if not EDGE_PATH.is_file():
@@ -181,6 +206,149 @@ def test_browser_can_research_local_knowledge_and_fill_taxonomy(browser_app):
 
     assert page.locator('input[name="species_chinese"]').input_value() == "蓝歌鸲"
     assert page.locator('input[name="species_scientific"]').input_value() == "Larvivora cyane"
+
+
+def test_vue_assistant_previews_then_fills_new_species_taxonomy(browser_app):
+    page, base_url, _data_dir = browser_app
+    page.route(
+        "**/api/assistant/status",
+        lambda route: route.fulfill(
+            json={"enabled": True, "available": True, "message": "ready"}
+        ),
+    )
+    page.route(
+        "**/api/assistant/taxonomy-research",
+        lambda route: route.fulfill(
+            json={
+                "query": "Blue-and-white Flycatcher",
+                "extraction": {
+                    "order": {
+                        "chinese_name": "雀形目",
+                        "scientific_name": "Passeriformes",
+                    },
+                    "family": {
+                        "chinese_name": "鹟科",
+                        "scientific_name": "Muscicapidae",
+                    },
+                    "genus": {
+                        "chinese_name": None,
+                        "scientific_name": "Cyanoptila",
+                    },
+                    "species": {
+                        "chinese_name": "白腹蓝鹟",
+                        "scientific_name": "Cyanoptila cyanomelana",
+                    },
+                    "subspecies": [],
+                    "missing_fields": ["subspecies"],
+                    "warnings": ["No confirmed subspecies in the source."],
+                },
+                "citations": [
+                    {
+                        "source_id": "local-paper.pdf",
+                        "title": "Local paper",
+                        "locator": "fragment 1",
+                        "excerpt": "Cyanoptila cyanomelana (Passeriformes: Muscicapidae)",
+                    }
+                ],
+            }
+        ),
+    )
+
+    page.goto(f"{base_url}/vue/observations?new=1")
+    page.locator("dialog.record-dialog[open]").wait_for(state="visible")
+    query = page.locator("[data-vue-feather-query]")
+    query.wait_for(state="visible")
+    query.fill("Blue-and-white Flycatcher")
+    page.locator("[data-vue-feather-run]").click()
+
+    output = page.locator("[data-vue-feather-output]")
+    output.get_by_text("Cyanoptila cyanomelana", exact=False).first.wait_for()
+    species_scientific = page.locator("fieldset").first.locator("input").nth(8)
+    assert species_scientific.input_value() == ""
+
+    page.locator("[data-vue-feather-apply]").click()
+    assert species_scientific.input_value() == "Cyanoptila cyanomelana"
+
+
+def test_vue_can_create_observation_with_existing_species(browser_app, tmp_path):
+    page, base_url, _data_dir = browser_app
+    post_observation(base_url)
+    photo_path = tmp_path / "vue-observation.jpg"
+    photo_path.write_bytes(jpeg_bytes((92, 114, 78)))
+
+    page.goto(f"{base_url}/vue/observations?new=1")
+    dialog = page.locator("dialog.record-dialog[open]")
+    dialog.wait_for(state="visible")
+    form = dialog.locator("form")
+    form.locator('input[type="file"][accept*="image/jpeg"]').set_input_files(
+        str(photo_path)
+    )
+    location_fields = form.locator("fieldset").nth(3).locator("input")
+    location_fields.nth(0).fill("2026-08-26T07:15")
+    location_fields.nth(1).fill("30.275")
+    location_fields.nth(2).fill("120.156")
+    location_fields.nth(5).fill("CN-ZJ")
+    location_fields.nth(6).fill("Zhejiang")
+    location_fields.nth(7).fill("West Lake")
+
+    with page.expect_response(
+        lambda response: response.url.endswith("/api/observations")
+        and response.request.method == "POST"
+    ) as response_info:
+        form.locator('button[type="submit"]').click()
+    assert response_info.value.status == 201
+    page.locator("dialog.v2-archive-dialog[open]").wait_for(state="visible")
+    assert len(httpx.get(f"{base_url}/api/observations").json()) == 2
+
+
+def test_vue_can_create_location_and_open_saved_detail(browser_app):
+    page, base_url, _data_dir = browser_app
+    page.goto(f"{base_url}/vue/locations?new=1")
+    dialog = page.locator("dialog.location-form-dialog[open]")
+    dialog.wait_for(state="visible")
+    form = dialog.locator("form")
+    basic_fields = form.locator("fieldset").first.locator("input")
+    basic_fields.nth(0).fill("Riverside Wetland")
+    basic_fields.nth(4).fill("CN-ZJ")
+    basic_fields.nth(5).fill("Zhejiang")
+    coordinates = form.locator('input[type="number"]')
+    coordinates.nth(1).fill("30.281")
+    coordinates.nth(2).fill("120.162")
+
+    with page.expect_response(
+        lambda response: response.url.endswith("/api/locations")
+        and response.request.method == "POST"
+    ) as response_info:
+        form.locator('button[type="submit"]').click()
+    assert response_info.value.status == 201
+    page.locator("dialog.v2-archive-dialog[open]").wait_for(state="visible")
+    page.wait_for_url("**/vue/locations?location=*")
+    assert "new=1" not in page.url
+    assert len(httpx.get(f"{base_url}/api/locations").json()) == 1
+
+
+def test_vue_can_create_trip_and_open_saved_detail(browser_app):
+    page, base_url, _data_dir = browser_app
+    post_location(base_url)
+    page.goto(f"{base_url}/vue/trips?new=1")
+    dialog = page.locator("dialog.trip-form-dialog[open]")
+    dialog.wait_for(state="visible")
+    form = dialog.locator("form")
+    form.locator('input[type="text"]').fill("Autumn birding walk")
+    date_fields = form.locator('input[type="datetime-local"]')
+    date_fields.nth(0).fill("2026-08-26T06:30")
+    date_fields.nth(1).fill("2026-08-26T10:00")
+
+    with page.expect_response(
+        lambda response: response.url.endswith("/api/trips")
+        and response.request.method == "POST"
+    ) as response_info:
+        form.locator('button[type="submit"]').click()
+    assert response_info.value.status == 201
+    page.locator("dialog.v2-archive-dialog[open]").wait_for(state="visible")
+    page.wait_for_url("**/vue/trips?trip=*")
+    assert "new=1" not in page.url
+    assert len(httpx.get(f"{base_url}/api/trips").json()) == 1
 
 
 def test_browser_can_permanently_delete_observation(browser_app):

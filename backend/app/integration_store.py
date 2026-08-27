@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import shutil
 import threading
 from copy import deepcopy
 from ctypes import wintypes
@@ -10,9 +11,12 @@ from typing import Protocol
 
 from .config import Settings
 
-FILE_HEADER = b"TSUBASA-INTEGRATIONS-V1\0"
-LEGACY_FILE_HEADER = bytes.fromhex(
-    "59 55 48 45 4e 2d 49 4e 54 45 47 52 41 54 49 4f 4e 53 2d 56 31 00"
+FILE_HEADER = b"TSUBASA-INTEGRATIONS-V2\0"
+DPAPI_FILE_HEADERS = (
+    b"TSUBASA-INTEGRATIONS-V1\0",
+    bytes.fromhex(
+        "59 55 48 45 4e 2d 49 4e 54 45 47 52 41 54 49 4f 4e 53 2d 56 31 00"
+    ),
 )
 CRYPTPROTECT_UI_FORBIDDEN = 0x1
 CRYPTPROTECT_LOCAL_MACHINE = 0x4
@@ -159,19 +163,29 @@ class IntegrationStore:
             if not self.path.is_file():
                 return _defaults()
             try:
-                encrypted = self.path.read_bytes()
-                header = next(
-                    (
-                        candidate
-                        for candidate in (FILE_HEADER, LEGACY_FILE_HEADER)
-                        if encrypted.startswith(candidate)
-                    ),
-                    None,
-                )
-                if header is None:
-                    raise IntegrationConfigError("API 配置文件格式无法识别。")
-                plain = self._get_protector().unprotect(encrypted[len(header) :])
+                content = self.path.read_bytes()
+                if content.startswith(FILE_HEADER):
+                    plain = content[len(FILE_HEADER) :]
+                else:
+                    header = next(
+                        (
+                            candidate
+                            for candidate in DPAPI_FILE_HEADERS
+                            if content.startswith(candidate)
+                        ),
+                        None,
+                    )
+                    if header is None:
+                        raise IntegrationConfigError("API 配置文件格式无法识别。")
+                    try:
+                        plain = self._get_protector().unprotect(content[len(header) :])
+                    except IntegrationConfigError:
+                        # V1 was bound to a Windows user or machine. An unreadable legacy
+                        # file must not prevent the cross-platform app from starting.
+                        return _defaults()
                 payload = json.loads(plain.decode("utf-8"))
+                if not isinstance(payload, dict):
+                    raise IntegrationConfigError("API 配置文件格式无法识别。")
             except IntegrationConfigError:
                 raise
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -188,10 +202,18 @@ class IntegrationStore:
             encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode(
                 "utf-8"
             )
-            protected = FILE_HEADER + self._get_protector().protect(encoded)
+            portable = FILE_HEADER + encoded
             temporary = self.path.with_suffix(".tmp")
             try:
-                temporary.write_bytes(protected)
+                if self.path.is_file() and self.path.read_bytes().startswith(
+                    DPAPI_FILE_HEADERS
+                ):
+                    legacy_backup = self.path.with_suffix(".dpapi.bak")
+                    if not legacy_backup.exists():
+                        shutil.copy2(self.path, legacy_backup)
+                temporary.write_bytes(portable)
+                if os.name != "nt":
+                    temporary.chmod(0o600)
                 temporary.replace(self.path)
             except OSError as exc:
                 raise IntegrationConfigError("无法保存 API 配置。") from exc
@@ -221,7 +243,7 @@ class IntegrationStore:
         amap_source = "environment" if amap.get("use_environment", True) and amap_key else "managed"
         llm = payload["llm"]
         return {
-            "storage": "windows_dpapi",
+            "storage": "portable_local_file",
             "amap": {
                 "configured": bool(amap_key),
                 "key_hint": self._masked(amap_key),

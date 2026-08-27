@@ -119,6 +119,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def preview_trips_page() -> FileResponse:
         return FileResponse(STATIC_DIR / "v2-trips.html")
 
+    @app.get("/vue", include_in_schema=False)
+    @app.get("/vue/{frontend_path:path}", include_in_schema=False)
+    def vue_preview_page(frontend_path: str = "") -> FileResponse:
+        """Serve the isolated Vue migration preview without replacing stable routes."""
+        return FileResponse(STATIC_DIR / "vue" / "index.html")
+
     @app.get("/legacy", include_in_schema=False)
     def legacy_home_page() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
