@@ -151,6 +151,9 @@ class Species(TimestampMixin, Base):
     habitat_preferences: Mapped[list[SpeciesHabitatPreference]] = relationship(
         back_populates="species", cascade="all, delete-orphan"
     )
+    collection_memberships: Mapped[list[CollectionPlanSpecies]] = relationship(
+        back_populates="species", cascade="all, delete-orphan"
+    )
 
     @property
     def catalog_number(self) -> str:
@@ -584,3 +587,100 @@ class SpeciesIndividualTag(TimestampMixin, Base):
 
     species: Mapped[Species] = relationship(back_populates="individual_tags")
     observation: Mapped[Observation | None] = relationship()
+
+
+class CollectionPlan(TimestampMixin, Base):
+    __tablename__ = "collection_plans"
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(180))
+    introduction: Mapped[str | None] = mapped_column(Text, nullable=True)
+    template_kind: Mapped[str] = mapped_column(String(24))
+
+    subitems: Mapped[list[CollectionPlanSubitem]] = relationship(
+        back_populates="plan",
+        cascade="all, delete-orphan",
+        order_by="CollectionPlanSubitem.position",
+    )
+    memberships: Mapped[list[CollectionPlanSpecies]] = relationship(
+        back_populates="plan",
+        cascade="all, delete-orphan",
+        order_by="CollectionPlanSpecies.position",
+    )
+
+    @property
+    def catalog_number(self) -> str:
+        return f"COL-{self.id:06d}"
+
+
+class CollectionPlanSubitem(TimestampMixin, Base):
+    __tablename__ = "collection_plan_subitems"
+    __table_args__ = (
+        UniqueConstraint("plan_id", "position"),
+        UniqueConstraint("plan_id", "label_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plan_id: Mapped[int] = mapped_column(
+        ForeignKey("collection_plans.id", ondelete="CASCADE"), index=True
+    )
+    label: Mapped[str] = mapped_column(String(80))
+    label_key: Mapped[str] = mapped_column(String(80))
+    position: Mapped[int] = mapped_column(Integer)
+
+    plan: Mapped[CollectionPlan] = relationship(back_populates="subitems")
+    slots: Mapped[list[CollectionPlanSlot]] = relationship(
+        back_populates="subitem", cascade="all, delete-orphan"
+    )
+
+
+class CollectionPlanSpecies(TimestampMixin, Base):
+    __tablename__ = "collection_plan_species"
+    __table_args__ = (
+        UniqueConstraint("plan_id", "species_id"),
+        UniqueConstraint("plan_id", "position"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plan_id: Mapped[int] = mapped_column(
+        ForeignKey("collection_plans.id", ondelete="CASCADE"), index=True
+    )
+    species_id: Mapped[int] = mapped_column(
+        ForeignKey("species.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+
+    plan: Mapped[CollectionPlan] = relationship(back_populates="memberships")
+    species: Mapped[Species] = relationship(back_populates="collection_memberships")
+    slots: Mapped[list[CollectionPlanSlot]] = relationship(
+        back_populates="membership", cascade="all, delete-orphan"
+    )
+
+
+class CollectionPlanSlot(TimestampMixin, Base):
+    __tablename__ = "collection_plan_slots"
+    __table_args__ = (
+        UniqueConstraint("membership_id", "subitem_id"),
+        CheckConstraint("crop_center_x >= 0 AND crop_center_x <= 1", name="crop_center_x_range"),
+        CheckConstraint("crop_center_y >= 0 AND crop_center_y <= 1", name="crop_center_y_range"),
+        CheckConstraint("crop_zoom >= 1 AND crop_zoom <= 4", name="crop_zoom_range"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    membership_id: Mapped[int] = mapped_column(
+        ForeignKey("collection_plan_species.id", ondelete="CASCADE"), index=True
+    )
+    subitem_id: Mapped[int] = mapped_column(
+        ForeignKey("collection_plan_subitems.id", ondelete="CASCADE"), index=True
+    )
+    observation_species_id: Mapped[int | None] = mapped_column(
+        ForeignKey("observation_species.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    crop_center_x: Mapped[float] = mapped_column(Float, default=0.5)
+    crop_center_y: Mapped[float] = mapped_column(Float, default=0.5)
+    crop_zoom: Mapped[float] = mapped_column(Float, default=1.0)
+
+    membership: Mapped[CollectionPlanSpecies] = relationship(back_populates="slots")
+    subitem: Mapped[CollectionPlanSubitem] = relationship(back_populates="slots")
+    observation_species: Mapped[ObservationSpecies | None] = relationship()

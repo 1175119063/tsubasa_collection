@@ -4,6 +4,7 @@ from fastapi import UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from .collection_service import CollectionServiceMixin
 from .enums import (
     MediaKind,
     PhotoType,
@@ -33,7 +34,12 @@ from .service_common import CreationResult, DomainError, normalized_name
 from .species_service import SpeciesServiceMixin
 
 
-class BirdService(LocationTripServiceMixin, ObservationServiceMixin, SpeciesServiceMixin):
+class BirdService(
+    CollectionServiceMixin,
+    LocationTripServiceMixin,
+    ObservationServiceMixin,
+    SpeciesServiceMixin,
+):
     def __init__(self, session: Session, media_store: MediaStore) -> None:
         self.session = session
         self.media_store = media_store
@@ -318,7 +324,7 @@ class BirdService(LocationTripServiceMixin, ObservationServiceMixin, SpeciesServ
             "species_count": self.session.scalar(select(func.count(Species.id))) or 0,
             "observation_count": self.session.scalar(select(func.count(Observation.id))) or 0,
             "photo_count": self.session.scalar(
-                select(func.count(MediaAsset.id)).where(MediaAsset.kind == MediaKind.PHOTO)
+                select(func.count(Observation.photo_asset_id))
             )
             or 0,
             "audio_count": self.session.scalar(

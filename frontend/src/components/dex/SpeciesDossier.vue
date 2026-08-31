@@ -36,7 +36,7 @@ export interface SpeciesDetail {
   ecology: { group: string; body_size: string; habitats: string[] };
   observations: DossierObservation[];
   species_audio: Array<{ id: number; title?: string | null; recorded_at?: string | null; locality?: string | null; notes?: string | null; url: string }>;
-  collected: { admin1_regions: IntelItem[]; seasons: IntelItem[] };
+  collected: { admin1_regions: IntelItem[]; seasons: IntelItem[]; sexes: IntelItem[]; life_stages: IntelItem[] };
   individuals: IntelItem[];
   behaviors: IntelItem[];
   subspecies: Array<{ id: number; chinese_name?: string | null; scientific_name: string; captured: boolean; observation_id?: number | null }>;

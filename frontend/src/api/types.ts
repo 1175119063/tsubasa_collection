@@ -214,3 +214,46 @@ export interface TripDetail extends TripSummary {
   species: ArchiveSpeciesSummary[];
   observations: ObservationRecord[];
 }
+
+export type CollectionTemplateKind = "none" | "plumage" | "sex_age" | "custom";
+
+export interface CollectionPlanSummary {
+  id: number;
+  catalog_number: string;
+  name: string;
+  introduction: string | null;
+  template_kind: CollectionTemplateKind;
+  subitems: string[];
+  species_count: number;
+  slot_count: number;
+  completed_count: number;
+  cover_url: string | null;
+  updated_at: string;
+}
+
+export interface CollectionSlot {
+  id: number;
+  subitem_id: number;
+  subitem_label: string;
+  label: string;
+  observation_species_id: number | null;
+  observation_id: number | null;
+  photo_url: string | null;
+  thumbnail_url: string | null;
+  crop_center_x: number;
+  crop_center_y: number;
+  crop_zoom: number;
+}
+
+export interface CollectionMembership {
+  id: number;
+  species_id: number;
+  species_name: string;
+  scientific_name: string;
+  position: number;
+  slots: CollectionSlot[];
+}
+
+export interface CollectionPlanDetail extends CollectionPlanSummary {
+  memberships: CollectionMembership[];
+}

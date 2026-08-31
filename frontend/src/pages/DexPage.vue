@@ -5,6 +5,8 @@ import { api, errorMessage, jsonRequest } from "@/api/client";
 import type { SpeciesSummary } from "@/api/types";
 import DiscoveryCard from "@/components/DiscoveryCard.vue";
 import SpeciesDossier, { type SpeciesDetail } from "@/components/dex/SpeciesDossier.vue";
+import SpeciesProfileForm from "@/components/dex/SpeciesProfileForm.vue";
+import SpeciesAudioForm from "@/components/dex/SpeciesAudioForm.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -18,6 +20,8 @@ const error = ref("");
 const dossier = ref<HTMLDialogElement>();
 const detail = ref<SpeciesDetail | null>(null);
 const detailLoading = ref(false);
+const profileDialog = ref<HTMLDialogElement>(); const profileOpen = ref(false);
+const audioDialog = ref<HTMLDialogElement>(); const audioOpen = ref(false);
 
 const orders = computed(() => [...new Set(species.value.map((item) => item.order_name))].sort());
 const families = computed(() => [...new Set(species.value.filter((item) => !order.value || item.order_name === order.value).map((item) => item.family_name))].sort());
@@ -80,9 +84,12 @@ async function deleteAudio(audioId: number): Promise<void> {
 
 function reset(): void { query.value = ""; order.value = ""; family.value = ""; genus.value = ""; }
 
-function openStableEditor(): void {
-  if (detail.value) window.location.href = `/dex?species=${detail.value.id}`;
-}
+async function openProfileEditor(): Promise<void> { if (!detail.value) return; profileOpen.value = true; await nextTick(); profileDialog.value?.showModal(); }
+function closeProfileEditor(): void { profileDialog.value?.close(); profileOpen.value = false; }
+async function profileSaved(saved: SpeciesDetail): Promise<void> { closeProfileEditor(); detail.value = saved; await loadSpecies(); }
+async function openAudioForm(): Promise<void> { if (!detail.value) return; audioOpen.value = true; await nextTick(); audioDialog.value?.showModal(); }
+function closeAudioForm(): void { audioDialog.value?.close(); audioOpen.value = false; }
+async function audioSaved(): Promise<void> { closeAudioForm(); await refreshDetail(); }
 
 onMounted(async () => {
   await loadSpecies();
@@ -112,6 +119,8 @@ onMounted(async () => {
   </main>
   <dialog ref="dossier" class="v2-dossier" @click.self="closeDossier">
     <p v-if="detailLoading" class="v2-loading v2-dossier-loading">正在调取调查档案…</p>
-    <SpeciesDossier v-if="detail" :detail="detail" @close="closeDossier" @set-cover="setCover" @delete-observation="deleteObservation" @delete-audio="deleteAudio" @edit="openStableEditor" @add-audio="openStableEditor" />
+    <SpeciesDossier v-if="detail" :detail="detail" @close="closeDossier" @set-cover="setCover" @delete-observation="deleteObservation" @delete-audio="deleteAudio" @edit="openProfileEditor" @add-audio="openAudioForm" />
   </dialog>
+  <dialog ref="profileDialog" class="record-dialog profile-dialog" @click.self="closeProfileEditor"><SpeciesProfileForm v-if="profileOpen && detail" :detail="detail" @close="closeProfileEditor" @saved="profileSaved" /></dialog>
+  <dialog ref="audioDialog" class="record-dialog" @click.self="closeAudioForm"><SpeciesAudioForm v-if="audioOpen && detail" :detail="detail" @close="closeAudioForm" @saved="audioSaved" /></dialog>
 </template>

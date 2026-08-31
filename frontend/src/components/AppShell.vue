@@ -17,6 +17,7 @@ const navItems = [
   { name: "observations", label: "田野记录", to: "/observations" },
   { name: "locations", label: "区域档案", to: "/locations" },
   { name: "trips", label: "远征日志", to: "/trips" },
+  { name: "collections", label: "收集计划", to: "/collections" },
 ];
 </script>
 
@@ -37,7 +38,7 @@ const navItems = [
         :to="item.to"
       >{{ item.label }}</RouterLink>
     </nav>
-    <a class="v2-stable-link" href="/">当前稳定版</a>
+    <span class="v2-edition-mark">VUE 3 · 正式版</span>
   </header>
   <slot />
   <footer class="v2-footer">

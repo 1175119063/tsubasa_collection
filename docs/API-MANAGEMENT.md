@@ -49,15 +49,14 @@
 
 ## 密钥存储
 
-集成配置保存在 `data/integrations.dat`，整个 JSON 载荷使用 Windows DPAPI 加密：
+集成配置保存在 `data/integrations.dat`，使用带格式头的跨平台本地 JSON：
 
-1. 优先使用当前 Windows 用户范围；
-2. 如果服务进程未加载用户配置文件而导致用户范围不可用，退回本机范围；
-3. 本机范围仍依赖 `data` 目录和文件的访问权限，拥有文件读取权限的同机账户可能具备解密条件；
-4. 页面与摘要接口只返回末四位提示，不返回完整 Key；
-5. HTTP 错误和应用日志不得拼接 Authorization 请求头或明文 Key。
+1. 配置不绑定 Windows 用户或机器，可在受信任的设备间单独迁移；
+2. 文件中包含明文 Key，必须依赖本机账户、目录和文件权限保护；
+3. 页面与摘要接口只返回末四位提示，不返回完整 Key；
+4. HTTP 错误和应用日志不得拼接 Authorization 请求头或明文 Key；
 
-`integrations.dat` 不进入资料库 ZIP 备份，也不应加入 Git。DPAPI 密文具有 Windows 环境绑定属性，迁移后应重新填写全部 Key。
+`integrations.dat` 不进入资料库 ZIP 备份，也不应加入 Git。换电脑后可重新填写全部 Key，或在保护好明文密钥的前提下单独安全迁移该文件。
 
 ## 后端接口
 

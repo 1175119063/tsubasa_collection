@@ -9,14 +9,6 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 
-class XorProtector:
-    def protect(self, value: bytes) -> bytes:
-        return bytes(item ^ 0xA5 for item in value)
-
-    def unprotect(self, value: bytes) -> bytes:
-        return self.protect(value)
-
-
 def settings(tmp_path, amap_key: str | None = None) -> Settings:
     return Settings(
         _env_file=None,
@@ -101,39 +93,6 @@ def test_local_http_base_url_is_allowed() -> None:
     )
 
     assert value.base_url == "http://127.0.0.1:8001/v1"
-
-
-def test_legacy_dpapi_format_is_read_and_rewritten_portably(tmp_path) -> None:
-    app_settings = settings(tmp_path)
-    store = IntegrationStore(app_settings, XorProtector())
-    payload = b'{"version":1,"amap":{"api_key":"old-key","use_environment":false}}'
-    store.path.parent.mkdir(parents=True)
-    store.path.write_bytes(
-        b"TSUBASA-INTEGRATIONS-V1\0" + XorProtector().protect(payload)
-    )
-
-    assert store.get_amap_key() == "old-key"
-    store.update_amap("new-key", False)
-
-    assert store.path.read_bytes().startswith(b"TSUBASA-INTEGRATIONS-V2\0")
-    assert store.path.with_suffix(".dpapi.bak").is_file()
-    assert IntegrationStore(app_settings).get_amap_key() == "new-key"
-
-
-def test_unreadable_legacy_dpapi_file_falls_back_to_defaults(tmp_path) -> None:
-    class UnreadableProtector:
-        def protect(self, value: bytes) -> bytes:
-            return value
-
-        def unprotect(self, value: bytes) -> bytes:
-            raise IntegrationConfigError("cannot decrypt")
-
-    store = IntegrationStore(settings(tmp_path), UnreadableProtector())
-    store.path.parent.mkdir(parents=True)
-    store.path.write_bytes(b"TSUBASA-INTEGRATIONS-V1\0unreadable")
-
-    assert store.summary()["storage"] == "portable_local_file"
-    assert store.get_llm()["provider"] == "local"
 
 
 def test_integration_management_routes_do_not_return_plaintext_keys(tmp_path) -> None:

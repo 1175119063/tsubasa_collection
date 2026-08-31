@@ -155,145 +155,42 @@ def profile_payload(observation_id: int) -> dict:
 def test_complete_demo_flow_and_species_id_is_never_reused(tmp_path):
     app = create_app(Settings(data_dir=tmp_path / "library"))
     with TestClient(app) as client:
-        home_page = client.get("/")
-        assert home_page.status_code == 200
-        observations_page = client.get("/observations")
-        dex_page = client.get("/dex")
-        locations_page = client.get("/locations")
-        trips_page = client.get("/trips")
-        preview_page = client.get("/preview")
-        preview_dex_page = client.get("/preview/dex")
-        preview_observations_page = client.get("/preview/observations")
-        preview_locations_page = client.get("/preview/locations")
-        preview_trips_page = client.get("/preview/trips")
-        vue_pages = [
+        frontend_pages = [
             client.get(path)
             for path in (
-                "/vue",
-                "/vue/dex",
-                "/vue/observations",
-                "/vue/locations",
-                "/vue/map",
-                "/vue/trips",
+                "/",
+                "/dex",
+                "/observations",
+                "/locations",
+                "/map",
+                "/trips",
+                "/collections",
             )
         ]
-        legacy_page = client.get("/legacy")
-        legacy_observations_page = client.get("/legacy/observations")
-        legacy_dex_page = client.get("/legacy/dex")
-        legacy_locations_page = client.get("/legacy/locations")
-        legacy_trips_page = client.get("/legacy/trips")
-        assert observations_page.status_code == 200
-        assert dex_page.status_code == 200
-        assert locations_page.status_code == 200
-        assert trips_page.status_code == 200
-        assert preview_page.status_code == 200
-        assert preview_dex_page.status_code == 200
-        assert preview_observations_page.status_code == 200
-        assert preview_locations_page.status_code == 200
-        assert preview_trips_page.status_code == 200
-        assert all(page.status_code == 200 for page in vue_pages)
-        assert all('<div id="app"></div>' in page.text for page in vue_pages)
-        assert all("/static/vue/assets/" in page.text for page in vue_pages)
-        legacy_pages = [
-            legacy_page,
-            legacy_observations_page,
-            legacy_dex_page,
-            legacy_locations_page,
-            legacy_trips_page,
-        ]
-        assert all(page.status_code == 200 for page in legacy_pages)
-        assert 'data-page="home"' in home_page.text
-        assert "no-store" in home_page.headers["cache-control"]
-        assert 'data-page="dex"' in dex_page.text
-        assert 'data-page="observations"' in observations_page.text
-        assert 'data-page="locations"' in locations_page.text
-        assert 'data-page="trips"' in trips_page.text
-        assert 'data-page="home"' in preview_page.text
-        assert 'data-page="dex"' in preview_dex_page.text
-        assert 'data-page="observations"' in preview_observations_page.text
-        assert 'data-page="locations"' in preview_locations_page.text
-        assert 'data-page="trips"' in preview_trips_page.text
-        assert "/static/v2.css?v=" in preview_page.text
-        assert "/static/v2.js?v=" in preview_dex_page.text
-        assert 'id="v2-observation-groups"' in preview_observations_page.text
-        assert 'id="v2-location-grid"' in preview_locations_page.text
-        assert 'id="v2-trip-groups"' in preview_trips_page.text
-        preview_pages_script = client.get("/static/v2-pages.js")
-        assert preview_pages_script.status_code == 200
-        assert "openObservation" in preview_pages_script.text
-        assert "openLocation" in preview_pages_script.text
-        assert "openTrip" in preview_pages_script.text
-        assert preview_pages_script.text.count('class="v2-archive-danger-zone"') == 2
-        assert "删除区域只会解除其中观察记录的关联" in preview_pages_script.text
-        assert 'href="/locations"' in home_page.text
-        assert "远征日志" in home_page.text
-        assert 'href="/trips"' in home_page.text
-        assert 'href="/legacy"' in home_page.text
-        assert 'id="change-home-cover"' in home_page.text
-        assert 'id="home-cover-dialog"' in home_page.text
-        assert "/static/assets/wing-chronicle-logo.png" in home_page.text
-        assert "/static/assets/wing-chronicle-logo.png" in dex_page.text
-        assert "/static/assets/wing-chronicle-logo.png" in observations_page.text
-        assert "/static/assets/wing-chronicle-logo.png" in locations_page.text
-        assert "/static/assets/wing-chronicle-logo.png" in trips_page.text
-        home_script = client.get("/static/v2.js").text
-        assert 'Tsubasa.api("/api/home/cover")' in home_script
-        assert "data-home-cover-observation" in home_script
-        assert 'id="new-location-button"' in locations_page.text
-        assert 'id="location-grid"' in locations_page.text
-        assert 'id="trip-groups"' in trips_page.text
-        assert 'id="trip-observation-edit-dialog"' in trips_page.text
-        trips_script = client.get("/static/trips.js").text
-        assert "data-edit-trip-observations" in trips_script
-        assert "filter((item) => !item.trip)" in trips_script
-        assert "state.linkedObservationIds" in trips_script
-        assert "new Set([...state.linkedObservationIds, ...selectedIds])" in trips_script
-        assert 'id="trip-location-filter"' in trips_page.text
-        assert 'id="observation-groups"' in observations_page.text
-        assert 'id="observation-detail-dialog"' in observations_page.text
-        assert 'id="observation-year-filter"' in observations_page.text
-        assert 'id="species-search"' in observations_page.text
-        assert 'id="species-search-status"' in observations_page.text
-        assert 'id="species-search-results"' in observations_page.text
-        assert 'id="species-selection-summary"' in observations_page.text
-        assert 'id="order-node-search"' in observations_page.text
-        assert 'id="family-node-search"' in observations_page.text
-        assert 'id="genus-node-search"' in observations_page.text
-        assert 'id="location-search"' in observations_page.text
-        assert "/static/styles.css?v=" in observations_page.text
-        assert "/static/observations.js?v=" in observations_page.text
-        assert 'id="species-grid"' in dex_page.text
-        assert 'id="family-filter"' in dex_page.text
-        assert 'id="genus-filter"' in dex_page.text
-        assert 'id="species-filter"' in dex_page.text
-        assert 'id="profile-dialog"' in dex_page.text
-        assert 'id="profile-behavior-list"' in dex_page.text
-        assert 'id="profile-individual-list"' in dex_page.text
-        assert 'id="add-individual-button"' in dex_page.text
-        assert 'id="profile-ecology-options"' in dex_page.text
-        assert 'id="profile-body-size-options"' in dex_page.text
-        assert 'id="profile-habitat-options"' in dex_page.text
-        assert 'id="species-audio-dialog"' in dex_page.text
-        assert "/static/dex.js?v=" in dex_page.text
-        assert "/observations?observation=" in client.get("/static/dex.js").text
-        dex_script = client.get("/static/dex.js").text
-        assert "data-edit-profile" in dex_script
-        assert "species-observation-total" in dex_script
-        assert "iucn-badge" in dex_script
-        assert "data-individual-row" in dex_script
-        assert "individuals" in dex_script
-        assert "function ecologyPanel" in dex_script
-        assert "preferred_habitats" in dex_script
-        observations_script = client.get("/static/observations.js").text
-        assert 'data-edit-observation="${item.id}"' in observations_script
-        assert 'class="observation-preview-scroll"' in observations_script
-        assert "data-species-result" in observations_script
-        assert "function chooseSpecies" in observations_script
-        assert "function chooseTaxonomy" in observations_script
-        assert "function chooseLocation" in observations_script
-        assert 'method: "PATCH"' in observations_script
-        static_response = client.get("/static/observations.js")
-        assert "no-store" in static_response.headers["cache-control"]
+        assert all(page.status_code == 200 for page in frontend_pages)
+        assert all('<div id="app"></div>' in page.text for page in frontend_pages)
+        assert all("/static/vue/assets/" in page.text for page in frontend_pages)
+        assert all("no-store" in page.headers["cache-control"] for page in frontend_pages)
+
+        retired_routes = {
+            "/vue": "/",
+            "/vue/observations?new=1": "/observations?new=1",
+            "/preview/dex": "/dex",
+            "/legacy/locations": "/locations",
+        }
+        for retired, target in retired_routes.items():
+            response = client.get(retired, follow_redirects=False)
+            assert response.status_code == 308
+            assert response.headers["location"] == target
+
+        for removed_asset in (
+            "/static/index.html",
+            "/static/v2-index.html",
+            "/static/core.js",
+            "/static/v2-pages.js",
+            "/static/assistant.js",
+        ):
+            assert client.get(removed_asset).status_code == 404
         assert client.get("/api/health").json()["status"] == "ok"
 
         created = post_observation(client, observation_payload())
@@ -517,8 +414,8 @@ def test_map_overview_page_is_available(tmp_path):
         response = client.get("/map")
 
     assert response.status_code == 200
-    assert 'id="region-overview-map"' in response.text
-    assert "leaflet.markercluster" in response.text
+    assert '<div id="app"></div>' in response.text
+    assert "/static/vue/assets/" in response.text
 
 
 def test_restore_rejects_tampered_media_without_changing_library(tmp_path):
@@ -577,7 +474,7 @@ def test_existing_database_is_registered_at_migration_baseline(tmp_path):
         }
         assert "coordinate_system" in location_columns
         assert connection.execute("SELECT version_num FROM alembic_version").fetchone()[0] == (
-            "20260822_04"
+            "20260831_05"
         )
     finally:
         connection.close()
@@ -1013,6 +910,9 @@ def test_location_auto_links_matching_records_and_delete_only_unlinks(tmp_path):
         assert location["species_count"] == 1
         assert location["visit_day_count"] == 1
         assert location["monthly_activity"][0]["visit_day_count"] == 1
+        stats_before_cover = client.get("/api/stats").json()
+        assert stats_before_cover["observation_count"] == 2
+        assert stats_before_cover["photo_count"] == 2
 
         cover_response = client.post(
             f"/api/locations/{location['id']}/cover",
@@ -1022,6 +922,9 @@ def test_location_auto_links_matching_records_and_delete_only_unlinks(tmp_path):
         assert cover_response.json()["cover_source"] == "custom"
         custom_cover_url = cover_response.json()["cover_url"]
         assert client.get(custom_cover_url).status_code == 200
+        stats_after_cover = client.get("/api/stats").json()
+        assert stats_after_cover["observation_count"] == 2
+        assert stats_after_cover["photo_count"] == 2
 
         observations = client.get("/api/observations").json()
         assert all(item["location"]["id"] == location["id"] for item in observations)
@@ -1192,3 +1095,146 @@ def test_trip_association_statistics_cover_and_constraints(tmp_path):
         assert deleted.status_code == 200
         assert deleted.json()["unlinked_observation_count"] == 1
         assert all(item["trip"] is None for item in client.get("/api/observations").json())
+
+
+def test_collection_plan_uniform_slots_evidence_and_deletion_rules(tmp_path):
+    app = create_app(Settings(_env_file=None, data_dir=tmp_path / "library"))
+    with TestClient(app) as client:
+        first = post_observation(client, observation_payload())
+        assert first.status_code == 201, first.text
+        first_species_id = first.json()["species_id"]
+        first_observation_id = first.json()["observation_id"]
+
+        later_payload = observation_payload()
+        later_payload["species_id"] = first_species_id
+        later_payload["new_species"] = None
+        later_payload["observed_at"] = "2026-08-16T08:30"
+        later = post_observation(client, later_payload, color=(90, 110, 80))
+        assert later.status_code == 201, later.text
+
+        second_payload = observation_payload("Passer montanus")
+        second_payload["new_species"]["chinese_name"] = "麻雀"
+        second = post_observation(client, second_payload, color=(120, 90, 65))
+        assert second.status_code == 201, second.text
+        second_species_id = second.json()["species_id"]
+
+        created = client.post(
+            "/api/collections",
+            json={
+                "name": "鸲类收集",
+                "introduction": "比较不同性别与年龄的外形。",
+                "template_kind": "sex_age",
+                "subitems": [],
+            },
+        )
+        assert created.status_code == 201, created.text
+        plan = created.json()
+        assert plan["catalog_number"] == "COL-000001"
+        assert plan["subitems"] == ["♂", "♀", "juv."]
+        assert plan["memberships"] == []
+        members = client.put(
+            f"/api/collections/{plan['id']}/species",
+            json={"species_ids": [first_species_id, second_species_id]},
+        )
+        assert members.status_code == 200, members.text
+        plan = members.json()
+        assert plan["slot_count"] == 6
+        assert plan["completed_count"] == 0
+        assert all(
+            len(membership["slots"]) == 3 for membership in plan["memberships"]
+        )
+
+        observations = client.get("/api/observations").json()
+        first_record = next(item for item in observations if item["id"] == first_observation_id)
+        first_entry_id = next(
+            entry["id"]
+            for entry in first_record["species_entries"]
+            if entry["species_id"] == first_species_id
+        )
+        second_record = next(
+            item for item in observations if item["id"] == second.json()["observation_id"]
+        )
+        second_entry_id = second_record["species_entries"][0]["id"]
+        first_slot = plan["memberships"][0]["slots"][0]
+
+        wrong_species = client.put(
+            f"/api/collections/{plan['id']}/slots/{first_slot['id']}",
+            json={"observation_species_id": second_entry_id},
+        )
+        assert wrong_species.status_code == 422
+
+        selected = client.put(
+            f"/api/collections/{plan['id']}/slots/{first_slot['id']}",
+            json={
+                "observation_species_id": first_entry_id,
+                "crop_center_x": 0.3,
+                "crop_center_y": 0.7,
+                "crop_zoom": 2.25,
+            },
+        )
+        assert selected.status_code == 200, selected.text
+        selected_slot = selected.json()["memberships"][0]["slots"][0]
+        assert selected_slot["observation_id"] == first_observation_id
+        assert selected_slot["crop_center_x"] == 0.3
+        assert selected.json()["completed_count"] == 1
+
+        renamed = client.put(
+            f"/api/collections/{plan['id']}",
+            json={
+                "name": "鸲类与文鸟收集",
+                "introduction": "修改计划资料不会覆盖成员。",
+                "template_kind": "sex_age",
+                "subitems": [],
+            },
+        )
+        assert renamed.status_code == 200, renamed.text
+        assert renamed.json()["species_count"] == 2
+        assert renamed.json()["completed_count"] == 1
+
+        reordered = client.put(
+            f"/api/collections/{plan['id']}/species",
+            json={
+                "species_ids": [second_species_id, first_species_id],
+            },
+        )
+        assert reordered.status_code == 200, reordered.text
+        assert [item["species_id"] for item in reordered.json()["memberships"]] == [
+            second_species_id,
+            first_species_id,
+        ]
+        preserved = next(
+            item
+            for item in reordered.json()["memberships"]
+            if item["species_id"] == first_species_id
+        )
+        assert preserved["slots"][0]["observation_id"] == first_observation_id
+
+        candidates = client.get(
+            f"/api/collections/{plan['id']}/species/{first_species_id}/observations"
+        )
+        assert candidates.status_code == 200
+        assert len(candidates.json()) == 2
+        assert all(
+            any(
+                entry["species_id"] == first_species_id
+                for entry in observation["species_entries"]
+            )
+            for observation in candidates.json()
+        )
+
+        deleted_evidence = client.delete(f"/api/observations/{first_observation_id}")
+        assert deleted_evidence.status_code == 200
+        after_evidence_delete = client.get(f"/api/collections/{plan['id']}").json()
+        assert after_evidence_delete["species_count"] == 2
+        assert after_evidence_delete["completed_count"] == 0
+        first_membership = next(
+            item
+            for item in after_evidence_delete["memberships"]
+            if item["species_id"] == first_species_id
+        )
+        assert first_membership["slots"][0]["photo_url"] is None
+
+        deleted_plan = client.delete(f"/api/collections/{plan['id']}")
+        assert deleted_plan.status_code == 200
+        assert len(client.get("/api/species").json()) == 2
+        assert len(client.get("/api/observations").json()) == 2

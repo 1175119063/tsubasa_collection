@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import router
@@ -76,74 +76,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/", include_in_schema=False)
-    def home_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-index.html")
-
     @app.get("/observations", include_in_schema=False)
-    def observations_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-observations.html")
-
     @app.get("/dex", include_in_schema=False)
-    def dex_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-dex.html")
-
     @app.get("/locations", include_in_schema=False)
-    def locations_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-locations.html")
-
     @app.get("/map", include_in_schema=False)
-    def map_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-map.html")
-
     @app.get("/trips", include_in_schema=False)
-    def trips_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-trips.html")
-
-    @app.get("/preview", include_in_schema=False)
-    def preview_home_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-index.html")
-
-    @app.get("/preview/dex", include_in_schema=False)
-    def preview_dex_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-dex.html")
-
-    @app.get("/preview/observations", include_in_schema=False)
-    def preview_observations_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-observations.html")
-
-    @app.get("/preview/locations", include_in_schema=False)
-    def preview_locations_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-locations.html")
-
-    @app.get("/preview/trips", include_in_schema=False)
-    def preview_trips_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "v2-trips.html")
+    @app.get("/collections", include_in_schema=False)
+    def frontend_app_page() -> FileResponse:
+        """Serve the Vue application on every public frontend route."""
+        return FileResponse(STATIC_DIR / "vue" / "index.html")
 
     @app.get("/vue", include_in_schema=False)
     @app.get("/vue/{frontend_path:path}", include_in_schema=False)
-    def vue_preview_page(frontend_path: str = "") -> FileResponse:
-        """Serve the isolated Vue migration preview without replacing stable routes."""
-        return FileResponse(STATIC_DIR / "vue" / "index.html")
-
+    @app.get("/preview", include_in_schema=False)
+    @app.get("/preview/{frontend_path:path}", include_in_schema=False)
     @app.get("/legacy", include_in_schema=False)
-    def legacy_home_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "index.html")
-
-    @app.get("/legacy/observations", include_in_schema=False)
-    def legacy_observations_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "observations.html")
-
-    @app.get("/legacy/dex", include_in_schema=False)
-    def legacy_dex_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "dex.html")
-
-    @app.get("/legacy/locations", include_in_schema=False)
-    def legacy_locations_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "locations.html")
-
-    @app.get("/legacy/trips", include_in_schema=False)
-    def legacy_trips_page() -> FileResponse:
-        return FileResponse(STATIC_DIR / "trips.html")
+    @app.get("/legacy/{frontend_path:path}", include_in_schema=False)
+    def retired_frontend_redirect(
+        request: Request, frontend_path: str = ""
+    ) -> RedirectResponse:
+        """Keep old bookmarks useful without retaining either retired frontend."""
+        target = f"/{frontend_path.lstrip('/')}" if frontend_path else "/"
+        if request.url.query:
+            target = f"{target}?{request.url.query}"
+        return RedirectResponse(target, status_code=308)
 
     return app
 

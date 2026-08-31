@@ -5,9 +5,10 @@ import MapPage from "@/pages/MapPage.vue";
 import ObservationsPage from "@/pages/ObservationsPage.vue";
 import LocationsPage from "@/pages/LocationsPage.vue";
 import TripsPage from "@/pages/TripsPage.vue";
+import CollectionsPage from "@/pages/CollectionsPage.vue";
 
 const router = createRouter({
-  history: createWebHistory("/vue/"),
+  history: createWebHistory("/"),
   routes: [
     { path: "/", name: "home", component: HomePage, meta: { title: "探索营地" } },
     { path: "/dex", name: "dex", component: DexPage, meta: { title: "鸟类调查册" } },
@@ -15,6 +16,7 @@ const router = createRouter({
     { path: "/locations", name: "locations", component: LocationsPage, meta: { title: "区域档案" } },
     { path: "/map", name: "map", component: MapPage, meta: { title: "探索地图" } },
     { path: "/trips", name: "trips", component: TripsPage, meta: { title: "远征日志" } },
+    { path: "/collections", name: "collections", component: CollectionsPage, meta: { title: "收集计划" } },
   ],
   scrollBehavior: () => ({ top: 0 }),
 });

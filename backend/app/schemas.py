@@ -282,3 +282,52 @@ class TripInput(BaseModel):
 
 class TripObservationSelectionInput(BaseModel):
     observation_ids: list[int] = Field(default_factory=list)
+
+
+class CollectionPlanInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    name: str = Field(min_length=1, max_length=180)
+    introduction: str | None = Field(default=None, max_length=10000)
+    template_kind: Literal["none", "plumage", "sex_age", "custom"]
+    subitems: list[str] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_collection_structure(self) -> "CollectionPlanInput":
+        if self.template_kind == "custom":
+            if not self.subitems:
+                raise ValueError("自定义模板至少需要一个子项")
+            keys = {
+                " ".join(unicodedata.normalize("NFKC", label).split()).casefold()
+                for label in self.subitems
+            }
+            if "" in keys or len(keys) != len(self.subitems):
+                raise ValueError("自定义子项不能为空或重复")
+            if any(len(label) > 80 for label in self.subitems):
+                raise ValueError("自定义子项不能超过 80 个字符")
+        elif self.subitems:
+            raise ValueError("预设模板不接受自定义子项")
+        return self
+
+
+class CollectionPlanSpeciesInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    species_ids: list[int] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_species_ids(self) -> "CollectionPlanSpeciesInput":
+        if len(self.species_ids) != len(set(self.species_ids)):
+            raise ValueError("同一收集计划中不能重复添加同一物种")
+        if any(species_id < 1 for species_id in self.species_ids):
+            raise ValueError("物种 ID 必须大于零")
+        return self
+
+
+class CollectionSlotEvidenceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    observation_species_id: int | None = Field(default=None, ge=1)
+    crop_center_x: float = Field(default=0.5, ge=0, le=1)
+    crop_center_y: float = Field(default=0.5, ge=0, le=1)
+    crop_zoom: float = Field(default=1, ge=1, le=4)

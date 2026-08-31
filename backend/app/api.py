@@ -29,6 +29,9 @@ from .media_store import MediaStore, MediaValidationError
 from .models import MediaAsset
 from .observation_query_skill import ObservationQueryError, ObservationQueryExecutor
 from .schemas import (
+    CollectionPlanInput,
+    CollectionPlanSpeciesInput,
+    CollectionSlotEvidenceInput,
     LocationInput,
     LocationObservationSelectionInput,
     ObservationInput,
@@ -723,6 +726,92 @@ def delete_trip(trip_id: int, request: Request) -> dict:
     with request.app.state.database.session_factory() as session:
         try:
             return service_for(request, session).delete_trip(trip_id)
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.get("/collections")
+def list_collection_plans(request: Request) -> list[dict]:
+    with request.app.state.database.session_factory() as session:
+        return service_for(request, session).list_collection_plans()
+
+
+@router.post("/collections", status_code=201)
+def create_collection_plan(payload: CollectionPlanInput, request: Request) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).create_collection_plan(payload)
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.get("/collections/{plan_id}")
+def collection_plan_detail(plan_id: int, request: Request) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).collection_plan_detail(plan_id)
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.put("/collections/{plan_id}")
+def update_collection_plan(
+    plan_id: int, payload: CollectionPlanInput, request: Request
+) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).update_collection_plan(plan_id, payload)
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.delete("/collections/{plan_id}")
+def delete_collection_plan(plan_id: int, request: Request) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).delete_collection_plan(plan_id)
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.put("/collections/{plan_id}/species")
+def set_collection_plan_species(
+    plan_id: int, payload: CollectionPlanSpeciesInput, request: Request
+) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).set_collection_plan_species(
+                plan_id, payload
+            )
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.get("/collections/{plan_id}/species/{species_id}/observations")
+def collection_species_observations(
+    plan_id: int, species_id: int, request: Request
+) -> list[dict]:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).collection_species_observations(
+                plan_id, species_id
+            )
+        except DomainError as exc:
+            raise HTTPException(exc.status_code, exc.message) from exc
+
+
+@router.put("/collections/{plan_id}/slots/{slot_id}")
+def set_collection_slot_evidence(
+    plan_id: int,
+    slot_id: int,
+    payload: CollectionSlotEvidenceInput,
+    request: Request,
+) -> dict:
+    with request.app.state.database.session_factory() as session:
+        try:
+            return service_for(request, session).set_collection_slot_evidence(
+                plan_id, slot_id, payload
+            )
         except DomainError as exc:
             raise HTTPException(exc.status_code, exc.message) from exc
 

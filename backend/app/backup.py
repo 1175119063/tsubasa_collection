@@ -200,7 +200,16 @@ class BackupService:
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 )
             }
-            required = {"alembic_version", "media_assets", "observations", "species"}
+            required = {
+                "alembic_version",
+                "collection_plan_slots",
+                "collection_plan_species",
+                "collection_plan_subitems",
+                "collection_plans",
+                "media_assets",
+                "observations",
+                "species",
+            }
             if not required.issubset(tables):
                 raise ValueError("恢复数据库缺少必要的数据表")
             assets = connection.execute(

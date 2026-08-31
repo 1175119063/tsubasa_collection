@@ -180,6 +180,10 @@ onMounted(() => {
           <span class="v2-card-rune">Ⅳ</span><p>EXPEDITION LOG</p><h3>远征日志</h3>
           <small>把同一次外出中的发现编入一段旅程</small><b>查看远征 →</b>
         </RouterLink>
+        <RouterLink class="v2-quest-card" to="/collections">
+          <span class="v2-card-rune">Ⅴ</span><p>COLLECTION PLAN</p><h3>收集计划</h3>
+          <small>把相似鸟种与不同形态编成自己的专题收藏</small><b>查看收藏 →</b>
+        </RouterLink>
       </div>
     </section>
 

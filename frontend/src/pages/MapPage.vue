@@ -39,7 +39,7 @@ function popupFor(item: LocationSummary): HTMLElement {
   const details = document.createElement("span");
   details.textContent = `${labels[item.location_type] || item.location_type} · ${item.species_count} 种 · ${item.observation_count} 笔记录`;
   const link = document.createElement("a");
-  link.href = `/vue/locations?location=${item.id}`;
+  link.href = `/locations?location=${item.id}`;
   link.textContent = "打开区域档案";
   content.append(title, document.createElement("br"), details, document.createElement("br"), link);
   return content;

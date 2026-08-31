@@ -124,91 +124,9 @@ def browser_app(tmp_path):
     thread.join(timeout=10)
 
 
-def test_browser_can_create_observation(browser_app, tmp_path):
-    page, base_url, _data_dir = browser_app
-    photo_path = tmp_path / "browser-bird.jpg"
-    photo_path.write_bytes(jpeg_bytes())
-
-    page.goto(f"{base_url}/observations?new=1")
-    page.locator("#record-dialog").wait_for(state="visible")
-    page.locator("#species-select").select_option("new")
-    for level in ("order", "family", "genus"):
-        page.locator(f"#{level}-node-select").select_option("new")
-    page.locator('input[name="order_chinese"]').fill("雀形目")
-    page.locator('input[name="order_scientific"]').fill("Passeriformes")
-    page.locator('input[name="family_chinese"]').fill("梅花雀科")
-    page.locator('input[name="family_scientific"]').fill("Estrildidae")
-    page.locator('input[name="genus_chinese"]').fill("文鸟属")
-    page.locator('input[name="genus_scientific"]').fill("Lonchura")
-    page.locator('input[name="species_chinese"]').fill("白腰文鸟")
-    page.locator('input[name="species_scientific"]').fill("Lonchura striata")
-    page.locator('select[name="china_status"]').select_option("three_protected")
-    page.locator("#photo-input").set_input_files(str(photo_path))
-    page.locator("#observed-at").fill("2026-08-15T08:30")
-    page.locator('#record-form input[name="latitude"]').fill("30.2741")
-    page.locator('#record-form input[name="longitude"]').fill("120.1551")
-    page.locator('#record-form input[name="admin1_code"]').fill("CN-ZJ")
-    page.locator('#record-form input[name="admin1_name"]').fill("浙江省")
-    page.locator('#record-form input[name="locality"]').fill("杭州西湖")
-
-    with page.expect_response(
-        lambda response: response.url.endswith("/api/observations")
-        and response.request.method == "POST"
-    ) as response_info:
-        page.locator('#record-form button[type="submit"]').click()
-    assert response_info.value.status == 201
-    page.locator(".v2-field-card", has_text="白腰文鸟").wait_for()
 
 
-def test_browser_can_research_local_knowledge_and_fill_taxonomy(browser_app):
-    page, base_url, _data_dir = browser_app
-    page.route(
-        "**/api/assistant/status",
-        lambda route: route.fulfill(
-            json={"enabled": True, "available": True, "message": "飞羽精灵已经醒来。"}
-        ),
-    )
-    page.route(
-        "**/api/assistant/taxonomy-research",
-        lambda route: route.fulfill(
-            json={
-                "query": "蓝歌鸲",
-                "extraction": {
-                    "order": {"chinese_name": "雀形目", "scientific_name": "Passeriformes"},
-                    "family": {"chinese_name": "鹟科", "scientific_name": "Muscicapidae"},
-                    "genus": {"chinese_name": None, "scientific_name": "Larvivora"},
-                    "species": {"chinese_name": "蓝歌鸲", "scientific_name": "Larvivora cyane"},
-                    "subspecies": [],
-                    "missing_fields": ["subspecies"],
-                    "warnings": ["资料没有提供可确认的亚种"],
-                },
-                "citations": [
-                    {
-                        "source_id": "paper.pdf",
-                        "title": "Local paper",
-                        "locator": "片段 1",
-                        "excerpt": "Larvivora cyane (Passeriformes: Muscicapidae)",
-                    }
-                ],
-            }
-        ),
-    )
-
-    page.goto(f"{base_url}/observations?new=1")
-    page.locator("#record-dialog").wait_for(state="visible")
-    page.locator("#species-select").select_option("new")
-    research = page.locator("#feather-species-research")
-    research.wait_for(state="visible")
-    assert research.is_enabled()
-    page.locator("#feather-species-query").fill("蓝歌鸲")
-    research.click()
-    page.locator("[data-feather-fill-species]").click()
-
-    assert page.locator('input[name="species_chinese"]').input_value() == "蓝歌鸲"
-    assert page.locator('input[name="species_scientific"]').input_value() == "Larvivora cyane"
-
-
-def test_vue_assistant_previews_then_fills_new_species_taxonomy(browser_app):
+def test_assistant_previews_then_fills_new_species_taxonomy(browser_app):
     page, base_url, _data_dir = browser_app
     page.route(
         "**/api/assistant/status",
@@ -254,7 +172,7 @@ def test_vue_assistant_previews_then_fills_new_species_taxonomy(browser_app):
         ),
     )
 
-    page.goto(f"{base_url}/vue/observations?new=1")
+    page.goto(f"{base_url}/observations?new=1")
     page.locator("dialog.record-dialog[open]").wait_for(state="visible")
     query = page.locator("[data-vue-feather-query]")
     query.wait_for(state="visible")
@@ -270,13 +188,13 @@ def test_vue_assistant_previews_then_fills_new_species_taxonomy(browser_app):
     assert species_scientific.input_value() == "Cyanoptila cyanomelana"
 
 
-def test_vue_can_create_observation_with_existing_species(browser_app, tmp_path):
+def test_browser_can_create_observation_with_existing_species(browser_app, tmp_path):
     page, base_url, _data_dir = browser_app
     post_observation(base_url)
     photo_path = tmp_path / "vue-observation.jpg"
     photo_path.write_bytes(jpeg_bytes((92, 114, 78)))
 
-    page.goto(f"{base_url}/vue/observations?new=1")
+    page.goto(f"{base_url}/observations?new=1")
     dialog = page.locator("dialog.record-dialog[open]")
     dialog.wait_for(state="visible")
     form = dialog.locator("form")
@@ -301,9 +219,49 @@ def test_vue_can_create_observation_with_existing_species(browser_app, tmp_path)
     assert len(httpx.get(f"{base_url}/api/observations").json()) == 2
 
 
-def test_vue_can_create_location_and_open_saved_detail(browser_app):
+def test_browser_can_edit_species_profile_and_open_audio_form(browser_app, tmp_path):
     page, base_url, _data_dir = browser_app
-    page.goto(f"{base_url}/vue/locations?new=1")
+    created = post_observation(base_url)
+    species_id = created["species_id"]
+    page.goto(f"{base_url}/dex?species={species_id}")
+    dossier = page.locator("dialog.v2-dossier[open]")
+    dossier.wait_for(state="visible")
+    dossier.get_by_role("button", name="修改图鉴").click()
+
+    profile = page.locator("dialog.profile-dialog[open]")
+    profile.wait_for(state="visible")
+    profile.get_by_label("物种简介").fill("Vue 图鉴编辑流程测试。")
+    with page.expect_response(
+        lambda response: response.url.endswith(f"/api/species/{species_id}/profile")
+        and response.request.method == "PUT"
+    ) as profile_response:
+        profile.get_by_role("button", name="保存图鉴资料").click()
+    assert profile_response.value.status == 200
+    profile.wait_for(state="hidden")
+    dossier.get_by_text("Vue 图鉴编辑流程测试。", exact=True).wait_for()
+
+    page.route(
+        f"**/api/species/{species_id}/audio",
+        lambda route: route.fulfill(status=201, json={"id": 1, "asset_id": 1}),
+    )
+    audio_path = tmp_path / "field-recording.mp3"
+    audio_path.write_bytes(b"ID3")
+    dossier.get_by_role("button", name="添加录音").click()
+    audio_form = page.locator("dialog.record-dialog[open]")
+    audio_form.wait_for(state="visible")
+    audio_form.get_by_label("MP3 录音").set_input_files(str(audio_path))
+    with page.expect_response(
+        lambda response: response.url.endswith(f"/api/species/{species_id}/audio")
+        and response.request.method == "POST"
+    ) as audio_response:
+        audio_form.get_by_role("button", name="保存录音").click()
+    assert audio_response.value.status == 201
+    audio_form.wait_for(state="hidden")
+
+
+def test_browser_can_create_location_and_open_saved_detail(browser_app):
+    page, base_url, _data_dir = browser_app
+    page.goto(f"{base_url}/locations?new=1")
     dialog = page.locator("dialog.location-form-dialog[open]")
     dialog.wait_for(state="visible")
     form = dialog.locator("form")
@@ -322,15 +280,15 @@ def test_vue_can_create_location_and_open_saved_detail(browser_app):
         form.locator('button[type="submit"]').click()
     assert response_info.value.status == 201
     page.locator("dialog.v2-archive-dialog[open]").wait_for(state="visible")
-    page.wait_for_url("**/vue/locations?location=*")
+    page.wait_for_url("**/locations?location=*")
     assert "new=1" not in page.url
     assert len(httpx.get(f"{base_url}/api/locations").json()) == 1
 
 
-def test_vue_can_create_trip_and_open_saved_detail(browser_app):
+def test_browser_can_create_trip_and_open_saved_detail(browser_app):
     page, base_url, _data_dir = browser_app
     post_location(base_url)
-    page.goto(f"{base_url}/vue/trips?new=1")
+    page.goto(f"{base_url}/trips?new=1")
     dialog = page.locator("dialog.trip-form-dialog[open]")
     dialog.wait_for(state="visible")
     form = dialog.locator("form")
@@ -346,7 +304,7 @@ def test_vue_can_create_trip_and_open_saved_detail(browser_app):
         form.locator('button[type="submit"]').click()
     assert response_info.value.status == 201
     page.locator("dialog.v2-archive-dialog[open]").wait_for(state="visible")
-    page.wait_for_url("**/vue/trips?trip=*")
+    page.wait_for_url("**/trips?trip=*")
     assert "new=1" not in page.url
     assert len(httpx.get(f"{base_url}/api/trips").json()) == 1
 
@@ -356,16 +314,17 @@ def test_browser_can_permanently_delete_observation(browser_app):
     post_observation(base_url)
     page.goto(f"{base_url}/observations")
     page.locator(".v2-field-card", has_text="白腰文鸟").click()
-    page.locator("#v2-observation-dialog").wait_for(state="visible")
+    detail = page.locator("dialog.v2-archive-dialog[open]")
+    detail.wait_for(state="visible")
     page.once("dialog", lambda dialog: dialog.accept())
     with page.expect_response(
         lambda response: "/api/observations/" in response.url
         and response.request.method == "DELETE"
     ) as response_info:
-        page.locator("[data-v2-delete-observation]").click()
+        detail.get_by_role("button", name="永久删除").click()
     assert response_info.value.status == 200
     page.wait_for_url(f"{base_url}/observations")
-    page.locator("#v2-observation-empty").wait_for(state="visible")
+    page.get_by_text("没有符合条件的记录", exact=True).wait_for(state="visible")
     assert httpx.get(f"{base_url}/api/observations").json() == []
 
 
@@ -373,26 +332,76 @@ def test_browser_can_restore_complete_backup(browser_app):
     page, base_url, data_dir = browser_app
     created = post_observation(base_url)
     page.goto(base_url)
-    page.locator("#create-backup").click()
+    page.get_by_role("button", name="完整备份资料库").click()
+    backup_dialog = page.get_by_role("dialog")
+    backup_dialog.wait_for(state="visible")
     with page.expect_response(
         lambda response: response.url.endswith("/api/backups")
         and response.request.method == "POST"
     ) as backup_response:
-        page.locator("#confirm-backup").click()
+        backup_dialog.get_by_role("button", name="立即创建完整备份").click()
     backup = backup_response.value.json()
     backup_path = data_dir.parent / "backups" / backup["filename"]
     assert backup_path.is_file()
 
     deleted = httpx.delete(f"{base_url}/api/observations/{created['observation_id']}")
     deleted.raise_for_status()
-    page.locator("#restore-backup-file").set_input_files(str(backup_path))
+    backup_dialog.get_by_label("选择 ZIP 备份").set_input_files(str(backup_path))
     page.once("dialog", lambda dialog: dialog.accept())
     with page.expect_response(
         lambda response: response.url.endswith("/api/backups/restore")
     ) as restore_response:
-        page.locator("#confirm-restore").click()
+        backup_dialog.get_by_role("button", name="校验并恢复备份").click()
     assert restore_response.value.status == 200
-    page.locator("#restore-status", has_text="资料库已恢复").wait_for()
+    backup_dialog.get_by_text("资料库已恢复", exact=False).wait_for()
     restored = httpx.get(f"{base_url}/api/observations").json()
     assert len(restored) == 1
     assert restored[0]["species_name"] == "白腰文鸟"
+
+
+def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app):
+    page, base_url, _data_dir = browser_app
+    post_observation(base_url)
+    page.goto(f"{base_url}/collections?new=1")
+    plan_form = page.locator("dialog.collection-form-dialog[open]")
+    plan_form.wait_for(state="visible")
+    plan_form.get_by_label("计划名称").fill("文鸟观察集")
+    plan_form.get_by_label("观察记录简介").fill("比较不同个体形态。")
+    plan_form.get_by_text("性别与年龄", exact=True).click()
+    with page.expect_response(
+        lambda response: response.url.endswith("/api/collections")
+        and response.request.method == "POST"
+    ) as create_info:
+        plan_form.get_by_role("button", name="保存计划").click()
+    assert create_info.value.status == 201
+    detail = page.locator("dialog.collection-detail-dialog[open]")
+    detail.wait_for(state="visible")
+    assert detail.get_by_text("计划中还没有鸟种", exact=True).is_visible()
+    detail.get_by_role("button", name="添加鸟种", exact=False).click()
+    member_dialog = page.locator("dialog.collection-member-dialog[open]")
+    member_dialog.wait_for(state="visible")
+    member_dialog.get_by_role("checkbox").check()
+    with page.expect_response(
+        lambda response: response.url.endswith("/species")
+        and "/api/collections/" in response.url
+        and response.request.method == "PUT"
+    ) as members_info:
+        member_dialog.get_by_role("button", name="保存鸟种").click()
+    assert members_info.value.status == 200
+    detail.get_by_role("button", name="为 白腰文鸟 ♂ 选择照片凭证").click()
+    evidence = page.locator("dialog.collection-evidence-modal[open]")
+    evidence.wait_for(state="visible")
+    evidence.locator(".collection-evidence-list button").first.click()
+    evidence.locator('input[type="range"]').fill("2")
+    with page.expect_response(
+        lambda response: "/api/collections/" in response.url
+        and "/slots/" in response.url
+        and response.request.method == "PUT"
+    ) as response_info:
+        evidence.get_by_role("button", name="保存头像").click()
+    assert response_info.value.status == 200
+    detail.get_by_role("button", name="预览 白腰文鸟 ♂ 的观察记录").click()
+    preview = page.locator("dialog.collection-preview-modal[open]")
+    preview.wait_for(state="visible")
+    assert preview.get_by_text("白腰文鸟", exact=True).is_visible()
+    assert preview.get_by_role("link", name="进入完整田野记录").is_visible()
