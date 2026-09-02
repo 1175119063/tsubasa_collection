@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import router
+from .api import domain_routers, router
 from .backup import BackupService
 from .config import Settings
 from .database import Database
@@ -15,6 +15,7 @@ from .feather_assistant import FeatherAssistant
 from .integration_store import IntegrationStore
 from .knowledge_service import KnowledgeLibrary
 from .media_store import MediaStore
+from .service_common import DomainError
 from .update_service import UpdateService
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -48,6 +49,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version=app_settings.app_version,
         lifespan=lifespan,
     )
+
+    @app.exception_handler(DomainError)
+    async def domain_error_response(_request: Request, exc: DomainError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.message},
+        )
+
     @app.middleware("http")
     async def prevent_stale_frontend_assets(request: Request, call_next):
         is_write = (
@@ -73,6 +82,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     app.include_router(router)
+    for domain_router in domain_routers:
+        app.include_router(domain_router, prefix="/api")
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/", include_in_schema=False)

@@ -1,21 +1,27 @@
 from __future__ import annotations
 
+from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from .media_store import ImportedMedia
 from .models import (
     CollectionPlan,
     CollectionPlanSlot,
     CollectionPlanSpecies,
     CollectionPlanSubitem,
+    Family,
+    Genus,
     Observation,
     ObservationSpecies,
     Species,
 )
 from .schemas import (
+    CollectionLogoInput,
     CollectionPlanInput,
     CollectionPlanSpeciesInput,
     CollectionSlotEvidenceInput,
+    CollectionSpeciesIntroductionInput,
 )
 from .service_common import DomainError, normalized_name
 
@@ -70,6 +76,10 @@ class CollectionServiceMixin:
             for membership in plan.memberships
             for slot in membership.slots
         }
+        saved_introductions = {
+            membership.species_id: membership.introduction
+            for membership in plan.memberships
+        }
         species_ids = [membership.species_id for membership in plan.memberships]
         plan.name = payload.name
         plan.introduction = payload.introduction or None
@@ -77,7 +87,9 @@ class CollectionServiceMixin:
         plan.memberships.clear()
         plan.subitems.clear()
         self.session.flush()
-        self._replace_collection_structure(plan, payload, species_ids, saved_evidence)
+        self._replace_collection_structure(
+            plan, payload, species_ids, saved_evidence, saved_introductions
+        )
         self.session.commit()
         return self.collection_plan_detail(plan.id)
 
@@ -99,21 +111,141 @@ class CollectionServiceMixin:
             for membership in plan.memberships
             for slot in membership.slots
         }
+        saved_introductions = {
+            membership.species_id: membership.introduction
+            for membership in plan.memberships
+        }
         plan.memberships.clear()
         self.session.flush()
         self._create_collection_memberships(
-            plan, payload.species_ids, plan.subitems, saved_evidence
+            plan,
+            payload.species_ids,
+            plan.subitems,
+            saved_evidence,
+            saved_introductions,
         )
+        if (
+            plan.logo_observation_species is not None
+            and plan.logo_observation_species.species_id not in payload.species_ids
+        ):
+            plan.logo_observation_species = None
         self.session.commit()
         return self.collection_plan_detail(plan.id)
+
+    def update_collection_species_introduction(
+        self,
+        plan_id: int,
+        species_id: int,
+        payload: CollectionSpeciesIntroductionInput,
+    ) -> dict:
+        membership = self.session.scalar(
+            select(CollectionPlanSpecies).where(
+                CollectionPlanSpecies.plan_id == plan_id,
+                CollectionPlanSpecies.species_id == species_id,
+            )
+        )
+        if membership is None:
+            raise DomainError("该物种不属于当前收集计划", 404)
+        membership.introduction = payload.introduction or None
+        self.session.commit()
+        return self.collection_plan_detail(plan_id)
 
     def delete_collection_plan(self, plan_id: int) -> dict:
         plan = self.session.get(CollectionPlan, plan_id)
         if plan is None:
             raise DomainError("收集计划不存在", 404)
+        logo_asset_id = plan.logo_asset_id
         self.session.delete(plan)
         self.session.commit()
+        if logo_asset_id is not None:
+            self._remove_unreferenced_assets({logo_asset_id})
         return {"deleted": True, "id": plan_id}
+
+    def set_collection_plan_logo(
+        self, plan_id: int, payload: CollectionLogoInput
+    ) -> dict:
+        plan = self.session.scalar(
+            self._collection_query().where(CollectionPlan.id == plan_id)
+        )
+        if plan is None:
+            raise DomainError("收集计划不存在", 404)
+        if payload.observation_species_id is None:
+            if plan.logo_asset is None:
+                raise DomainError("当前计划没有可以重新裁切的本地 Logo", 422)
+            self._set_logo_crop(plan, payload)
+            self.session.commit()
+            return self.collection_plan_detail(plan_id)
+        eligible = {
+            slot.observation_species_id
+            for membership in plan.memberships
+            for slot in membership.slots
+            if slot.observation_species_id is not None
+        }
+        if payload.observation_species_id not in eligible:
+            raise DomainError("计划 Logo 必须来自本计划已经装订的照片凭证", 422)
+        entry = self.session.get(ObservationSpecies, payload.observation_species_id)
+        if entry is None:
+            raise DomainError("计划 Logo 对应的观察物种条目不存在", 404)
+        old_asset_id = plan.logo_asset_id
+        plan.logo_asset = None
+        plan.logo_observation_species = entry
+        self._set_logo_crop(plan, payload)
+        self.session.commit()
+        if old_asset_id is not None:
+            self._remove_unreferenced_assets({old_asset_id})
+        return self.collection_plan_detail(plan_id)
+
+    async def upload_collection_plan_logo(
+        self,
+        plan_id: int,
+        upload: UploadFile,
+        crop_center_x: float,
+        crop_center_y: float,
+        crop_zoom: float,
+    ) -> dict:
+        plan = self.session.get(CollectionPlan, plan_id)
+        if plan is None:
+            raise DomainError("收集计划不存在", 404)
+        imported: ImportedMedia | None = None
+        old_asset_id = plan.logo_asset_id
+        try:
+            imported = await self.media_store.import_photo(self.session, upload)
+            plan.logo_asset = imported.asset
+            plan.logo_observation_species_id = None
+            plan.logo_crop_center_x = crop_center_x
+            plan.logo_crop_center_y = crop_center_y
+            plan.logo_crop_zoom = crop_zoom
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            if imported is not None:
+                for path in imported.created_files:
+                    path.unlink(missing_ok=True)
+            raise
+        if old_asset_id is not None and old_asset_id != imported.asset.id:
+            self._remove_unreferenced_assets({old_asset_id})
+        return self.collection_plan_detail(plan_id)
+
+    def clear_collection_plan_logo(self, plan_id: int) -> dict:
+        plan = self.session.get(CollectionPlan, plan_id)
+        if plan is None:
+            raise DomainError("收集计划不存在", 404)
+        old_asset_id = plan.logo_asset_id
+        plan.logo_asset = None
+        plan.logo_observation_species_id = None
+        plan.logo_crop_center_x = 0.5
+        plan.logo_crop_center_y = 0.5
+        plan.logo_crop_zoom = 1
+        self.session.commit()
+        if old_asset_id is not None:
+            self._remove_unreferenced_assets({old_asset_id})
+        return self.collection_plan_detail(plan_id)
+
+    @staticmethod
+    def _set_logo_crop(plan: CollectionPlan, payload: CollectionLogoInput) -> None:
+        plan.logo_crop_center_x = payload.crop_center_x
+        plan.logo_crop_center_y = payload.crop_center_y
+        plan.logo_crop_zoom = payload.crop_zoom
 
     def set_collection_slot_evidence(
         self,
@@ -176,6 +308,7 @@ class CollectionServiceMixin:
         species_ids: list[int],
         saved_evidence: dict[tuple[int, str], tuple[int | None, float, float, float]]
         | None = None,
+        saved_introductions: dict[int, str | None] | None = None,
     ) -> None:
         labels = (
             payload.subitems
@@ -195,7 +328,7 @@ class CollectionServiceMixin:
         self.session.flush()
 
         self._create_collection_memberships(
-            plan, species_ids, subitems, saved_evidence
+            plan, species_ids, subitems, saved_evidence, saved_introductions
         )
 
     def _create_collection_memberships(
@@ -205,6 +338,7 @@ class CollectionServiceMixin:
         subitems: list[CollectionPlanSubitem],
         saved_evidence: dict[tuple[int, str], tuple[int | None, float, float, float]]
         | None = None,
+        saved_introductions: dict[int, str | None] | None = None,
     ) -> None:
 
         species_by_id = {
@@ -230,6 +364,7 @@ class CollectionServiceMixin:
                 plan=plan,
                 species=species_by_id[species_id],
                 position=position,
+                introduction=(saved_introductions or {}).get(species_id),
             )
             self.session.add(membership)
             self.session.flush()
@@ -250,9 +385,15 @@ class CollectionServiceMixin:
             select(CollectionPlan)
             .options(
                 selectinload(CollectionPlan.subitems),
-                selectinload(CollectionPlan.memberships).selectinload(
-                    CollectionPlanSpecies.species
-                ),
+                selectinload(CollectionPlan.logo_asset),
+                selectinload(CollectionPlan.logo_observation_species)
+                .selectinload(ObservationSpecies.observation)
+                .selectinload(Observation.photo_asset),
+                selectinload(CollectionPlan.memberships)
+                .selectinload(CollectionPlanSpecies.species)
+                .selectinload(Species.genus)
+                .selectinload(Genus.family)
+                .selectinload(Family.order),
                 selectinload(CollectionPlan.memberships)
                 .selectinload(CollectionPlanSpecies.slots)
                 .selectinload(CollectionPlanSlot.subitem),
@@ -286,6 +427,7 @@ class CollectionServiceMixin:
                 if cover_slot and cover_slot.observation_species
                 else None
             ),
+            "logo": self._collection_logo_dict(plan),
             "updated_at": plan.updated_at.isoformat(timespec="minutes"),
         }
         if detailed:
@@ -295,6 +437,20 @@ class CollectionServiceMixin:
                     "species_id": membership.species_id,
                     "species_name": membership.species.chinese_name,
                     "scientific_name": membership.species.scientific_name,
+                    "catalog_number": membership.species.catalog_number,
+                    "order_name": membership.species.genus.family.order.chinese_name,
+                    "order_scientific_name": membership.species.genus.family.order.scientific_name,
+                    "family_name": membership.species.genus.family.chinese_name,
+                    "family_scientific_name": membership.species.genus.family.scientific_name,
+                    "genus_name": membership.species.genus.chinese_name,
+                    "genus_scientific_name": membership.species.genus.scientific_name,
+                    "iucn_status": membership.species.iucn_status.value,
+                    "china_protection_status": (
+                        membership.species.china_protection_status.value
+                        if membership.species.china_protection_status
+                        else None
+                    ),
+                    "introduction": membership.introduction,
                     "position": membership.position,
                     "slots": [
                         self._collection_slot_dict(slot, membership.species.chinese_name)
@@ -306,6 +462,27 @@ class CollectionServiceMixin:
                 for membership in plan.memberships
             ]
         return result
+
+    def _collection_logo_dict(self, plan: CollectionPlan) -> dict:
+        if plan.logo_asset is not None:
+            source = "upload"
+            url = self._media_url(plan.logo_asset)
+        elif plan.logo_observation_species is not None:
+            source = "collection"
+            url = self._media_url(
+                plan.logo_observation_species.observation.photo_asset
+            )
+        else:
+            source = None
+            url = None
+        return {
+            "source": source,
+            "url": url,
+            "observation_species_id": plan.logo_observation_species_id,
+            "crop_center_x": plan.logo_crop_center_x,
+            "crop_center_y": plan.logo_crop_center_y,
+            "crop_zoom": plan.logo_crop_zoom,
+        }
 
     def _collection_slot_dict(
         self, slot: CollectionPlanSlot, species_name: str

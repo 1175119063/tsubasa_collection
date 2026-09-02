@@ -486,13 +486,13 @@ class SpeciesServiceMixin:
 
         individual_keys = [normalized_name(item.label) for item in payload.individuals]
         if len(individual_keys) != len(set(individual_keys)):
-            raise DomainError("涓綋鏍囩涓嶈兘閲嶅", 422)
+            raise DomainError("个体标签不能重复", 422)
         for individual in payload.individuals:
             if (
                 individual.observation_id is not None
                 and individual.observation_id not in observations_by_id
             ):
-                raise DomainError("涓綋鏍囩鍙兘鍏宠仈璇ョ墿绉嶇殑瑙傚療璁板綍", 422)
+                raise DomainError("个体标签只能关联该物种的观察记录", 422)
 
         old_genus_id = species.genus_id
         old_family_id = species.genus.family_id

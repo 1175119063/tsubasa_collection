@@ -591,13 +591,44 @@ class SpeciesIndividualTag(TimestampMixin, Base):
 
 class CollectionPlan(TimestampMixin, Base):
     __tablename__ = "collection_plans"
-    __table_args__ = {"sqlite_autoincrement": True}
+    __table_args__ = (
+        CheckConstraint(
+            "NOT (logo_asset_id IS NOT NULL AND logo_observation_species_id IS NOT NULL)",
+            name="logo_single_source",
+        ),
+        CheckConstraint(
+            "logo_crop_center_x >= 0 AND logo_crop_center_x <= 1",
+            name="logo_crop_center_x_range",
+        ),
+        CheckConstraint(
+            "logo_crop_center_y >= 0 AND logo_crop_center_y <= 1",
+            name="logo_crop_center_y_range",
+        ),
+        CheckConstraint(
+            "logo_crop_zoom >= 1 AND logo_crop_zoom <= 4",
+            name="logo_crop_zoom_range",
+        ),
+        {"sqlite_autoincrement": True},
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(180))
     introduction: Mapped[str | None] = mapped_column(Text, nullable=True)
     template_kind: Mapped[str] = mapped_column(String(24))
+    logo_asset_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    logo_observation_species_id: Mapped[int | None] = mapped_column(
+        ForeignKey("observation_species.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    logo_crop_center_x: Mapped[float] = mapped_column(Float, default=0.5)
+    logo_crop_center_y: Mapped[float] = mapped_column(Float, default=0.5)
+    logo_crop_zoom: Mapped[float] = mapped_column(Float, default=1.0)
 
+    logo_asset: Mapped[MediaAsset | None] = relationship(foreign_keys=[logo_asset_id])
+    logo_observation_species: Mapped[ObservationSpecies | None] = relationship(
+        foreign_keys=[logo_observation_species_id]
+    )
     subitems: Mapped[list[CollectionPlanSubitem]] = relationship(
         back_populates="plan",
         cascade="all, delete-orphan",
@@ -650,6 +681,7 @@ class CollectionPlanSpecies(TimestampMixin, Base):
         ForeignKey("species.id", ondelete="CASCADE"), index=True
     )
     position: Mapped[int] = mapped_column(Integer)
+    introduction: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     plan: Mapped[CollectionPlan] = relationship(back_populates="memberships")
     species: Mapped[Species] = relationship(back_populates="collection_memberships")

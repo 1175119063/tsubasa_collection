@@ -228,6 +228,14 @@ export interface CollectionPlanSummary {
   slot_count: number;
   completed_count: number;
   cover_url: string | null;
+  logo: {
+    source: "upload" | "collection" | null;
+    url: string | null;
+    observation_species_id: number | null;
+    crop_center_x: number;
+    crop_center_y: number;
+    crop_zoom: number;
+  };
   updated_at: string;
 }
 
@@ -250,6 +258,16 @@ export interface CollectionMembership {
   species_id: number;
   species_name: string;
   scientific_name: string;
+  catalog_number: string;
+  order_name: string;
+  order_scientific_name: string;
+  family_name: string;
+  family_scientific_name: string;
+  genus_name: string;
+  genus_scientific_name: string;
+  iucn_status: "NE" | "LC" | "NT" | "VU" | "EN" | "CR" | "EW" | "EX";
+  china_protection_status: "three_protected" | "level_2" | "level_1" | null;
+  introduction: string | null;
   position: number;
   slots: CollectionSlot[];
 }

@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from .enums import EvidenceDimension, PhotoType
 from .models import (
     BirdingTrip,
+    CollectionPlan,
     Family,
     Genus,
     HomeDisplayPreference,
@@ -559,6 +560,11 @@ class ObservationServiceMixin:
                     self.session.scalar(
                         select(func.count(LocationCover.location_id)).where(
                             LocationCover.asset_id == asset_id
+                        )
+                    ),
+                    self.session.scalar(
+                        select(func.count(CollectionPlan.id)).where(
+                            CollectionPlan.logo_asset_id == asset_id
                         )
                     ),
                 )

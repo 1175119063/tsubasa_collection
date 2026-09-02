@@ -3,6 +3,7 @@ import json
 import sqlite3
 import zipfile
 
+from app.assistant_context_service import AssistantLibraryContextService
 from app.assistant_schemas import AssistantSqlQuery
 from app.config import Settings
 from app.enums import MediaKind
@@ -474,7 +475,7 @@ def test_existing_database_is_registered_at_migration_baseline(tmp_path):
         }
         assert "coordinate_system" in location_columns
         assert connection.execute("SELECT version_num FROM alembic_version").fetchone()[0] == (
-            "20260831_05"
+            "20260901_07"
         )
     finally:
         connection.close()
@@ -771,6 +772,63 @@ def test_species_profile_archives_keep_links_and_fall_back_after_deletion(tmp_pa
             item for item in detail["individuals"] if item["label"] == "雄性 · 成鸟 · 繁殖羽"
         )
         assert custom_individual["linked"] is False
+
+
+def test_species_profile_individual_errors_are_valid_utf8(tmp_path):
+    app = create_app(Settings(data_dir=tmp_path / "library"))
+    with TestClient(app) as client:
+        first = post_observation(client, observation_payload())
+        species_id = first.json()["species_id"]
+        observation_id = first.json()["observation_id"]
+
+        duplicate_payload = profile_payload(observation_id)
+        duplicate_payload["individuals"] = [
+            {"label": "雄性成鸟", "observation_id": observation_id},
+            {"label": "  雄性成鸟  ", "observation_id": None},
+        ]
+        duplicate = client.put(
+            f"/api/species/{species_id}/profile",
+            json=duplicate_payload,
+        )
+        assert duplicate.status_code == 422
+        assert duplicate.json()["detail"] == "个体标签不能重复"
+
+        other_payload = observation_payload("Passer montanus")
+        other_payload["new_species"]["chinese_name"] = "麻雀"
+        other = post_observation(client, other_payload)
+        wrong_link_payload = profile_payload(observation_id)
+        wrong_link_payload["individuals"] = [
+            {
+                "label": "错误关联",
+                "observation_id": other.json()["observation_id"],
+            }
+        ]
+        wrong_link = client.put(
+            f"/api/species/{species_id}/profile",
+            json=wrong_link_payload,
+        )
+        assert wrong_link.status_code == 422
+        assert wrong_link.json()["detail"] == "个体标签只能关联该物种的观察记录"
+
+
+def test_assistant_library_context_is_built_outside_the_route_layer(tmp_path):
+    app = create_app(Settings(data_dir=tmp_path / "library"))
+    with TestClient(app) as client:
+        created = post_observation(client, observation_payload())
+        assert created.status_code == 201
+        context_service = AssistantLibraryContextService(
+            app.state.database,
+            app.state.media_store,
+        )
+
+        assert context_service.build("你好，今天过得怎么样？") is None
+        context = json.loads(
+            context_service.build("资料库里的白腰文鸟有多少笔观察记录？") or "{}"
+        )
+        assert context["totals"]["species_count"] == 1
+        assert context["totals"]["observation_count"] == 1
+        assert context["matched_species"][0]["chinese_name"] == "白腰文鸟"
+        assert context["matched_species"][0]["observation_count"] == 1
 
 
 def test_species_profile_rejects_mismatched_archive_evidence(tmp_path):
@@ -1178,6 +1236,66 @@ def test_collection_plan_uniform_slots_evidence_and_deletion_rules(tmp_path):
         assert selected_slot["crop_center_x"] == 0.3
         assert selected.json()["completed_count"] == 1
 
+        introduced = client.put(
+            f"/api/collections/{plan['id']}/species/{first_species_id}/introduction",
+            json={"introduction": "它是这份专题中最早确认的成员。"},
+        )
+        assert introduced.status_code == 200, introduced.text
+        introduced_member = next(
+            item
+            for item in introduced.json()["memberships"]
+            if item["species_id"] == first_species_id
+        )
+        assert introduced_member["introduction"] == "它是这份专题中最早确认的成员。"
+        assert introduced_member["order_name"] == "雀形目"
+        assert introduced_member["family_name"] == "梅花雀科"
+        assert introduced_member["genus_name"] == "文鸟属"
+        assert introduced_member["iucn_status"] == "LC"
+        assert introduced_member["china_protection_status"] == "three_protected"
+        missing_introduction = client.put(
+            f"/api/collections/{plan['id']}/species/999999/introduction",
+            json={"introduction": "不应保存"},
+        )
+        assert missing_introduction.status_code == 404
+
+        logo = client.put(
+            f"/api/collections/{plan['id']}/logo",
+            json={
+                "observation_species_id": first_entry_id,
+                "crop_center_x": 0.35,
+                "crop_center_y": 0.6,
+                "crop_zoom": 1.8,
+            },
+        )
+        assert logo.status_code == 200, logo.text
+        assert logo.json()["logo"]["source"] == "collection"
+        assert logo.json()["logo"]["observation_species_id"] == first_entry_id
+        assert logo.json()["logo"]["crop_zoom"] == 1.8
+
+        uploaded_logo = client.post(
+            f"/api/collections/{plan['id']}/logo",
+            data={
+                "crop_center_x": "0.4",
+                "crop_center_y": "0.55",
+                "crop_zoom": "1.5",
+            },
+            files={
+                "photo": (
+                    "collection-logo.jpg",
+                    jpeg_bytes((32, 61, 48)),
+                    "image/jpeg",
+                )
+            },
+        )
+        assert uploaded_logo.status_code == 200, uploaded_logo.text
+        assert uploaded_logo.json()["logo"]["source"] == "upload"
+        uploaded_logo_url = uploaded_logo.json()["logo"]["url"]
+        assert client.get(uploaded_logo_url).status_code == 200
+        cleared_logo = client.delete(f"/api/collections/{plan['id']}/logo")
+        assert cleared_logo.status_code == 200
+        assert cleared_logo.json()["logo"]["source"] is None
+        assert client.get(uploaded_logo_url).status_code == 404
+
         renamed = client.put(
             f"/api/collections/{plan['id']}",
             json={
@@ -1208,6 +1326,7 @@ def test_collection_plan_uniform_slots_evidence_and_deletion_rules(tmp_path):
             if item["species_id"] == first_species_id
         )
         assert preserved["slots"][0]["observation_id"] == first_observation_id
+        assert preserved["introduction"] == "它是这份专题中最早确认的成员。"
 
         candidates = client.get(
             f"/api/collections/{plan['id']}/species/{first_species_id}/observations"

@@ -400,8 +400,59 @@ def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app
     ) as response_info:
         evidence.get_by_role("button", name="保存头像").click()
     assert response_info.value.status == 200
-    detail.get_by_role("button", name="预览 白腰文鸟 ♂ 的观察记录").click()
-    preview = page.locator("dialog.collection-preview-modal[open]")
-    preview.wait_for(state="visible")
-    assert preview.get_by_text("白腰文鸟", exact=True).is_visible()
-    assert preview.get_by_role("link", name="进入完整田野记录").is_visible()
+
+    detail.get_by_role("button", name="设置计划 Logo", exact=False).click()
+    logo_dialog = page.locator("dialog.collection-logo-modal[open]")
+    logo_dialog.wait_for(state="visible")
+    logo_dialog.locator(".collection-logo-candidates button").first.click()
+    with page.expect_response(
+        lambda response: response.url.endswith("/logo")
+        and "/api/collections/" in response.url
+        and response.request.method == "PUT"
+    ) as logo_info:
+        logo_dialog.get_by_role("button", name="保存 Logo").click()
+    assert logo_info.value.status == 200
+    assert detail.locator(".collection-logo-panel > img").is_visible()
+
+    detail.get_by_role("button", name="查看 白腰文鸟 ♂ 的计划档案").click()
+    preview = detail.locator(".collection-preview-panel")
+    preview.get_by_role("heading", name="白腰文鸟", exact=True).wait_for(
+        state="visible"
+    )
+    assert preview.get_by_text("梅花雀科", exact=True).is_visible()
+    assert preview.get_by_text("IUCN LC · 无危", exact=True).is_visible()
+    assert preview.get_by_role("link", name="查看这笔照片凭证").is_visible()
+    preview.get_by_role("textbox").fill("记录它在文鸟专题中的辨识要点。")
+    with page.expect_response(
+        lambda response: response.url.endswith("/introduction")
+        and "/api/collections/" in response.url
+        and response.request.method == "PUT"
+    ) as introduction_info:
+        preview.get_by_role("button", name="保存简介").click()
+    assert introduction_info.value.status == 200
+    preview.get_by_text("专题简介已保存", exact=True).wait_for(state="visible")
+
+
+def test_browser_collection_plan_without_subitems_uses_portrait_index(browser_app):
+    page, base_url, _data_dir = browser_app
+    response = httpx.post(
+        f"{base_url}/api/collections",
+        json={
+            "name": "单幅鸟种陈列",
+            "introduction": "每个物种只保留一张代表照片。",
+            "template_kind": "none",
+            "subitems": [],
+        },
+    )
+    response.raise_for_status()
+    plan = response.json()
+
+    page.goto(f"{base_url}/collections?collection={plan['id']}")
+    detail = page.locator("dialog.collection-detail-dialog[open]")
+    detail.wait_for(state="visible")
+    simple_index = detail.locator(".collection-simple-index")
+    assert simple_index.is_visible()
+    assert simple_index.get_by_text("收录物种", exact=True).is_visible()
+    assert simple_index.get_by_text("已设照片", exact=True).is_visible()
+    assert detail.get_by_text("装订进度", exact=True).count() == 0
+    assert detail.get_by_text("统一模板", exact=True).count() == 0

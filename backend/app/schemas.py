@@ -324,7 +324,22 @@ class CollectionPlanSpeciesInput(BaseModel):
         return self
 
 
+class CollectionSpeciesIntroductionInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    introduction: str | None = Field(default=None, max_length=10000)
+
+
 class CollectionSlotEvidenceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    observation_species_id: int | None = Field(default=None, ge=1)
+    crop_center_x: float = Field(default=0.5, ge=0, le=1)
+    crop_center_y: float = Field(default=0.5, ge=0, le=1)
+    crop_zoom: float = Field(default=1, ge=1, le=4)
+
+
+class CollectionLogoInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     observation_species_id: int | None = Field(default=None, ge=1)
