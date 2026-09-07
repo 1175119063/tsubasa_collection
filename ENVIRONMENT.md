@@ -67,4 +67,4 @@ https://api.example.com/v1
 
 `integrations.dat` 不包含在“完整备份资料库”的 ZIP 中，也不应提交版本控制。换电脑或复制发行包后，应重新填写密钥，或单独安全迁移该文件。启用外部模型后，开放式“精灵对话”和田野记录查询 skill 可使用对应服务商；分类字段提取和页面功能说明继续使用本地 Ollama。数据库查询始终在本机执行。
 
-高德地图也可以继续通过 `.env` 的 `TSUBASA_AMAP_WEB_SERVICE_KEY` 提供。只要在 API 管理中保存新的 Key，就会改用加密配置；主动清除表示明确停用当前 Key，因此不会自动回退到 `.env`。
+高德地图也可以继续通过 `.env` 的 `TSUBASA_AMAP_WEB_SERVICE_KEY` 提供，天地图浏览器端 Key 可以通过 `TSUBASA_TIANDITU_BROWSER_KEY` 提供。只要在 API 管理中保存新的 Key，就会改用本地配置文件中的值；主动清除表示明确停用当前 Key，因此不会自动回退到 `.env`。

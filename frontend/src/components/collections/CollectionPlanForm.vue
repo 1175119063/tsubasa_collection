@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { api, errorMessage, jsonRequest } from "@/api/client";
 import type {
   CollectionPlanDetail,
@@ -11,6 +11,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   close: [];
+  logo: [];
   saved: [plan: CollectionPlanDetail];
 }>();
 
@@ -22,8 +23,19 @@ const form = reactive({
 });
 const status = ref("");
 const saving = ref(false);
+let loadedPlanId: number | null | undefined;
+
+const logoStyle = computed(() => {
+  if (!props.plan?.logo.url) return undefined;
+  return {
+    transform: `scale(${props.plan.logo.crop_zoom}) translate(${(0.5 - props.plan.logo.crop_center_x) * 100}%, ${(0.5 - props.plan.logo.crop_center_y) * 100}%)`,
+  };
+});
 
 watch(() => props.plan, (plan) => {
+  const planId = plan?.id ?? null;
+  if (planId === loadedPlanId) return;
+  loadedPlanId = planId;
   form.name = plan?.name ?? "";
   form.introduction = plan?.introduction ?? "";
   form.templateKind = plan?.template_kind ?? "none";
@@ -70,6 +82,13 @@ async function save(): Promise<void> {
       <section class="form-section">
         <label>计划名称<input v-model="form.name" required maxlength="180" placeholder="例如：鸲类收集" /></label>
         <label>观察记录简介<textarea v-model="form.introduction" rows="5" maxlength="10000" placeholder="写下这些鸟种的来历、渊源或你的收集目标。"></textarea></label>
+        <section v-if="plan" class="collection-form-logo">
+          <div><p class="eyebrow">PLAN EMBLEM</p><h3>计划 Logo</h3></div>
+          <div class="collection-form-logo-row">
+            <span><img v-if="plan.logo.url" :src="plan.logo.url" alt="当前计划 Logo" :style="logoStyle" /><b v-else>?</b></span>
+            <div><strong>{{ plan.logo.url ? "已设置展示图" : "尚未设置展示图" }}</strong><small>从已装订照片中挑选，或上传本地 JPEG，并进行正方形裁切。</small><button type="button" class="secondary-button" @click="emit('logo')">{{ plan.logo.url ? "更换计划 Logo" : "设置计划 Logo" }}</button></div>
+          </div>
+        </section>
       </section>
       <section class="form-section">
         <div class="section-heading"><div><p class="eyebrow">UNIFORM TEMPLATE</p><h3>全计划统一子项</h3></div></div>

@@ -15,11 +15,12 @@ from .assistant_schemas import (
     AssistantTaxonomyResearchResponse,
     AssistantTextInput,
     LlmIntegrationInput,
+    TiandituIntegrationInput,
 )
 from .database import Database
 from .feather_assistant import FeatherAssistantError
 from .integration_store import IntegrationConfigError
-from .map_service import AmapService, MapServiceError
+from .map_service import AmapService, MapServiceError, TiandituService
 from .observation_query_skill import ObservationQueryError, ObservationQueryExecutor
 from .routes.catalog import router as catalog_router
 from .routes.collections import router as collection_router
@@ -292,8 +293,7 @@ async def feather_assistant_chat(payload: AssistantChatInput, request: Request) 
     return result.model_dump()
 
 
-@router.get("/integrations")
-def integration_summary(request: Request) -> dict:
+def integration_summary_result(request: Request) -> dict:
     try:
         result = request.app.state.integration_store.summary()
     except IntegrationConfigError as exc:
@@ -306,15 +306,21 @@ def integration_summary(request: Request) -> dict:
     return result
 
 
+@router.get("/integrations")
+def integration_summary(request: Request) -> dict:
+    return integration_summary_result(request)
+
+
 @router.put("/integrations/amap")
 def update_amap_integration(payload: AmapIntegrationInput, request: Request) -> dict:
     try:
-        return request.app.state.integration_store.update_amap(
+        request.app.state.integration_store.update_amap(
             payload.api_key,
             payload.clear_api_key,
         )
     except IntegrationConfigError as exc:
         raise integration_error(exc) from exc
+    return integration_summary_result(request)
 
 
 @router.post("/integrations/amap/test")
@@ -329,10 +335,36 @@ def test_amap_integration(request: Request) -> dict:
     return {"ok": True, "result_count": len(items), "message": "高德地图 API 连接成功。"}
 
 
+@router.put("/integrations/tianditu")
+def update_tianditu_integration(
+    payload: TiandituIntegrationInput, request: Request
+) -> dict:
+    try:
+        request.app.state.integration_store.update_tianditu(
+            payload.api_key,
+            payload.clear_api_key,
+        )
+    except IntegrationConfigError as exc:
+        raise integration_error(exc) from exc
+    return integration_summary_result(request)
+
+
+@router.post("/integrations/tianditu/test")
+def test_tianditu_integration(request: Request) -> dict:
+    try:
+        TiandituService(
+            request.app.state.integration_store.get_tianditu_key()
+        ).test_connection()
+    except (IntegrationConfigError, MapServiceError) as exc:
+        status_code = exc.status_code if isinstance(exc, MapServiceError) else 422
+        raise HTTPException(status_code, str(exc)) from exc
+    return {"ok": True, "message": "天地图底图连接成功。"}
+
+
 @router.put("/integrations/llm")
 def update_llm_integration(payload: LlmIntegrationInput, request: Request) -> dict:
     try:
-        return request.app.state.integration_store.update_llm(
+        request.app.state.integration_store.update_llm(
             payload.provider,
             payload.base_url,
             payload.model,
@@ -341,6 +373,7 @@ def update_llm_integration(payload: LlmIntegrationInput, request: Request) -> di
         )
     except IntegrationConfigError as exc:
         raise integration_error(exc) from exc
+    return integration_summary_result(request)
 
 
 @router.post("/integrations/llm/test")
@@ -356,13 +389,15 @@ async def test_llm_integration(request: Request) -> dict:
 @router.get("/map/config")
 def map_config(request: Request) -> dict:
     try:
-        key = request.app.state.integration_store.get_amap_key()
+        amap_key = request.app.state.integration_store.get_amap_key()
+        tianditu_key = request.app.state.integration_store.get_tianditu_key()
     except IntegrationConfigError as exc:
         raise integration_error(exc) from exc
     return {
         "provider": "amap",
-        "map_provider": "openstreetmap",
-        "enabled": bool(key),
+        "map_provider": "tianditu" if tianditu_key else "openstreetmap",
+        "enabled": bool(amap_key),
+        "tianditu_key": tianditu_key,
     }
 
 

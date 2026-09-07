@@ -148,6 +148,13 @@ class AmapIntegrationInput(BaseModel):
     clear_api_key: bool = False
 
 
+class TiandituIntegrationInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    api_key: str | None = Field(default=None, min_length=4, max_length=200)
+    clear_api_key: bool = False
+
+
 class LlmIntegrationInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 

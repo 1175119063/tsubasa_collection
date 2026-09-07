@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fastapi import UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 
@@ -15,6 +16,8 @@ from .models import (
     Observation,
     ObservationAudio,
     ObservationLocationLink,
+    ObservationPhoto,
+    ObservationPhotoSpecies,
     ObservationSpecies,
     ObservationTripLink,
     Species,
@@ -22,7 +25,12 @@ from .models import (
     Subspecies,
     TaxonomicOrder,
 )
-from .schemas import ObservationSpeciesInput, ObservationUpdateInput
+from .schemas import (
+    ObservationPhotoAddInput,
+    ObservationPhotoUpdateInput,
+    ObservationSpeciesInput,
+    ObservationUpdateInput,
+)
 from .service_common import DomainError
 
 
@@ -194,13 +202,144 @@ class ObservationServiceMixin:
         self.session.commit()
         return self._observation_dict(entry.observation)
 
+    async def add_observation_photo(
+        self,
+        observation_id: int,
+        payload: ObservationPhotoAddInput,
+        photo: UploadFile,
+    ) -> dict:
+        observation = self._observation_with_photos(observation_id)
+        if len(observation.photos) >= 20:
+            raise DomainError("一笔观察最多保存 20 张照片", 422)
+        entries = self._photo_species_entries(observation, payload.species_entry_ids)
+        imported = None
+        try:
+            imported = await self.media_store.import_photo(self.session, photo)
+            if any(item.asset_id == imported.asset.id for item in observation.photos):
+                raise DomainError("这张照片已经在本笔观察中", 409)
+            item = ObservationPhoto(
+                observation=observation,
+                asset=imported.asset,
+                observed_at=payload.observed_at,
+                position=len(observation.photos),
+                is_cover=payload.is_cover,
+                species_links=[
+                    ObservationPhotoSpecies(species_entry=entry) for entry in entries
+                ],
+            )
+            self.session.add(item)
+            if payload.is_cover:
+                self._set_cover_photo(observation, item)
+            self.session.commit()
+            return self._observation_dict(observation)
+        except Exception:
+            self.session.rollback()
+            if imported is not None:
+                for path in imported.created_files:
+                    path.unlink(missing_ok=True)
+            raise
+
+    def update_observation_photo(
+        self,
+        observation_id: int,
+        photo_id: int,
+        payload: ObservationPhotoUpdateInput,
+    ) -> dict:
+        observation = self._observation_with_photos(observation_id)
+        photo = next((item for item in observation.photos if item.id == photo_id), None)
+        if photo is None:
+            raise DomainError("观察照片不存在", 404)
+        entries = self._photo_species_entries(observation, payload.species_entry_ids)
+        if photo.is_cover and not payload.is_cover:
+            raise DomainError("请先选择另一张照片作为封面", 422)
+        photo.observed_at = payload.observed_at
+        photo.species_links = [
+            ObservationPhotoSpecies(species_entry=entry) for entry in entries
+        ]
+        if payload.is_cover:
+            self._set_cover_photo(observation, photo)
+        self.session.commit()
+        return self._observation_dict(observation)
+
+    def delete_observation_photo(self, observation_id: int, photo_id: int) -> dict:
+        observation = self._observation_with_photos(observation_id)
+        photo = next((item for item in observation.photos if item.id == photo_id), None)
+        if photo is None:
+            raise DomainError("观察照片不存在", 404)
+        if len(observation.photos) <= 1:
+            raise DomainError("一笔观察必须至少保留一张照片", 422)
+        asset_id = photo.asset_id
+        was_cover = photo.is_cover
+        observation.photos.remove(photo)
+        self.session.flush()
+        remaining = list(observation.photos)
+        for position, item in enumerate(sorted(remaining, key=lambda value: value.position)):
+            item.position = position
+        if was_cover:
+            self._set_cover_photo(observation, remaining[0])
+        self.session.commit()
+        self._remove_unreferenced_assets({asset_id})
+        return self._observation_dict(observation)
+
+    def _observation_with_photos(self, observation_id: int) -> Observation:
+        observation = self.session.scalar(
+            select(Observation)
+            .where(Observation.id == observation_id)
+            .options(
+                selectinload(Observation.photo_asset),
+                selectinload(Observation.photos).selectinload(ObservationPhoto.asset),
+                selectinload(Observation.photos)
+                .selectinload(ObservationPhoto.species_links)
+                .selectinload(ObservationPhotoSpecies.species_entry),
+                selectinload(Observation.species_entries).selectinload(
+                    ObservationSpecies.species
+                ),
+                selectinload(Observation.species_entries).selectinload(
+                    ObservationSpecies.subspecies
+                ),
+                selectinload(Observation.audio_links).selectinload(ObservationAudio.asset),
+                selectinload(Observation.location_link).selectinload(
+                    ObservationLocationLink.location
+                ),
+                selectinload(Observation.trip_link)
+                .selectinload(ObservationTripLink.trip)
+                .selectinload(BirdingTrip.location),
+            )
+        )
+        if observation is None:
+            raise DomainError("观察记录不存在", 404)
+        return observation
+
+    @staticmethod
+    def _photo_species_entries(
+        observation: Observation, entry_ids: list[int]
+    ) -> list[ObservationSpecies]:
+        entries = {
+            entry.id: entry for entry in observation.species_entries if entry.id is not None
+        }
+        if any(entry_id not in entries for entry_id in entry_ids):
+            raise DomainError("照片只能关联这笔观察中已有的物种", 422)
+        return [entries[entry_id] for entry_id in entry_ids]
+
+    @staticmethod
+    def _set_cover_photo(observation: Observation, selected: ObservationPhoto) -> None:
+        for item in observation.photos:
+            item.is_cover = item is selected
+        selected.is_cover = True
+        observation.photo_asset = selected.asset
+
     def add_observation_species(
         self, observation_id: int, payload: ObservationSpeciesInput
     ) -> dict:
         observation = self.session.scalar(
             select(Observation)
             .where(Observation.id == observation_id)
-            .options(selectinload(Observation.species_entries))
+            .options(
+                selectinload(Observation.species_entries),
+                selectinload(Observation.photos).selectinload(
+                    ObservationPhoto.species_links
+                ),
+            )
         )
         if observation is None:
             raise DomainError("观察记录不存在", 404)
@@ -216,17 +355,20 @@ class ObservationServiceMixin:
             subspecies = self.session.get(Subspecies, payload.subspecies_id)
             if subspecies is None or subspecies.species_id != species.id:
                 raise DomainError("所选亚种不属于该物种", 422)
-        observation.species_entries.append(
-            ObservationSpecies(
-                species=species,
-                subspecies=subspecies,
-                photo_type=payload.photo_type,
-                sex=payload.sex,
-                life_stage=payload.life_stage,
-                notes=payload.notes or None,
-                is_primary=False,
-            )
+        entry = ObservationSpecies(
+            species=species,
+            subspecies=subspecies,
+            photo_type=payload.photo_type,
+            sex=payload.sex,
+            life_stage=payload.life_stage,
+            notes=payload.notes or None,
+            is_primary=False,
         )
+        observation.species_entries.append(entry)
+        self.session.flush()
+        cover = next((photo for photo in observation.photos if photo.is_cover), None)
+        if cover is not None:
+            cover.species_links.append(ObservationPhotoSpecies(species_entry=entry))
         self.session.commit()
         return self._observation_dict(observation)
 
@@ -252,6 +394,11 @@ class ObservationServiceMixin:
         observation = entry.observation
         if len(observation.species_entries) <= 1:
             raise DomainError("一笔观察必须至少保留一个物种", 422)
+        if any(
+            len(link.photo.species_links) <= 1
+            for link in entry.photo_links
+        ):
+            raise DomainError("请先为仅关联该物种的照片选择其他物种", 422)
         if entry.is_primary:
             replacement = next(
                 item for item in observation.species_entries if item.id != entry.id
@@ -388,6 +535,22 @@ class ObservationServiceMixin:
             "photo_asset_id": item.photo_asset_id,
             "photo_url": self._media_url(item.photo_asset),
             "thumbnail_url": self._media_url(item.photo_asset, thumbnail=True),
+            "photo_count": len(item.photos) or 1,
+            "photos": [
+                {
+                    "id": photo.id,
+                    "asset_id": photo.asset_id,
+                    "observed_at": photo.observed_at.isoformat(timespec="minutes"),
+                    "position": photo.position,
+                    "is_cover": photo.is_cover,
+                    "species_entry_ids": [
+                        link.observation_species_id for link in photo.species_links
+                    ],
+                    "photo_url": self._media_url(photo.asset),
+                    "thumbnail_url": self._media_url(photo.asset, thumbnail=True),
+                }
+                for photo in sorted(item.photos, key=lambda value: value.position)
+            ],
             "audio": [
                 {
                     "id": link.id,
@@ -399,15 +562,35 @@ class ObservationServiceMixin:
         }
 
     @staticmethod
-    def _proof(observation: Observation) -> dict:
+    def _proof(observation: Observation, species_id: int | None = None) -> dict:
+        photo = None
+        if species_id is not None:
+            entry = next(
+                (
+                    item
+                    for item in observation.species_entries
+                    if item.species_id == species_id
+                ),
+                None,
+            )
+            if entry is not None:
+                photo = ObservationServiceMixin._photo_for_entry(entry)
+        asset = photo.asset if photo is not None else observation.photo_asset
         return {
             "observation_id": observation.id,
-            "asset_id": observation.photo_asset_id,
-            "photo_url": ObservationServiceMixin._media_url(observation.photo_asset),
+            "asset_id": asset.id,
+            "photo_url": ObservationServiceMixin._media_url(asset),
             "thumbnail_url": ObservationServiceMixin._media_url(
-                observation.photo_asset, thumbnail=True
+                asset, thumbnail=True
             ),
         }
+
+    @staticmethod
+    def _photo_for_entry(entry: ObservationSpecies) -> ObservationPhoto | None:
+        photos = [link.photo for link in entry.photo_links]
+        return next((photo for photo in photos if photo.is_cover), None) or min(
+            photos, key=lambda photo: (photo.position, photo.id), default=None
+        )
 
     @staticmethod
     def _media_url(asset: MediaAsset, thumbnail: bool = False) -> str:
@@ -428,7 +611,7 @@ class ObservationServiceMixin:
         if selected is not None and self._observation_matches_archive(
             selected, dimension, value_key, species_id
         ):
-            return self._proof(selected)
+            return self._proof(selected, species_id)
         return fallback
 
     @staticmethod
@@ -489,6 +672,7 @@ class ObservationServiceMixin:
             raise DomainError("观察记录不存在", 404)
 
         asset_ids = {observation.photo_asset_id}
+        asset_ids.update(photo.asset_id for photo in observation.photos)
         asset_ids.update(link.asset_id for link in observation.audio_links)
         species_to_remove = []
         for entry in observation.species_entries:
@@ -547,6 +731,11 @@ class ObservationServiceMixin:
                     self.session.scalar(
                         select(func.count(Observation.id)).where(
                             Observation.photo_asset_id == asset_id
+                        )
+                    ),
+                    self.session.scalar(
+                        select(func.count(ObservationPhoto.id)).where(
+                            ObservationPhoto.asset_id == asset_id
                         )
                     ),
                     self.session.scalar(

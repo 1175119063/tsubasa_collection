@@ -148,6 +148,11 @@ class SpeciesServiceMixin:
             observations,
             species.display_preference.cover_observation_id if species.display_preference else None,
         )
+        cover_entry = next(
+            entry for entry in species.observation_entries if entry.observation_id == cover.id
+        )
+        cover_photo = self._photo_for_entry(cover_entry)
+        cover_asset = cover_photo.asset if cover_photo else cover.photo_asset
         return {
             "id": species.id,
             "catalog_number": species.catalog_number,
@@ -165,8 +170,8 @@ class SpeciesServiceMixin:
                 species.china_protection_status.value if species.china_protection_status else None
             ),
             "observation_count": len(observations),
-            "cover_asset_id": cover.photo_asset_id,
-            "cover_url": self._media_url(cover.photo_asset, thumbnail=True),
+            "cover_asset_id": cover_asset.id,
+            "cover_url": self._media_url(cover_asset, thumbnail=True),
             "first_observed_at": observations[0].observed_at.isoformat(timespec="minutes"),
         }
 
@@ -228,7 +233,7 @@ class SpeciesServiceMixin:
         captured_subspecies: dict[int, dict] = {}
         for item in observations:
             species_entry = entries_by_observation[item.id]
-            proof = self._proof(item)
+            proof = self._proof(item, species.id)
             countries.setdefault(
                 item.country_code,
                 {"code": item.country_code, "name": item.country_name, **proof},
@@ -338,9 +343,9 @@ class SpeciesServiceMixin:
                     }
                     for item in sorted(species.subspecies, key=lambda value: value.scientific_name)
                 ],
-                "cover": self._proof(cover),
+                "cover": self._proof(cover, species.id),
                 "first_encounter": {
-                    **self._proof(first),
+                    **self._proof(first, species.id),
                     "observed_at": first.observed_at.isoformat(timespec="minutes"),
                     "country_name": first.country_name,
                     "admin1_name": first.admin1_name,
@@ -363,7 +368,7 @@ class SpeciesServiceMixin:
                         "label": item.label,
                         "linked": item.observation_id is not None,
                         **(
-                            self._proof(item.observation)
+                                self._proof(item.observation, species.id)
                             if item.observation is not None
                             else {}
                         ),
@@ -410,7 +415,7 @@ class SpeciesServiceMixin:
                             "label": item.label,
                             "linked": item.observation_id is not None,
                             **(
-                                self._proof(item.observation)
+                                self._proof(item.observation, species.id)
                                 if item.observation is not None
                                 else {}
                             ),
@@ -494,13 +499,16 @@ class SpeciesServiceMixin:
             ):
                 raise DomainError("个体标签只能关联该物种的观察记录", 422)
 
-        old_genus_id = species.genus_id
-        old_family_id = species.genus.family_id
-        old_order_id = species.genus.family.order_id
-        order = self._upsert_profile_order(payload.order)
-        family = self._upsert_profile_family(payload.family, order)
-        genus = self._upsert_profile_genus(payload.genus, family)
-        species.genus = genus
+        for supplied, current in (
+            (payload.order, species.genus.family.order),
+            (payload.family, species.genus.family),
+            (payload.genus, species.genus),
+        ):
+            if supplied is not None and (
+                supplied.chinese_name != current.chinese_name
+                or supplied.scientific_name != current.scientific_name
+            ):
+                raise DomainError("分类修改请使用“修改分类”，预览影响后单独保存", 409)
         species.notes = payload.introduction or None
         if species.ecology_profile is None:
             species.ecology_profile = SpeciesEcologyProfile(
@@ -559,12 +567,6 @@ class SpeciesServiceMixin:
             )
 
         self.session.flush()
-        if (old_genus_id, old_family_id, old_order_id) != (
-            genus.id,
-            family.id,
-            order.id,
-        ):
-            self._prune_taxonomy(old_genus_id, old_family_id, old_order_id)
         self.session.commit()
         self.session.expire_all()
         return self.species_detail(species_id)
@@ -603,5 +605,5 @@ class SpeciesServiceMixin:
         return {
             "species_id": species_id,
             "cover_observation_id": selected.id,
-            "cover_asset_id": selected.photo_asset_id,
+            "cover_asset_id": self._proof(selected, species_id)["asset_id"],
         }

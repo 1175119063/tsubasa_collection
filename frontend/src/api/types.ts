@@ -10,11 +10,29 @@ export interface SpeciesSummary {
   catalog_number: string;
   chinese_name: string;
   scientific_name: string;
+  family_id: number;
+  genus_id: number;
   order_name: string;
   family_name: string;
+  family_scientific_name: string;
   genus_name: string;
+  genus_scientific_name: string;
   observation_count: number;
   cover_url: string;
+}
+
+export interface TaxonomyGenus {
+  id: number;
+  chinese_name: string;
+  scientific_name: string;
+}
+
+export interface TaxonomyFamily extends TaxonomyGenus {
+  genera: TaxonomyGenus[];
+}
+
+export interface TaxonomyOrder extends TaxonomyGenus {
+  families: TaxonomyFamily[];
 }
 
 export interface ObservationSummary {
@@ -82,7 +100,20 @@ export interface ObservationRecord {
   photo_asset_id: number;
   photo_url: string;
   thumbnail_url: string;
+  photo_count: number;
+  photos: ObservationPhoto[];
   audio: Array<{ id: number; asset_id: number; url: string }>;
+}
+
+export interface ObservationPhoto {
+  id: number;
+  asset_id: number;
+  observed_at: string;
+  position: number;
+  is_cover: boolean;
+  species_entry_ids: number[];
+  photo_url: string;
+  thumbnail_url: string;
 }
 
 export interface HomepageFeature {
@@ -116,6 +147,11 @@ export interface UpdateDownload {
 export interface IntegrationSummary {
   storage: "portable_local_file";
   amap: {
+    configured: boolean;
+    key_hint: string | null;
+    source: "environment" | "managed" | null;
+  };
+  tianditu: {
     configured: boolean;
     key_hint: string | null;
     source: "environment" | "managed" | null;

@@ -16,4 +16,4 @@ Set-Location -LiteralPath $projectRoot
 Write-Host 'Tsubasa demo: http://127.0.0.1:8000' -ForegroundColor Green
 Write-Host 'Press Ctrl+C to stop the server.' -ForegroundColor DarkGray
 
-& $pythonPath -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+& $pythonPath -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload --reload-dir backend/app

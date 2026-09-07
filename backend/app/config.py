@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     app_version: str = "0.3.0"
     data_dir: Path = PROJECT_ROOT / "data"
     amap_web_service_key: str | None = None
+    tianditu_browser_key: str | None = None
     feather_assistant_enabled: bool = True
     feather_assistant_base_url: str = "http://127.0.0.1:11434"
     feather_assistant_model: str = "feiyu-jingling"

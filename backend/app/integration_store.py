@@ -18,6 +18,7 @@ def _defaults() -> dict:
     return {
         "version": 1,
         "amap": {"api_key": None, "use_environment": True},
+        "tianditu": {"api_key": None, "use_environment": True},
         "llm": {
             "provider": "local",
             "base_url": None,
@@ -50,7 +51,7 @@ class IntegrationStore:
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
                 raise IntegrationConfigError("API 配置文件已经损坏，无法读取。") from exc
             defaults = _defaults()
-            for section in ("amap", "llm"):
+            for section in ("amap", "tianditu", "llm"):
                 if isinstance(payload.get(section), dict):
                     defaults[section].update(payload[section])
             return defaults
@@ -86,6 +87,12 @@ class IntegrationStore:
             return self.settings.amap_web_service_key
         return config.get("api_key") or None
 
+    def get_tianditu_key(self) -> str | None:
+        config = self._read()["tianditu"]
+        if config.get("use_environment", True):
+            return self.settings.tianditu_browser_key
+        return config.get("api_key") or None
+
     def get_llm(self) -> dict:
         return deepcopy(self._read()["llm"])
 
@@ -94,6 +101,13 @@ class IntegrationStore:
         amap = payload["amap"]
         amap_key = self.get_amap_key()
         amap_source = "environment" if amap.get("use_environment", True) and amap_key else "managed"
+        tianditu = payload["tianditu"]
+        tianditu_key = self.get_tianditu_key()
+        tianditu_source = (
+            "environment"
+            if tianditu.get("use_environment", True) and tianditu_key
+            else "managed"
+        )
         llm = payload["llm"]
         return {
             "storage": "portable_local_file",
@@ -101,6 +115,11 @@ class IntegrationStore:
                 "configured": bool(amap_key),
                 "key_hint": self._masked(amap_key),
                 "source": amap_source if amap_key else None,
+            },
+            "tianditu": {
+                "configured": bool(tianditu_key),
+                "key_hint": self._masked(tianditu_key),
+                "source": tianditu_source if tianditu_key else None,
             },
             "llm": {
                 "provider": llm.get("provider") or "local",
@@ -117,6 +136,15 @@ class IntegrationStore:
             payload["amap"] = {"api_key": None, "use_environment": False}
         elif api_key:
             payload["amap"] = {"api_key": api_key.strip(), "use_environment": False}
+        self._write(payload)
+        return self.summary()
+
+    def update_tianditu(self, api_key: str | None, clear_api_key: bool) -> dict:
+        payload = self._read()
+        if clear_api_key:
+            payload["tianditu"] = {"api_key": None, "use_environment": False}
+        elif api_key:
+            payload["tianditu"] = {"api_key": api_key.strip(), "use_environment": False}
         self._write(payload)
         return self.summary()
 

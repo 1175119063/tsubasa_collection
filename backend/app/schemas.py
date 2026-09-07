@@ -79,6 +79,49 @@ class ObservationSpeciesInput(BaseModel):
         return self
 
 
+class ObservationPhotoCreateInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    observed_at: datetime
+    includes_primary: bool = True
+    species_ids: list[int] = Field(default_factory=list, max_length=9)
+    is_cover: bool = False
+
+    @model_validator(mode="after")
+    def validate_photo(self) -> "ObservationPhotoCreateInput":
+        if self.observed_at.tzinfo is not None:
+            raise ValueError("照片拍摄时间不包含时区")
+        if self.observed_at.second or self.observed_at.microsecond:
+            raise ValueError("照片拍摄时间必须精确到分钟")
+        if len(self.species_ids) != len(set(self.species_ids)):
+            raise ValueError("照片关联的物种不能重复")
+        if not self.includes_primary and not self.species_ids:
+            raise ValueError("每张照片必须至少关联一个物种")
+        return self
+
+
+class ObservationPhotoAddInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    observed_at: datetime
+    species_entry_ids: list[int] = Field(min_length=1, max_length=10)
+    is_cover: bool = False
+
+    @model_validator(mode="after")
+    def validate_photo(self) -> "ObservationPhotoAddInput":
+        if self.observed_at.tzinfo is not None:
+            raise ValueError("照片拍摄时间不包含时区")
+        if self.observed_at.second or self.observed_at.microsecond:
+            raise ValueError("照片拍摄时间必须精确到分钟")
+        if len(self.species_entry_ids) != len(set(self.species_entry_ids)):
+            raise ValueError("照片关联的物种不能重复")
+        return self
+
+
+class ObservationPhotoUpdateInput(ObservationPhotoAddInput):
+    pass
+
+
 class ObservationInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -102,6 +145,7 @@ class ObservationInput(BaseModel):
     life_stage: LifeStage | None = None
     notes: str | None = None
     additional_species: list[ObservationSpeciesInput] = Field(default_factory=list, max_length=9)
+    photos: list[ObservationPhotoCreateInput] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def validate_observation(self) -> "ObservationInput":
@@ -137,6 +181,13 @@ class ObservationInput(BaseModel):
             raise ValueError("同一观察中不能重复添加同一物种")
         if self.species_id is not None and self.species_id in additional_ids:
             raise ValueError("主要物种不能在附加物种中重复出现")
+        valid_photo_species = set(additional_ids)
+        for photo in self.photos:
+            unknown_ids = set(photo.species_ids) - valid_photo_species
+            if unknown_ids:
+                raise ValueError("照片只能关联这笔观察中已经填写的物种")
+        if self.photos and sum(photo.is_cover for photo in self.photos) != 1:
+            raise ValueError("一笔观察必须指定一张封面照片")
         return self
 
 
@@ -188,9 +239,9 @@ class SpeciesProfileUpdateInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     introduction: str | None = Field(default=None, max_length=10000)
-    order: TaxonNodeInput
-    family: TaxonNodeInput
-    genus: TaxonNodeInput
+    order: TaxonNodeInput | None = None
+    family: TaxonNodeInput | None = None
+    genus: TaxonNodeInput | None = None
     ecological_group: EcologicalGroup = EcologicalGroup.UNKNOWN
     body_size: BodySize = BodySize.UNKNOWN
     preferred_habitats: list[HabitatType] = Field(default_factory=list, max_length=3)

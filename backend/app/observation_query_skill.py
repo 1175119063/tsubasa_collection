@@ -182,13 +182,13 @@ class ObservationQueryExecutor:
 
 QUERY_SKILL_SCHEMA = """只可查询下面两个只读视图。SQL 必须返回名为 observation_id 的列。
 
-field_observations（一行一笔拍摄记录）：
+field_observations（一行一笔田野观察）：
 - observation_id, observed_at, observed_date, observed_year, observed_month, observed_day
 - season, locality, country_name, admin1_name, observation_notes
 - location_id, location_name, location_city, location_district
 - trip_id, trip_name, species_count
 
-field_observation_taxa（一行是照片中的一个物种）：
+field_observation_taxa（一行是观察中的一个物种）：
 - observation_id, species_id, catalog_number
 - species_chinese_name, species_scientific_name
 - genus_chinese_name, genus_scientific_name

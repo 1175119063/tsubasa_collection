@@ -423,7 +423,11 @@ class CollectionServiceMixin:
             "slot_count": len(slots),
             "completed_count": completed,
             "cover_url": (
-                self._media_url(cover_slot.observation_species.observation.photo_asset)
+                self._media_url(
+                    self._photo_for_entry(cover_slot.observation_species).asset
+                    if self._photo_for_entry(cover_slot.observation_species)
+                    else cover_slot.observation_species.observation.photo_asset
+                )
                 if cover_slot and cover_slot.observation_species
                 else None
             ),
@@ -469,8 +473,9 @@ class CollectionServiceMixin:
             url = self._media_url(plan.logo_asset)
         elif plan.logo_observation_species is not None:
             source = "collection"
+            photo = self._photo_for_entry(plan.logo_observation_species)
             url = self._media_url(
-                plan.logo_observation_species.observation.photo_asset
+                photo.asset if photo else plan.logo_observation_species.observation.photo_asset
             )
         else:
             source = None
@@ -489,6 +494,8 @@ class CollectionServiceMixin:
     ) -> dict:
         entry = slot.observation_species
         observation = entry.observation if entry else None
+        photo = self._photo_for_entry(entry) if entry else None
+        asset = photo.asset if photo else observation.photo_asset if observation else None
         return {
             "id": slot.id,
             "subitem_id": slot.subitem_id,
@@ -496,10 +503,10 @@ class CollectionServiceMixin:
             "label": " ".join(filter(None, (species_name, slot.subitem.label))),
             "observation_species_id": slot.observation_species_id,
             "observation_id": observation.id if observation else None,
-            "photo_url": self._media_url(observation.photo_asset) if observation else None,
+            "photo_url": self._media_url(asset) if asset else None,
             "thumbnail_url": (
-                self._media_url(observation.photo_asset, thumbnail=True)
-                if observation
+                self._media_url(asset, thumbnail=True)
+                if asset
                 else None
             ),
             "crop_center_x": slot.crop_center_x,

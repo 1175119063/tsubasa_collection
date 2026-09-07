@@ -19,6 +19,8 @@ from .models import (
     Observation,
     ObservationAudio,
     ObservationLocationLink,
+    ObservationPhoto,
+    ObservationPhotoSpecies,
     ObservationSpecies,
     Species,
     Subspecies,
@@ -32,9 +34,11 @@ from .schemas import (
 )
 from .service_common import CreationResult, DomainError, normalized_name
 from .species_service import SpeciesServiceMixin
+from .taxonomy_service import TaxonomyServiceMixin
 
 
 class BirdService(
+    TaxonomyServiceMixin,
     CollectionServiceMixin,
     LocationTripServiceMixin,
     ObservationServiceMixin,
@@ -49,19 +53,28 @@ class BirdService(
         payload: ObservationInput,
         photo: UploadFile,
         audio_files: list[UploadFile] | None = None,
+        additional_photos: list[UploadFile] | None = None,
     ) -> CreationResult:
         imported: list[ImportedMedia] = []
         try:
             species = self._resolve_species(payload)
             subspecies = self._resolve_subspecies(species, payload)
 
-            photo_import = await self.media_store.import_photo(self.session, photo)
-            imported.append(photo_import)
+            photo_uploads = [photo, *(additional_photos or [])]
+            if len(photo_uploads) > 20:
+                raise DomainError("一笔观察最多保存 20 张照片", 422)
+            photo_imports = []
+            for upload in photo_uploads:
+                photo_import = await self.media_store.import_photo(self.session, upload)
+                if any(item.asset.id == photo_import.asset.id for item in photo_imports):
+                    raise DomainError("同一笔观察不能重复添加相同照片", 409)
+                imported.append(photo_import)
+                photo_imports.append(photo_import)
 
             observation = Observation(
                 species=species,
                 subspecies=subspecies,
-                photo_asset=photo_import.asset,
+                photo_asset=photo_imports[0].asset,
                 photo_type=payload.photo_type,
                 observed_at=payload.observed_at,
                 latitude=payload.latitude,
@@ -114,6 +127,42 @@ class BirdService(
                         is_primary=False,
                     )
                 )
+
+            self.session.flush()
+            entries_by_species = {
+                entry.species_id: entry for entry in observation.species_entries
+            }
+            primary_entry = next(
+                entry for entry in observation.species_entries if entry.is_primary
+            )
+            photo_metadata = payload.photos
+            if photo_metadata and len(photo_metadata) != len(photo_imports):
+                raise DomainError("照片资料数量与上传照片数量不一致", 422)
+            created_photos = []
+            for position, photo_import in enumerate(photo_imports):
+                metadata = photo_metadata[position] if photo_metadata else None
+                linked_entries = (
+                    [
+                        *([primary_entry] if metadata.includes_primary else []),
+                        *[entries_by_species[item] for item in metadata.species_ids],
+                    ]
+                    if metadata
+                    else list(observation.species_entries)
+                )
+                observation_photo = ObservationPhoto(
+                    asset=photo_import.asset,
+                    observed_at=metadata.observed_at if metadata else payload.observed_at,
+                    position=position,
+                    is_cover=metadata.is_cover if metadata else position == 0,
+                )
+                observation_photo.species_links = [
+                    ObservationPhotoSpecies(species_entry=entry)
+                    for entry in linked_entries
+                ]
+                observation.photos.append(observation_photo)
+                created_photos.append(observation_photo)
+            selected_cover = next(item for item in created_photos if item.is_cover)
+            observation.photo_asset = selected_cover.asset
 
             location = self._resolve_observation_location(payload)
             if location is not None:
@@ -255,45 +304,6 @@ class BirdService(
             raise DomainError(f"属 {data.scientific_name} 已属于其他科", 409)
         return node
 
-    def _upsert_profile_order(self, data: TaxonNodeInput) -> TaxonomicOrder:
-        key = normalized_name(data.scientific_name)
-        node = self.session.scalar(
-            select(TaxonomicOrder).where(TaxonomicOrder.scientific_name_key == key)
-        )
-        if node is None:
-            node = TaxonomicOrder(scientific_name_key=key)
-            self.session.add(node)
-        node.chinese_name = data.chinese_name
-        node.scientific_name = data.scientific_name
-        self.session.flush()
-        return node
-
-    def _upsert_profile_family(
-        self, data: TaxonNodeInput, order: TaxonomicOrder
-    ) -> Family:
-        key = normalized_name(data.scientific_name)
-        node = self.session.scalar(select(Family).where(Family.scientific_name_key == key))
-        if node is None:
-            node = Family(scientific_name_key=key)
-            self.session.add(node)
-        node.order = order
-        node.chinese_name = data.chinese_name
-        node.scientific_name = data.scientific_name
-        self.session.flush()
-        return node
-
-    def _upsert_profile_genus(self, data: TaxonNodeInput, family: Family) -> Genus:
-        key = normalized_name(data.scientific_name)
-        node = self.session.scalar(select(Genus).where(Genus.scientific_name_key == key))
-        if node is None:
-            node = Genus(scientific_name_key=key)
-            self.session.add(node)
-        node.family = family
-        node.chinese_name = data.chinese_name
-        node.scientific_name = data.scientific_name
-        self.session.flush()
-        return node
-
     def _resolve_subspecies(self, species: Species, payload: ObservationInput) -> Subspecies | None:
         if payload.photo_type is PhotoType.GROUP:
             return None
@@ -323,9 +333,7 @@ class BirdService(
         return {
             "species_count": self.session.scalar(select(func.count(Species.id))) or 0,
             "observation_count": self.session.scalar(select(func.count(Observation.id))) or 0,
-            "photo_count": self.session.scalar(
-                select(func.count(Observation.photo_asset_id))
-            )
+            "photo_count": self.session.scalar(select(func.count(ObservationPhoto.id)))
             or 0,
             "audio_count": self.session.scalar(
                 select(func.count(MediaAsset.id)).where(MediaAsset.kind == MediaKind.AUDIO)

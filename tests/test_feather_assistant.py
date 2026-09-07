@@ -153,7 +153,7 @@ def test_help_is_grounded_in_local_documentation() -> None:
     assert result.answer == "探险家，我已经翻到对应的档案页了。点击“登记新发现”。"
     _path, payload = assistant.requests[0]
     assert payload is not None
-    assert "一笔观察对应一张照片" in payload["messages"][0]["content"]
+    assert "一笔观察可以包含一至二十张照片" in payload["messages"][0]["content"]
     assert "不得称为“旅行者”" in payload["messages"][0]["content"]
     assert payload["options"]["temperature"] == 0.25
 

@@ -8,7 +8,8 @@ def observations_csv(observations: list[dict]) -> bytes:
     """Export one row per species entry while preserving the shared observation ID."""
     output = io.StringIO(newline="")
     fields = [
-        "observation_id", "observed_at", "species_catalog_number",
+        "observation_id", "observed_at", "photo_count", "photo_observed_at",
+        "species_catalog_number",
         "species_chinese_name", "species_scientific_name", "photo_type", "sex",
         "life_stage", "subspecies_chinese_name", "subspecies_scientific_name",
         "country_code", "country_name", "admin1_code", "admin1_name", "locality",
@@ -34,6 +35,10 @@ def observations_csv(observations: list[dict]) -> bytes:
             writer.writerow({
                 "observation_id": observation["id"],
                 "observed_at": observation["observed_at"],
+                "photo_count": observation.get("photo_count", 1),
+                "photo_observed_at": " | ".join(
+                    photo["observed_at"] for photo in observation.get("photos", [])
+                ) or observation["observed_at"],
                 "species_catalog_number": (
                     f"AV-{species_id:06d}" if species_id is not None else ""
                 ),

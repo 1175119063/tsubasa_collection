@@ -55,7 +55,7 @@ defineExpose({ open, close });
         id="vue-home-cover-search"
         v-model="query"
         type="search"
-        placeholder="输入物种名、馆藏编号、地点或日期"
+        placeholder="输入物种名、图鉴编号、地点或日期"
         autocomplete="off"
       />
       <p v-if="loading">正在整理照片档案……</p>

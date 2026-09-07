@@ -13,6 +13,7 @@ dependencies:
       - mutagen
       - pillow
       - playwright
+      - pypdf
       - pydantic-settings
       - pytest
       - python-multipart

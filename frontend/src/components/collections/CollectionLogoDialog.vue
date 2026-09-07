@@ -119,7 +119,7 @@ async function clearLogo(): Promise<void> {
         <p>按住图片拖动取景。Logo 区会以正方形展示，原始照片不会被修改。</p>
       </div>
       <div class="collection-logo-sources">
-        <section><p class="eyebrow">FROM COLLECTION</p><h3>从收集陈列挑选</h3><div class="collection-logo-candidates"><button v-for="slot in candidates" :key="slot.id" type="button" :class="{ 'is-selected': mode === 'collection' && selectedEntryId === slot.observation_species_id }" @click="chooseCollection(slot.observation_species_id)"><img :src="slot.thumbnail_url || slot.photo_url || ''" alt="" /><span>{{ slot.label }}</span></button><p v-if="!candidates.length" class="compact-empty">先为收集项装订照片凭证，才可以从这里选择。</p></div></section>
+        <section><p class="eyebrow">FROM COLLECTION</p><h3>从已收集照片中挑选</h3><div class="collection-logo-candidates"><button v-for="slot in candidates" :key="slot.id" type="button" :class="{ 'is-selected': mode === 'collection' && selectedEntryId === slot.observation_species_id }" @click="chooseCollection(slot.observation_species_id)"><img :src="slot.thumbnail_url || slot.photo_url || ''" alt="" /><span>{{ slot.label }}</span></button><p v-if="!candidates.length" class="compact-empty">先为收集项装订照片凭证，才可以从这里选择。</p></div></section>
         <section><p class="eyebrow">LOCAL JPEG</p><h3>上传本地图片</h3><label class="collection-logo-upload"><input type="file" accept="image/jpeg,.jpg,.jpeg" @change="chooseFile" /><span>{{ selectedFile?.name || (plan.logo.source === 'upload' ? '当前使用本地上传图片' : '选择 JPEG 图片') }}</span></label></section>
       </div>
     </div>

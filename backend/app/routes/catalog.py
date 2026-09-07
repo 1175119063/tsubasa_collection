@@ -12,6 +12,7 @@ from ..schemas import (
     SpeciesAudioInput,
     SpeciesProfileUpdateInput,
 )
+from ..taxonomy_service import TaxonomyApplyInput, TaxonomyEditInput, TaxonomyRank
 
 router = APIRouter()
 
@@ -29,6 +30,20 @@ def list_species(service: BirdServiceDependency) -> list[dict]:
 @router.get("/taxonomy/tree")
 def taxonomy_tree(service: BirdServiceDependency) -> list[dict]:
     return service.taxonomy_tree()
+
+
+@router.post("/taxonomy/{rank}/{node_id}/preview")
+def preview_taxonomy_edit(
+    rank: TaxonomyRank, node_id: int, payload: TaxonomyEditInput, service: BirdServiceDependency,
+) -> dict:
+    return service.preview_taxonomy_edit(rank, node_id, payload)
+
+
+@router.put("/taxonomy/{rank}/{node_id}")
+def apply_taxonomy_edit(
+    rank: TaxonomyRank, node_id: int, payload: TaxonomyApplyInput, service: BirdServiceDependency,
+) -> dict:
+    return service.apply_taxonomy_edit(rank, node_id, payload)
 
 
 @router.get("/species/{species_id}")

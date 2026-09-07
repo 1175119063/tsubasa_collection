@@ -11,6 +11,8 @@ from ..export_service import observations_csv
 from ..media_store import MediaValidationError
 from ..schemas import (
     ObservationInput,
+    ObservationPhotoAddInput,
+    ObservationPhotoUpdateInput,
     ObservationSpeciesInput,
     ObservationUpdateInput,
 )
@@ -39,6 +41,7 @@ async def create_observation(
     service: BirdServiceDependency,
     payload: Annotated[str, Form()],
     photo: Annotated[UploadFile, File()],
+    additional_photos: Annotated[list[UploadFile] | None, File()] = None,
     audio: Annotated[list[UploadFile] | None, File()] = None,
 ) -> dict:
     try:
@@ -46,7 +49,7 @@ async def create_observation(
     except ValidationError as exc:
         raise HTTPException(422, exc.errors(include_context=False)) from exc
     try:
-        result = await service.create_observation(metadata, photo, audio)
+        result = await service.create_observation(metadata, photo, audio, additional_photos)
     except MediaValidationError as exc:
         raise HTTPException(422, str(exc)) from exc
     return {
@@ -63,6 +66,42 @@ async def create_observation(
             for entry in result.observation.species_entries
         ],
     }
+
+
+@router.post("/observations/{observation_id}/photos", status_code=201)
+async def add_observation_photo(
+    observation_id: int,
+    service: BirdServiceDependency,
+    payload: Annotated[str, Form()],
+    photo: Annotated[UploadFile, File()],
+) -> dict:
+    try:
+        metadata = ObservationPhotoAddInput.model_validate_json(payload)
+    except ValidationError as exc:
+        raise HTTPException(422, exc.errors(include_context=False)) from exc
+    try:
+        return await service.add_observation_photo(observation_id, metadata, photo)
+    except MediaValidationError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.patch("/observations/{observation_id}/photos/{photo_id}")
+def update_observation_photo(
+    observation_id: int,
+    photo_id: int,
+    payload: ObservationPhotoUpdateInput,
+    service: BirdServiceDependency,
+) -> dict:
+    return service.update_observation_photo(observation_id, photo_id, payload)
+
+
+@router.delete("/observations/{observation_id}/photos/{photo_id}")
+def delete_observation_photo(
+    observation_id: int,
+    photo_id: int,
+    service: BirdServiceDependency,
+) -> dict:
+    return service.delete_observation_photo(observation_id, photo_id)
 
 
 @router.patch("/observations/{observation_id}")

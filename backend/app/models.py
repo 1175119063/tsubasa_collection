@@ -246,6 +246,11 @@ class Observation(TimestampMixin, Base):
     species_entries: Mapped[list[ObservationSpecies]] = relationship(
         back_populates="observation", cascade="all, delete-orphan"
     )
+    photos: Mapped[list[ObservationPhoto]] = relationship(
+        back_populates="observation",
+        cascade="all, delete-orphan",
+        order_by="ObservationPhoto.position",
+    )
 
 
 class ObservationSpecies(TimestampMixin, Base):
@@ -281,6 +286,48 @@ class ObservationSpecies(TimestampMixin, Base):
     observation: Mapped[Observation] = relationship(back_populates="species_entries")
     species: Mapped[Species] = relationship(back_populates="observation_entries")
     subspecies: Mapped[Subspecies | None] = relationship()
+    photo_links: Mapped[list[ObservationPhotoSpecies]] = relationship(
+        back_populates="species_entry", cascade="all, delete-orphan"
+    )
+
+
+class ObservationPhoto(TimestampMixin, Base):
+    __tablename__ = "observation_photos"
+    __table_args__ = (
+        UniqueConstraint("observation_id", "asset_id"),
+        CheckConstraint("position >= 0", name="observation_photo_position"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    observation_id: Mapped[int] = mapped_column(
+        ForeignKey("observations.id", ondelete="CASCADE"), index=True
+    )
+    asset_id: Mapped[int] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="RESTRICT"), index=True
+    )
+    observed_at: Mapped[datetime] = mapped_column(DateTime)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    is_cover: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+    observation: Mapped[Observation] = relationship(back_populates="photos")
+    asset: Mapped[MediaAsset] = relationship()
+    species_links: Mapped[list[ObservationPhotoSpecies]] = relationship(
+        back_populates="photo", cascade="all, delete-orphan"
+    )
+
+
+class ObservationPhotoSpecies(TimestampMixin, Base):
+    __tablename__ = "observation_photo_species"
+
+    photo_id: Mapped[int] = mapped_column(
+        ForeignKey("observation_photos.id", ondelete="CASCADE"), primary_key=True
+    )
+    observation_species_id: Mapped[int] = mapped_column(
+        ForeignKey("observation_species.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    photo: Mapped[ObservationPhoto] = relationship(back_populates="species_links")
+    species_entry: Mapped[ObservationSpecies] = relationship(back_populates="photo_links")
 
 
 class BirdingLocation(TimestampMixin, Base):

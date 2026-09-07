@@ -13,7 +13,6 @@ const emit = defineEmits<{
   edit: [];
   members: [];
   delete: [];
-  logo: [];
   evidence: [membership: CollectionMembership, slot: CollectionSlot];
   preview: [membership: CollectionMembership, slot: CollectionSlot];
   updated: [plan: CollectionPlanDetail];
@@ -39,7 +38,7 @@ const templateName = computed(() => {
   return "自定义序列";
 });
 const templateLabels = computed(() => props.detail.subitems.filter(Boolean));
-function specimenIndex(index: number): string {
+function collectionIndex(index: number): string {
   return String(index + 1).padStart(2, "0");
 }
 function avatarStyle(slot: CollectionSlot): Record<string, string> {
@@ -97,7 +96,6 @@ function activate(membership: CollectionMembership, slot: CollectionSlot): void 
         <section class="collection-logo-panel">
           <img v-if="detail.logo.url" :src="detail.logo.url" alt="计划 Logo" :style="logoStyle" />
           <div v-else class="collection-logo-placeholder"><span>PERSONAL<br />COLLECTION</span><strong>{{ detail.catalog_number }}</strong><i>✦</i></div>
-          <button type="button" @click="emit('logo')">{{ detail.logo.url ? "更换计划 Logo" : "＋ 设置计划 Logo" }}</button>
         </section>
         <section class="collection-hero-story">
         <p class="v2-kicker">{{ detail.catalog_number }} · PERSONAL COLLECTION</p>
@@ -124,13 +122,16 @@ function activate(membership: CollectionMembership, slot: CollectionSlot): void 
     </header>
     <div class="collection-dossier-content">
       <section class="collection-dossier-body">
-      <header class="collection-display-heading"><div><p class="v2-kicker">COLLECTION PLATE</p><h3>收集陈列</h3><span>点击头像查看计划内物种档案；问号表示尚待装订的形态。</span></div><div class="collection-status-legend"><span><i class="is-complete"></i>已装订</span><span><i></i>待凭证</span></div></header>
+      <header class="collection-display-heading"><div><p class="v2-kicker">COLLECTION OVERVIEW</p><h3>收集一览</h3><span>点击头像查看计划内物种档案；问号表示尚待装订的形态。</span></div><div class="collection-status-legend"><span><i class="is-complete"></i>已装订</span><span><i></i>待凭证</span></div></header>
       <div v-if="detail.memberships.length" class="collection-species-grid">
-        <article v-for="(membership, membershipIndex) in detail.memberships" :key="membership.id" class="collection-species-column" :data-index="specimenIndex(membershipIndex)">
+        <article v-for="(membership, membershipIndex) in detail.memberships" :key="membership.id" class="collection-species-column" :data-index="collectionIndex(membershipIndex)">
           <div v-for="slot in membership.slots" :key="slot.id" class="collection-slot-row">
             <button class="collection-slot" type="button" :aria-label="slot.observation_species_id ? `查看 ${slot.label} 的计划档案` : `为 ${slot.label} 选择照片凭证`" @click="activate(membership, slot)">
               <span class="collection-avatar" :class="{ 'is-empty': !slot.photo_url, 'is-complete': slot.photo_url }"><img v-if="slot.photo_url" :src="slot.photo_url" alt="" :style="avatarStyle(slot)" /><b v-else>?</b></span>
-              <span class="collection-label"><b>{{ slot.label }}</b><small>{{ slot.observation_species_id ? "EVIDENCE ATTACHED" : "AWAITING EVIDENCE" }}</small></span>
+              <span class="collection-label" :class="{ 'has-subitem': slot.subitem_label }">
+                <b>{{ membership.species_name }}</b>
+                <i v-if="slot.subitem_label">{{ slot.subitem_label }}</i>
+              </span>
             </button>
             <button v-if="slot.observation_species_id" class="collection-slot-change" type="button" title="更换照片或重新裁切" @click="emit('evidence', membership, slot)">✎</button>
             <span v-else class="collection-slot-change-space" aria-hidden="true"></span>
@@ -144,7 +145,7 @@ function activate(membership: CollectionMembership, slot: CollectionSlot): void 
           <section class="collection-profile-summary">
             <div class="collection-profile-heading">
               <span class="collection-profile-avatar"><img v-if="previewSlot.photo_url" :src="previewSlot.photo_url" :alt="previewMembership.species_name" :style="avatarStyle(previewSlot)" /></span>
-              <div><p class="v2-kicker">{{ previewMembership.catalog_number }} · SPECIES FILE</p><h3>{{ previewMembership.species_name }}</h3><i>{{ previewMembership.scientific_name }}</i></div>
+              <div><p class="v2-kicker">{{ previewMembership.catalog_number }} · SPECIES FILE</p><h3>{{ previewMembership.species_name }}</h3><i>{{ previewMembership.scientific_name }}</i><em v-if="previewSlot.subitem_label">收集子项 · {{ previewSlot.subitem_label }}</em></div>
             </div>
             <div class="collection-protection-row"><span :class="`is-${previewMembership.iucn_status.toLowerCase()}`">IUCN {{ previewMembership.iucn_status }} · {{ iucnLabel }}</span><span>{{ chinaProtectionLabel }}</span></div>
             <dl class="collection-taxonomy-list">
@@ -155,7 +156,7 @@ function activate(membership: CollectionMembership, slot: CollectionSlot): void 
             </dl>
             <RouterLink v-if="previewSlot.observation_id" :to="{ path: '/observations', query: { observation: previewSlot.observation_id } }">查看这笔照片凭证 →</RouterLink>
           </section>
-          <section class="collection-profile-note"><p class="v2-kicker">CURATOR'S NOTE</p><h4>本计划中的物种简介</h4><p>这段文字只属于“{{ detail.name }}”，不会修改鸟类调查册中的物种资料。</p><textarea v-model="introductionDraft" rows="8" maxlength="10000" :placeholder="`写下${previewMembership.species_name}为什么被收入这个专题，以及你对它的观察与理解……`"></textarea><footer><span>{{ introductionStatus || `${introductionDraft.length} / 10000` }}</span><button type="button" :disabled="savingIntroduction" @click="saveIntroduction">{{ savingIntroduction ? "保存中…" : "保存简介" }}</button></footer></section>
+          <section class="collection-profile-note"><p class="v2-kicker">EXPLORER'S NOTE</p><h4>本计划中的物种简介</h4><p>这段文字只属于“{{ detail.name }}”，不会修改鸟类调查册中的物种资料。</p><textarea v-model="introductionDraft" rows="8" maxlength="10000" :placeholder="`写下${previewMembership.species_name}为什么被收入这个专题，以及你对它的观察与理解……`"></textarea><footer><span>{{ introductionStatus || `${introductionDraft.length} / 10000` }}</span><button type="button" :disabled="savingIntroduction" @click="saveIntroduction">{{ savingIntroduction ? "保存中…" : "保存简介" }}</button></footer></section>
         </template>
         <div v-else class="collection-preview-empty"><span>SPECIES FILE</span><i>◎</i><strong>选择一项照片凭证</strong><p>点击左侧已经装订的圆形头像，这里会展开该物种在本收集计划中的专属档案。</p><small>{{ detail.introduction || detail.name }}</small></div>
       </aside>

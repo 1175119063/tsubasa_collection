@@ -1,0 +1,197 @@
+/* Observation screens share the archive sidebar width and forest palette. */
+.observations-page .v2-archive-sidebar { padding: 54px 26px 28px; }
+.observations-page .v2-archive-sidebar h1 { font-size: 30px; }
+.observations-page .v2-filter-intro { font: 12px/1.8 var(--sans); margin-bottom: 24px; }
+.observations-page .v2-archive-sidebar label { margin: 14px 0 6px; }
+.observations-page .v2-archive-sidebar select { height: 39px; font: 13px var(--sans); }
+.observations-page .v2-filter-reset { display: table; margin-top: 14px; line-height: 1.5; }
+.observations-page .v2-book-count { margin-top: 24px; padding-top: 20px; }
+.observations-page .v2-book-count strong { font-size: 32px; }
+.observations-page .v2-archive-content { min-width: 0; padding: 36px clamp(24px, 3vw, 48px) 56px; }
+.observations-page .v2-dex-header { gap: 20px; padding-bottom: 22px; }
+.observations-page .v2-dex-header h2 { font-size: 28px; }
+.observations-page .v2-kicker { margin-bottom: 10px; }
+.observations-page .v2-new-entry { padding: 12px 16px; font-size: 12px; }
+.observations-page .v2-record-groups { gap: 32px; margin-top: 24px; }
+.observations-page .v2-month-section > header { align-items: center; margin-bottom: 14px; padding-bottom: 12px; }
+.observations-page .v2-month-section > header > div { display: flex; align-items: baseline; gap: 12px; }
+.observations-page .v2-month-section h3 { font-size: 21px; }
+.observations-page .v2-month-section > header > b { padding: 4px 9px; background: var(--paper); font: 11px var(--sans); }
+.observations-page .observation-month-toggle { flex-shrink: 0; padding: 7px 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink-soft); font: 12px/1.5 var(--sans); cursor: pointer; }
+.observations-page .observation-month-toggle:hover { border-color: var(--moss); color: var(--ink); }
+.observations-page .v2-field-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+@media (min-width: 1500px) {
+  .observations-page .v2-field-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+.observations-page .v2-field-card { background: var(--paper-light); border-color: rgba(32, 60, 50, .18); box-shadow: 0 2px 5px rgba(32, 60, 50, .035); }
+.observations-page .v2-field-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(32, 60, 50, .12); border-color: var(--moss); }
+.observations-page .v2-field-photo::after { display: none; }
+.observations-page .v2-field-photo i { left: 10px; bottom: 10px; padding: 5px 7px; letter-spacing: .08em; border: 1px solid rgba(255,255,255,.25); }
+.observation-photo-count { position: absolute; right: 10px; top: 10px; padding: 5px 8px; background: var(--paper-light); color: var(--ink); font: 11px var(--sans); }
+.observations-page .v2-field-copy { padding: 14px 15px 12px; }
+.observations-page .v2-field-copy > strong { font-size: 20px; }
+.observations-page .v2-field-copy > em { min-height: 15px; margin: 3px 0 12px; font-size: 12px; }
+.observations-page .v2-field-copy > .observation-card-meta { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 7px; font: 12px/1.9 var(--sans); }
+.observation-card-meta > :first-child { color: var(--muted); font-size: 10px; }
+.observation-card-meta > :last-child { overflow: hidden; text-overflow: ellipsis; }
+.observations-page .v2-field-copy > b { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 9px; font-size: 10px; font-weight: 400; color: var(--ink-soft); }
+.observations-page .v2-empty { display: grid; justify-items: start; gap: 14px; padding: 40px 0; }
+
+.observation-detail-dialog { --observation-hero-bg: #1f362c; width: min(1120px, calc(100vw - 48px)); height: fit-content; max-height: calc(100dvh - 48px); color: var(--ink); background: var(--paper); border-color: rgba(214,185,119,.3); }
+.observation-detail-dialog .v2-dossier-close { width: 38px; height: 38px; margin: 14px 14px -52px; font-size: 26px; background: var(--observation-hero-bg); }
+.observation-detail-dialog .v2-observation-hero { min-height: 0; grid-template-columns: minmax(0, 1fr) 400px; background: var(--observation-hero-bg); }
+.observation-detail-dialog .v2-observation-hero-photo { position: relative; min-height: 440px; background: var(--observation-hero-bg); }
+.observation-detail-dialog .v2-observation-hero-photo img { position: absolute; inset: 0; object-fit: contain; }
+.observation-original-link { text-decoration: none; }
+.observation-detail-dialog .v2-observation-hero-copy { padding: 38px 30px 28px; min-width: 0; }
+.observation-detail-dialog .v2-observation-hero-copy > .v2-kicker { padding-right: 28px; line-height: 1.7; color: #ead4a1; }
+.observation-detail-dialog .v2-observation-hero-copy h2 { font-size: clamp(28px, 3vw, 40px); overflow-wrap: anywhere; }
+.observation-detail-dialog .v2-observation-hero-copy > em { margin-top: 5px; color: #c2d0c5; font-size: 14px; }
+.observation-detail-dialog .v2-observation-hero-copy dl { margin-top: 22px; }
+.observation-detail-dialog .v2-observation-hero-copy dl > div { grid-template-columns: 66px minmax(0, 1fr); gap: 12px; padding: 9px 0; }
+.observation-detail-dialog .v2-observation-hero-copy dt { line-height: 1.7; color: #c2d0c5; }
+.observation-detail-dialog .v2-observation-hero-copy dd { font-size: 13px; overflow-wrap: anywhere; }
+.observation-detail-dialog .v2-detail-actions { gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+.observation-detail-dialog .v2-detail-actions .v2-button { padding: 11px 13px; font-size: 12px; }
+.observation-detail-dialog .v2-observation-notes { padding: 22px 30px; border-top: 1px solid var(--line); }
+.observation-detail-dialog .v2-observation-notes h3 { font-size: 20px; margin-bottom: 10px; }
+.observation-detail-dialog .v2-observation-notes > p { color: var(--ink-soft); font-size: 13px; }
+.observation-detail-dialog .v2-observation-notes > .observation-note-empty { color: var(--ink-soft); }
+.observation-detail-dialog .v2-audio-list { margin-top: 18px; }
+.observation-detail-dialog .v2-audio-list h4 { margin: 0; font: 12px var(--sans); }
+.observation-detail-dialog .v2-observation-danger-zone { margin: 0 30px; padding: 18px 0 22px; gap: 18px; border-top-color: var(--line); }
+.observation-detail-dialog .v2-observation-danger-zone .v2-kicker { margin: 0 0 6px; color: var(--rust); }
+.observation-detail-dialog .v2-observation-danger-zone span { color: var(--ink-soft); font-size: 11px; line-height: 1.7; }
+.observation-detail-dialog .v2-observation-danger-zone .v2-button-danger { flex-shrink: 0; padding: 10px 14px; color: var(--rust); border-color: rgba(155,70,45,.55); font-size: 12px; }
+
+.observation-entry-dialog { padding: 0; background: var(--paper-light); }
+.v2-page .observation-entry-dialog .dialog-header { padding: 18px 24px; flex-shrink: 0; gap: 16px; background: var(--ink-deep); color: var(--paper-light); }
+.v2-page .observation-entry-dialog .dialog-header h2 { color: inherit; font-size: 25px; }
+.observation-entry-dialog .dialog-header .eyebrow { margin: 0 0 6px; color: var(--gold-light); font: 10px var(--sans); letter-spacing: .16em; }
+.observation-entry-dialog .dialog-header .icon-button { color: inherit; }
+.observation-entry-dialog .dialog-header p:not(.eyebrow) { font: 12px/1.7 var(--sans); }
+.observation-entry-dialog .form-scroll { padding: 4px 24px 22px; scrollbar-gutter: stable; }
+.v2-page .observation-entry-dialog .dialog-footer { padding: 14px 24px; gap: 18px; flex-shrink: 0; background: var(--paper-light); }
+.observation-entry-dialog .dialog-footer > span { font: 12px/1.7 var(--sans); color: var(--ink-soft); }
+.observation-entry-dialog .dialog-footer button { flex-shrink: 0; }
+
+.observation-editor-dialog { overflow: hidden; }
+.observation-editor-dialog > .observation-edit-form { margin: 0; padding: 0; border: 0; max-height: calc(92vh - 2px); }
+.v2-page .observation-editor-dialog .dialog-header { align-items: flex-start; background: #1f362c; }
+.observation-editor-dialog .dialog-header > div > span { display: block; margin-top: 8px; color: #c2d0c5; text-align: left; font: 12px/1.7 var(--sans); }
+.observation-editor-dialog .form-scroll { min-height: 0; }
+.observation-editor-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.observation-editor-actions > button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; margin: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 3px; font: 13px/18px var(--sans); box-shadow: none; }
+.observation-editor-actions > .danger-button { color: var(--rust); border-color: rgba(155,70,45,.45); }
+.observation-editor-actions > .danger-button:disabled { opacity: .45; cursor: not-allowed; }
+.observation-editor-actions > .primary-button { border-color: var(--rust); }
+
+/* Both single entry and batch entry render ObservationFields. */
+:is(.observation-entry-dialog, .batch-entry-form) fieldset { min-width: 0; margin-top: 18px; padding: 16px 18px 18px; background: rgba(255,255,255,.22); }
+:is(.observation-entry-dialog, .batch-entry-form) legend { font-size: 17px; }
+:is(.observation-entry-dialog, .batch-entry-form) legend span { font: 11px var(--sans); }
+:is(.observation-entry-dialog, .batch-entry-form) .form-grid { gap: 12px 16px; }
+:is(.observation-entry-dialog, .batch-entry-form) label { min-width: 0; font: 12px/1.7 var(--sans); }
+:is(.observation-entry-dialog, .batch-entry-form) input,
+:is(.observation-entry-dialog, .batch-entry-form) select,
+:is(.observation-entry-dialog, .batch-entry-form) textarea { min-width: 0; max-width: 100%; font: 13px/1.5 var(--sans); border-radius: 3px; }
+:is(.observation-entry-dialog, .batch-entry-form) .file-field { padding: 12px; background: rgba(32,60,50,.025); overflow-wrap: anywhere; }
+:is(.observation-entry-dialog, .batch-entry-form) .field-hint { font-size: 11px; }
+.observation-photo-preview { display: block; width: 100%; height: 190px; margin: 10px 0; object-fit: contain; background: var(--ink-deep); }
+.observation-photo-associations { padding: 10px 12px; border: 1px solid var(--line); background: var(--paper); }
+.observation-photo-associations > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.observation-photo-associations > header label { display: flex; align-items: center; gap: 6px; }
+.observation-photo-species { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 9px; }
+.observation-photo-species label { display: flex; align-items: center; gap: 6px; }
+.observation-photo-species input, .observation-photo-associations input { width: auto !important; margin: 0; }
+.observation-additional-photo { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 14px; padding: 12px; border: 1px solid var(--line); background: var(--paper); }
+.observation-additional-photo > img { width: 100%; height: 145px; object-fit: contain; background: var(--ink-deep); }
+.observation-additional-photo > div { min-width: 0; }
+.observation-additional-photo header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.observation-additional-photo header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.observation-additional-photo header button { border: 0; background: none; color: var(--rust); }
+.observation-additional-photo .field-hint.is-error { color: var(--rust); }
+
+.observation-photo-navigation { position: absolute; left: 50%; bottom: 18px; z-index: 2; display: flex; align-items: center; gap: 8px; transform: translateX(-50%); padding: 4px; background: rgba(17,43,35,.88); color: white; font: 11px var(--sans); }
+.observation-photo-navigation button { width: 30px; height: 28px; padding: 0; border: 1px solid rgba(255,255,255,.3); background: transparent; color: white; font-size: 22px; line-height: 1; }
+.observation-photo-thumbnails { position: absolute; z-index: 2; left: 14px; bottom: 14px; display: flex; gap: 6px; max-width: calc(50% - 35px); overflow-x: auto; }
+.observation-photo-thumbnails button { flex: 0 0 auto; width: 48px; height: 38px; padding: 2px; border: 1px solid rgba(255,255,255,.35); background: var(--ink-deep); opacity: .65; }
+.observation-photo-thumbnails button.is-active { border-color: var(--gold-light); opacity: 1; }
+.observation-photo-thumbnails img { position: static !important; width: 100% !important; height: 100% !important; object-fit: cover !important; }
+
+.observation-photo-manager { margin-bottom: 22px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.observation-photo-manager > header { display: flex; align-items: end; justify-content: space-between; gap: 14px; }
+.observation-photo-manager > header h3 { margin: 2px 0 0; color: var(--forest); font: 22px var(--serif); }
+.observation-photo-manager > header > span { font: 11px var(--sans); color: var(--muted); }
+.observation-photo-manager-list { display: grid; gap: 12px; margin-top: 14px; }
+.observation-photo-manager-list > article { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; padding: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.22); }
+.observation-photo-manager-list > article > img { width: 100%; height: 145px; object-fit: contain; background: var(--ink-deep); }
+.observation-photo-manager-list > article > div { min-width: 0; }
+.observation-photo-manager-title { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.observation-photo-manager-title span { color: var(--gold); font: 11px var(--sans); }
+.observation-photo-manager fieldset { margin: 9px 0 !important; padding: 8px 10px !important; }
+.observation-photo-manager fieldset label { display: inline-flex; align-items: center; gap: 5px; margin-right: 16px; }
+.observation-photo-manager fieldset input { width: auto; margin: 0; }
+.observation-photo-manager-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.observation-photo-manager-actions button { padding: 8px 10px; font-size: 11px; }
+.observation-photo-add { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; margin-top: 14px; padding: 14px; border: 1px dashed var(--line); }
+.observation-photo-add h4 { grid-column: 1 / -1; margin: 0; color: var(--forest); }
+.observation-photo-add > img { width: 100%; max-height: 170px; object-fit: contain; background: var(--ink-deep); }
+.observation-photo-add fieldset { grid-column: 1 / -1; }
+.observation-photo-add > button { justify-self: start; }
+:is(.observations-page, .observation-detail-dialog, .observation-entry-dialog, .batch-import) :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+@media (max-width: 1100px) {
+  .observations-page .v2-archive-sidebar { padding-inline: 20px; }
+  .observations-page .v2-dex-header { align-items: flex-start; flex-direction: column; gap: 14px; }
+}
+@media (max-width: 760px) {
+  .observations-page { display: block; }
+  .observations-page .v2-archive-sidebar { padding: 22px; }
+  .observations-page .v2-book-tab, .observations-page .v2-filter-intro, .observations-page .v2-book-count { display: none; }
+  .observations-page .v2-archive-sidebar > .v2-kicker { margin: 0 0 6px; }
+  .observations-page .v2-archive-sidebar h1 { margin: 0 0 16px; font-size: 26px; }
+  .observation-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: center; }
+  .observation-filter-field { min-width: 0; }
+  .observations-page .observation-filters label { margin: 0 0 5px; font-size: 11px; }
+  .observations-page .observation-filters select { margin: 0; height: 36px; padding: 4px; font-size: 12px; }
+  .observations-page .observation-filters .v2-filter-reset { margin-top: 2px; justify-self: start; font-size: 11px; }
+  .observations-page .v2-archive-content { padding: 24px 20px 40px; }
+  .observations-page .v2-dex-header h2 { font-size: 24px; }
+  .observations-page .v2-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .observations-page .v2-field-copy { padding: 10px; }
+  .observations-page .v2-field-copy > strong { font-size: 18px; }
+  .observations-page .v2-field-copy > em { font-size: 11px; margin-bottom: 8px; }
+  .observations-page .v2-field-copy > .observation-card-meta { display: block; font-size: 11px; }
+  .observation-card-meta > :first-child { display: none; }
+  .observations-page .v2-field-copy > b { flex-wrap: wrap; gap: 4px; font-size: 9px; }
+  .observation-detail-dialog { width: calc(100vw - 16px); max-width: none; max-height: calc(100dvh - 16px); }
+  .observation-detail-dialog .v2-observation-hero { display: block; }
+  .observation-detail-dialog .v2-observation-hero-photo { min-height: 0; height: 36dvh; aspect-ratio: auto; }
+  .observation-detail-dialog .v2-observation-hero-copy { padding: 22px; }
+  .observation-detail-dialog .v2-observation-hero-copy h2 { font-size: 30px; }
+  .observation-detail-dialog .v2-observation-hero-copy dl { margin-top: 18px; }
+  .observation-detail-dialog .v2-observation-notes { padding: 22px; }
+  .observation-detail-dialog .v2-observation-danger-zone { margin-inline: 22px; }
+  .observation-entry-dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  .observation-entry-dialog form { max-height: calc(100dvh - 16px); }
+  .observation-editor-dialog > .observation-edit-form { max-height: calc(100dvh - 18px); }
+  .v2-page .observation-entry-dialog .dialog-header { padding: 16px 18px; }
+  .v2-page .observation-entry-dialog .dialog-header h2 { font-size: 22px; }
+  .observation-entry-dialog .form-scroll { padding: 0 12px 18px; }
+  .v2-page .observation-entry-dialog .dialog-footer { padding: 12px 18px; flex-wrap: wrap; }
+  .observation-entry-dialog .dialog-footer > span { flex: 1 1 160px; font-size: 11px; }
+  :is(.observation-entry-dialog, .batch-entry-form) fieldset { padding: 12px; }
+  .observation-additional-photo, .observation-photo-manager-list > article { grid-template-columns: 1fr; }
+  .observation-additional-photo > img, .observation-photo-manager-list > article > img { height: 190px; }
+  .observation-photo-add { grid-template-columns: 1fr; }
+  .observation-photo-add > * { grid-column: 1; }
+  .observation-photo-thumbnails { max-width: 48%; }
+}
+@media (max-width: 360px) {
+  .observations-page .v2-field-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .observations-page .v2-field-card, .observations-page .v2-field-photo img { transition: none; }
+  .observations-page .v2-field-card:hover, .observations-page .v2-field-card:hover img { transform: none; }
+}

@@ -18,7 +18,14 @@ const router = createRouter({
     { path: "/trips", name: "trips", component: TripsPage, meta: { title: "远征日志" } },
     { path: "/collections", name: "collections", component: CollectionsPage, meta: { title: "收集计划" } },
   ],
-  scrollBehavior: () => ({ top: 0 }),
+  scrollBehavior: (to, from, savedPosition) => {
+    if (savedPosition) return savedPosition;
+    const staysInsideTaxonomy = to.path === "/dex"
+      && from.path === "/dex"
+      && to.query.view === "taxonomy"
+      && from.query.view === "taxonomy";
+    return staysInsideTaxonomy ? false : { top: 0 };
+  },
 });
 
 export default router;

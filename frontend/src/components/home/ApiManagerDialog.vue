@@ -10,13 +10,17 @@ const dialog = ref<HTMLDialogElement>();
 const provider = ref<"local" | "openai_compatible">("local");
 const amapKey = ref("");
 const clearAmap = ref(false);
+const tiandituKey = ref("");
+const clearTianditu = ref(false);
 const baseUrl = ref("");
 const model = ref("");
 const llmKey = ref("");
 const clearLlm = ref(false);
 const amapStatus = ref("");
+const tiandituStatus = ref("");
 const llmStatus = ref("");
 const amapBusy = ref(false);
+const tiandituBusy = ref(false);
 const llmBusy = ref(false);
 
 const external = computed(() => provider.value === "openai_compatible");
@@ -26,14 +30,17 @@ function fill(config: IntegrationSummary): void {
   baseUrl.value = config.llm.base_url ?? "";
   model.value = config.llm.model ?? "";
   amapKey.value = "";
+  tiandituKey.value = "";
   llmKey.value = "";
   clearAmap.value = false;
+  clearTianditu.value = false;
   clearLlm.value = false;
 }
 
 async function open(): Promise<void> {
   dialog.value?.showModal();
   amapStatus.value = "正在读取配置…";
+  tiandituStatus.value = "";
   llmStatus.value = "";
   try {
     const config = await api<IntegrationSummary>("/api/integrations");
@@ -59,11 +66,29 @@ async function saveAmap(): Promise<void> {
     }));
     emit("updated", config);
     fill(config);
-    amapStatus.value = "地图配置已加密保存。";
+    amapStatus.value = "高德 Web 服务配置已保存。";
   } catch (error) {
     amapStatus.value = errorMessage(error);
   } finally {
     amapBusy.value = false;
+  }
+}
+
+async function saveTianditu(): Promise<void> {
+  tiandituBusy.value = true;
+  tiandituStatus.value = "正在保存…";
+  try {
+    const config = await api<IntegrationSummary>("/api/integrations/tianditu", jsonRequest("PUT", {
+      api_key: tiandituKey.value || null,
+      clear_api_key: clearTianditu.value,
+    }));
+    emit("updated", config);
+    fill(config);
+    tiandituStatus.value = "天地图浏览器端 Key 已保存。";
+  } catch (error) {
+    tiandituStatus.value = errorMessage(error);
+  } finally {
+    tiandituBusy.value = false;
   }
 }
 
@@ -89,8 +114,8 @@ async function saveLlm(): Promise<void> {
   }
 }
 
-async function testService(kind: "amap" | "llm"): Promise<void> {
-  const status = kind === "amap" ? amapStatus : llmStatus;
+async function testService(kind: "amap" | "tianditu" | "llm"): Promise<void> {
+  const status = kind === "amap" ? amapStatus : kind === "tianditu" ? tiandituStatus : llmStatus;
   status.value = "正在测试…";
   try {
     const result = await api<{ message: string }>(`/api/integrations/${kind}/test`, { method: "POST" });
@@ -110,7 +135,7 @@ defineExpose({ open, close });
       <button type="button" aria-label="关闭" @click="close">×</button>
     </header>
     <div class="v2-api-dialog-body">
-      <p class="v2-api-security-note"><strong>本机安全说明</strong>API Key 使用跨平台本地配置文件保存，页面只显示末四位。配置文件包含明文密钥，请依赖本机账户与目录权限保护，并且不要公开分享。启用外部模型时，精灵对话内容及回答该问题所需的最小馆藏摘要会发送到你配置的服务商。</p>
+      <p class="v2-api-security-note"><strong>本机安全说明</strong>API Key 使用跨平台本地配置文件保存，配置页面只显示末四位。天地图 Key 属于浏览器端密钥，会随瓦片请求发送；配置文件也包含明文密钥，请依赖本机账户与目录权限保护，并且不要公开分享。启用外部模型时，精灵对话内容及回答该问题所需的最小记录摘要会发送到你配置的服务商。</p>
 
       <section class="v2-api-config-card">
         <div class="v2-api-config-title">
@@ -130,7 +155,24 @@ defineExpose({ open, close });
 
       <section class="v2-api-config-card">
         <div class="v2-api-config-title">
-          <span>02 · FEATHER CHAT MODEL</span><h3>飞羽精灵对话模型</h3>
+          <span>02 · BASE MAP</span><h3>天地图</h3>
+          <small>{{ config?.tianditu.configured ? `当前密钥：${config.tianditu.key_hint}（${config.tianditu.source === "environment" ? "环境配置" : "配置册"}）` : "未配置时使用 OpenStreetMap 备用底图" }}</small>
+        </div>
+        <div class="v2-api-fields">
+          <label class="v2-api-wide"><span>浏览器端 Key（tk）</span><input v-model="tiandituKey" type="password" maxlength="200" autocomplete="new-password" spellcheck="false" placeholder="留空则保留当前密钥" /></label>
+          <label class="v2-api-check"><input v-model="clearTianditu" type="checkbox" /><span>清除已保存的 Key</span></label>
+        </div>
+        <p class="v2-api-routing-note">用于大陆地区优先加载矢量底图和中文注记；浏览器请求瓦片时会携带这个浏览器端 Key。尚无 Key 时可前往<a href="https://console.tianditu.gov.cn/api/key" target="_blank" rel="noopener">天地图控制台</a>申请。</p>
+        <div class="v2-api-actions">
+          <button class="v2-button v2-button-primary" type="button" :disabled="tiandituBusy" @click="saveTianditu">{{ tiandituBusy ? "正在保存…" : "保存底图配置" }}</button>
+          <button class="v2-button v2-api-secondary" type="button" @click="testService('tianditu')">测试连接</button>
+          <p role="status">{{ tiandituStatus }}</p>
+        </div>
+      </section>
+
+      <section class="v2-api-config-card">
+        <div class="v2-api-config-title">
+          <span>03 · FEATHER CHAT MODEL</span><h3>飞羽精灵对话模型</h3>
           <small v-if="config?.llm.provider === 'openai_compatible'">当前模型：{{ config.llm.model || "未填写" }} · Key：{{ config.llm.api_key_hint || "未配置" }}</small>
           <small v-else>当前使用 {{ config?.local_model.model }}（{{ config?.local_model.base_url }}）</small>
         </div>

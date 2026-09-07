@@ -8,6 +8,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { api, errorMessage } from "@/api/client";
 import type { LocationSummary } from "@/api/types";
+import type { BaseMapHandle, MapServiceConfig } from "@/maps/base-map";
 
 const router = useRouter();
 const mapElement = ref<HTMLElement>();
@@ -15,8 +16,10 @@ const locations = ref<LocationSummary[]>([]);
 const query = ref("");
 const locationType = ref("");
 const status = ref("正在展开地图……");
+const baseMapStatus = ref("正在加载底图……");
 let map: L.Map | null = null;
 let markers: L.MarkerClusterGroup | null = null;
+let baseMapHandle: BaseMapHandle | null = null;
 
 const labels: Record<string, string> = {
   urban_park: "城市公园", campus: "校园", wetland: "湿地", forest: "森林",
@@ -74,10 +77,14 @@ function reset(): void {
 async function initialize(): Promise<void> {
   if (!mapElement.value) return;
   map = L.map(mapElement.value, { zoomControl: true }).setView([35, 105], 4);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap contributors",
-  }).addTo(map);
+  let config: MapServiceConfig | null = null;
+  try {
+    config = await api<MapServiceConfig>("/api/map/config");
+  } catch (error) {
+    baseMapStatus.value = errorMessage(error);
+  }
+  const { addBaseMap } = await import("@/maps/base-map");
+  baseMapHandle = addBaseMap(map, config, (message) => { baseMapStatus.value = message; });
   markers = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 55 });
   map.addLayer(markers);
   try {
@@ -92,6 +99,7 @@ async function initialize(): Promise<void> {
 watch([query, locationType], () => renderMarkers(locationType.value !== ""));
 onMounted(initialize);
 onBeforeUnmount(() => {
+  baseMapHandle?.destroy();
   map?.remove();
   map = null;
   markers = null;
@@ -120,6 +128,6 @@ onBeforeUnmount(() => {
       </div>
       <button class="v2-filter-reset" type="button" @click="router.push('/locations')">返回区域档案</button>
     </aside>
-    <section class="v2-map-stage"><div ref="mapElement" aria-label="区域档案地图"></div><p>{{ status }}</p></section>
+    <section class="v2-map-stage"><div ref="mapElement" aria-label="区域档案地图"></div><p>{{ status }} · {{ baseMapStatus }}</p></section>
   </main>
 </template>

@@ -427,8 +427,6 @@ textarea { resize: vertical; }
 .habitat-choice { position: relative; cursor: pointer; }
 .habitat-choice span { display: inline-block; padding: 8px 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.3); font-size: 10px; }
 .habitat-choice input:checked + span { color: #fff; border-color: var(--forest); background: var(--forest); }
-.profile-taxonomy-grid { display: grid; grid-template-columns: 44px 1fr 1fr; gap: 12px; align-items: end; }
-.profile-taxonomy-grid strong { align-self: center; color: var(--forest); font: 20px Georgia, "Songti SC", serif; }
 .profile-evidence-list, .profile-behavior-list { display: grid; gap: 12px; margin: 15px 0; }
 .profile-evidence-row { display: grid; grid-template-columns: minmax(150px, .55fr) 1fr; gap: 15px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); }
 .profile-evidence-row select { margin: 0; }
@@ -496,8 +494,7 @@ textarea { resize: vertical; }
   .trip-location-row { grid-template-columns: 30px 1fr 34px 34px; }.trip-location-row > label { grid-column: 2; }.trip-location-row > span { grid-column: 1 / -1; }.trip-location-row [data-remove-trip-location] { grid-column: 4; }
   .trip-edit-observation-item img { width: 60px; height: 52px; }
   .trip-edit-observation-item .danger-button { grid-column: 2; justify-self: start; }
-  .profile-taxonomy-grid, .profile-evidence-row, .profile-behavior-row { grid-template-columns: 1fr; }
-  .profile-taxonomy-grid strong { margin-top: 10px; }
+  .profile-evidence-row, .profile-behavior-row { grid-template-columns: 1fr; }
   .behavior-remove-button { justify-self: start; }
   .detail-hero img { min-height: 260px; }
   #detail-dialog { width: 94vw; overflow: auto; }

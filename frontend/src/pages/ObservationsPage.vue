@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, errorMessage } from "@/api/client";
 import type { LocationSummary, ObservationRecord, SpeciesSummary } from "@/api/types";
 import ObservationCard from "@/components/observations/ObservationCard.vue";
 import ObservationDetail from "@/components/observations/ObservationDetail.vue";
-import ObservationEditor from "@/components/observations/ObservationEditor.vue";
-import ObservationForm from "@/components/observations/ObservationForm.vue";
+const ObservationBatchImport = defineAsyncComponent(() => import("@/components/observations/ObservationBatchImport.vue"));
+const ObservationEditor = defineAsyncComponent(() => import("@/components/observations/ObservationEditor.vue"));
 
 interface AssistantSearchDetail { observation_ids?: Array<number | string>; sort?: "asc" | "desc" }
 
@@ -27,7 +27,17 @@ const dialog = ref<HTMLDialogElement>();
 const selected = ref<ObservationRecord | null>(null);
 const speciesIndex = ref(0);
 const species = ref<SpeciesSummary[]>([]); const editorDialog = ref<HTMLDialogElement>(); const editorOpen = ref(false);
-const locationsArchive = ref<LocationSummary[]>([]); const formDialog = ref<HTMLDialogElement>(); const formOpen = ref(false);
+const locationsArchive = ref<LocationSummary[]>([]);
+const batchDialog = ref<HTMLDialogElement>();
+const batchImport = ref<InstanceType<typeof ObservationBatchImport>>();
+const batchOpen = ref(false);
+const expandedMonths = ref(new Set<string>());
+const monthPreviewLimit = 5;
+
+function toggleMonth(key: string): void {
+  if (expandedMonths.value.has(key)) expandedMonths.value.delete(key);
+  else expandedMonths.value.add(key);
+}
 
 const years = computed(() => [...new Set(observations.value.map((item) => item.observed_at.slice(0, 4)))].sort());
 const months = computed(() => [...new Set(observations.value.filter((item) => !year.value || item.observed_at.startsWith(`${year.value}-`)).map((item) => item.observed_at.slice(5, 7)))].sort());
@@ -58,6 +68,9 @@ const groups = computed(() => {
 const countLabel = computed(() => filtered.value.length === observations.value.length ? observations.value.length : `${filtered.value.length}/${observations.value.length}`);
 
 watch(year, () => { if (!months.value.includes(month.value)) month.value = ""; });
+watch([year, month, locationId, sort, tripId, speciesId, multiSpeciesOnly, queryIds], () => {
+  expandedMonths.value.clear();
+});
 
 async function loadObservations(): Promise<void> {
   loading.value = true; error.value = "";
@@ -95,10 +108,12 @@ function reset(): void {
   void router.replace({ path: "/observations" });
 }
 
-async function openNew(): Promise<void> { formOpen.value = true; await nextTick(); formDialog.value?.showModal(); }
-function hideNew(): void { formDialog.value?.close(); formOpen.value = false; }
-function closeNew(): void { hideNew(); if (route.query.new) { const query = { ...route.query }; delete query.new; void router.replace({ query }); } }
-async function observationSaved(id: number): Promise<void> { hideNew(); await loadObservations(); const item = observations.value.find((value) => value.id === id); if (item) await openObservation(item); }
+async function openNew(): Promise<void> { batchOpen.value = true; await nextTick(); batchDialog.value?.showModal(); }
+function closeBatch(): void {
+  batchDialog.value?.close(); batchOpen.value = false;
+  if (route.query.new) { const query = { ...route.query }; delete query.new; void router.replace({ query }); }
+  void loadObservations();
+}
 async function openEditor(): Promise<void> { if (!selected.value) return; editorOpen.value = true; await nextTick(); editorDialog.value?.showModal(); }
 function closeEditor(): void { editorDialog.value?.close(); editorOpen.value = false; }
 function editorUpdated(updated: ObservationRecord): void { const index = observations.value.findIndex((item) => item.id === updated.id); if (index >= 0) observations.value[index] = updated; selected.value = updated; speciesIndex.value = Math.min(speciesIndex.value, updated.species_entries.length - 1); }
@@ -139,33 +154,46 @@ onBeforeUnmount(() => document.removeEventListener("feather:apply-observation-se
 </script>
 
 <template>
-  <main class="v2-archive-layout">
-    <aside class="v2-archive-sidebar">
+  <main class="v2-archive-layout observations-page">
+    <div class="v2-sidebar-column"><aside class="v2-archive-sidebar">
       <div class="v2-book-tab">FIELD NOTES</div><p class="v2-kicker">野外调查手记</p><h1>田野记录</h1>
       <p class="v2-filter-intro">按拍摄月份翻阅每一次真实相遇。照片、时间与地点共同构成调查凭证。</p>
-      <label for="vue-observation-year">年份</label><select id="vue-observation-year" v-model="year"><option value="">全部年份</option><option v-for="item in years" :key="item" :value="item">{{ item }}年</option></select>
-      <label for="vue-observation-month">月份</label><select id="vue-observation-month" v-model="month"><option value="">全部月份</option><option v-for="item in months" :key="item" :value="item">{{ Number(item) }}月</option></select>
-      <label for="vue-observation-location">调查区域</label><select id="vue-observation-location" v-model="locationId"><option value="">全部区域</option><option v-for="item in locations" :key="item.id" :value="String(item.id)">{{ item.name }}</option></select>
-      <label for="vue-observation-sort">装订顺序</label><select id="vue-observation-sort" v-model="sort"><option value="asc">从早到晚</option><option value="desc">从晚到早</option></select>
+      <div class="observation-filters">
+      <div class="observation-filter-field"><label for="vue-observation-year">年份</label><select id="vue-observation-year" v-model="year"><option value="">全部年份</option><option v-for="item in years" :key="item" :value="item">{{ item }}年</option></select></div>
+      <div class="observation-filter-field"><label for="vue-observation-month">月份</label><select id="vue-observation-month" v-model="month"><option value="">全部月份</option><option v-for="item in months" :key="item" :value="item">{{ Number(item) }}月</option></select></div>
+      <div class="observation-filter-field"><label for="vue-observation-location">调查区域</label><select id="vue-observation-location" v-model="locationId"><option value="">全部区域</option><option v-for="item in locations" :key="item.id" :value="String(item.id)">{{ item.name }}</option></select></div>
+      <div class="observation-filter-field"><label for="vue-observation-sort">装订顺序</label><select id="vue-observation-sort" v-model="sort"><option value="asc">从早到晚</option><option value="desc">从晚到早</option></select></div>
       <button class="v2-filter-reset" type="button" @click="reset">清除检索条件</button>
       <a class="v2-filter-reset" href="/api/exports/observations.csv" download>导出田野记录 CSV</a>
+      </div>
       <div class="v2-book-count"><strong>{{ countLabel }}</strong><span>页田野记录</span></div>
-    </aside>
+    </aside></div>
     <section class="v2-archive-content">
-      <header class="v2-dex-header"><div><p class="v2-kicker">按时间装订</p><h2>沿着日期重返现场</h2></div><button class="v2-new-entry" type="button" @click="openNew">＋ 登记新发现</button></header>
+      <header class="v2-dex-header"><div><p class="v2-kicker">按时间装订 · {{ filtered.length }} 笔观察</p><h2>沿着日期重返现场</h2></div><button class="v2-new-entry" type="button" @click="openNew">＋ 登记新发现</button></header>
       <p v-if="loading" class="v2-loading">正在整理田野手记…</p><p v-else-if="error" class="v2-loading">{{ error }}</p>
       <div v-else class="v2-record-groups">
         <section v-for="group in groups" :key="group.key" class="v2-month-section">
-          <header><div><span>{{ group.key.slice(0, 4) }}</span><h3>{{ Number(group.key.slice(5, 7)) }}月调查记录</h3></div><b>{{ group.items.length }} 页</b></header>
-          <div class="v2-field-grid"><ObservationCard v-for="item in group.items" :key="item.id" :observation="item" @click="openObservation(item)" /></div>
+          <header>
+            <div><span>{{ group.key.slice(0, 4) }}</span><h3>{{ Number(group.key.slice(5, 7)) }}月调查记录</h3></div>
+            <button v-if="group.items.length > monthPreviewLimit" class="observation-month-toggle" type="button" :aria-expanded="expandedMonths.has(group.key)" :aria-controls="`month-records-${group.key}`" @click="toggleMonth(group.key)">共 {{ group.items.length }} 页，点击{{ expandedMonths.has(group.key) ? '收起' : '展开' }}</button>
+            <b v-else>共 {{ group.items.length }} 页</b>
+          </header>
+          <div :id="`month-records-${group.key}`" class="v2-field-grid"><ObservationCard v-for="item in (expandedMonths.has(group.key) ? group.items : group.items.slice(0, monthPreviewLimit))" :key="item.id" :observation="item" @click="openObservation(item)" /></div>
         </section>
       </div>
-      <div v-if="!loading && !error && !filtered.length" class="v2-empty"><strong>没有符合条件的记录</strong><span>换一个月份或区域试试。</span></div>
+      <div v-if="!loading && !error && !filtered.length" class="v2-empty"><strong>{{ observations.length ? '没有符合条件的记录' : '从一次相遇开始' }}</strong><span>{{ observations.length ? '换一个月份或区域，重新翻阅田野记录。' : '添加一张照片，记下你遇见的第一只鸟。' }}</span><button class="v2-button v2-button-primary" type="button" @click="observations.length ? reset() : openNew()">{{ observations.length ? '查看全部记录' : '登记第一笔观察' }}</button></div>
     </section>
   </main>
-  <dialog ref="dialog" class="v2-archive-dialog" @click.self="closeObservation">
+  <dialog ref="dialog" class="v2-archive-dialog observation-detail-dialog" @cancel.prevent="closeObservation" @click.self="closeObservation">
     <ObservationDetail v-if="selected" :observation="selected" :species-index="speciesIndex" @close="closeObservation" @previous="navigateSpecies(-1)" @next="navigateSpecies(1)" @edit="openEditor" @delete="deleteObservation" />
   </dialog>
-  <dialog ref="editorDialog" class="record-dialog" @click.self="closeEditor"><ObservationEditor v-if="editorOpen && selected" :observation="selected" :species="species" :initial-index="speciesIndex" @close="closeEditor" @updated="editorUpdated" /></dialog>
-  <dialog ref="formDialog" class="record-dialog" @click.self="closeNew"><ObservationForm v-if="formOpen" :species="species" :locations="locationsArchive" @close="closeNew" @saved="observationSaved" /></dialog>
+  <dialog ref="editorDialog" class="record-dialog observation-entry-dialog observation-editor-dialog" @click.self="closeEditor"><ObservationEditor v-if="editorOpen && selected" :observation="selected" :species="species" :initial-index="speciesIndex" @close="closeEditor" @updated="editorUpdated" /></dialog>
+  <dialog ref="batchDialog" class="batch-dialog" @cancel.prevent="batchImport?.requestClose()" @click.self="batchImport?.requestClose()">
+    <ObservationBatchImport v-if="batchOpen" ref="batchImport" :species="species" :locations="locationsArchive" @close="closeBatch" @changed="loadObservations" />
+  </dialog>
 </template>
+
+<style scoped>
+.batch-dialog{width:min(1380px,96vw);max-width:96vw;max-height:94vh;padding:0;border:1px solid #8e7955}
+@media(max-width:760px){.batch-dialog{width:98vw;max-width:98vw}}
+</style>

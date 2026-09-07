@@ -121,3 +121,40 @@ class AmapService:
             "district": component.get("district"),
             "adcode": component.get("adcode"),
         }
+
+
+class TiandituService:
+    base_url = "https://t0.tianditu.gov.cn/vec_w/wmts"
+
+    def __init__(self, key: str | None) -> None:
+        self.key = (key or "").strip()
+        if not self.key:
+            raise MapServiceError("尚未配置天地图浏览器端 Key。", 503)
+
+    def test_connection(self) -> None:
+        query = urlencode(
+            {
+                "SERVICE": "WMTS",
+                "REQUEST": "GetTile",
+                "VERSION": "1.0.0",
+                "LAYER": "vec",
+                "STYLE": "default",
+                "TILEMATRIXSET": "w",
+                "FORMAT": "tiles",
+                "TILEMATRIX": "4",
+                "TILEROW": "6",
+                "TILECOL": "12",
+                "tk": self.key,
+            }
+        )
+        request = Request(
+            f"{self.base_url}?{query}",
+            headers={"User-Agent": "Tsubasa-Field-Journal/0.3"},
+        )
+        try:
+            with urlopen(request, timeout=8) as response:  # noqa: S310
+                signature = response.read(16)
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise MapServiceError("天地图底图服务暂时无法访问，请稍后重试。") from exc
+        if not (signature.startswith(b"\x89PNG") or signature.startswith(b"\xff\xd8\xff")):
+            raise MapServiceError("当前 Key 未能取得天地图瓦片，请检查 Key 类型或权限。", 503)

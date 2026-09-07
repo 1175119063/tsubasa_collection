@@ -475,7 +475,7 @@ def test_existing_database_is_registered_at_migration_baseline(tmp_path):
         }
         assert "coordinate_system" in location_columns
         assert connection.execute("SELECT version_num FROM alembic_version").fetchone()[0] == (
-            "20260901_07"
+            "20260905_08"
         )
     finally:
         connection.close()
@@ -729,6 +729,16 @@ def test_species_profile_archives_keep_links_and_fall_back_after_deletion(tmp_pa
 
         payload = profile_payload(second_id)
         payload["family"]["chinese_name"] = "梅花雀科（更正）"
+        family_id = client.get("/api/species").json()[0]["family_id"]
+        correction = {"action": "rename", "name": payload["family"]}
+        preview = client.post(
+            f"/api/taxonomy/family/{family_id}/preview", json=correction,
+        )
+        assert preview.status_code == 200
+        corrected = client.put(f"/api/taxonomy/family/{family_id}", json={
+            **correction, "preview_token": preview.json()["preview_token"],
+        })
+        assert corrected.status_code == 200
         response = client.put(f"/api/species/{species_id}/profile", json=payload)
         assert response.status_code == 200, response.text
         detail = response.json()

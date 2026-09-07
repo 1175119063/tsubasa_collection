@@ -35,7 +35,7 @@ const apiManagerDialog = ref<InstanceType<typeof ApiManagerDialog>>();
 const latestSpecies = computed(() => [...species.value].sort((a, b) => b.id - a.id).slice(0, 4));
 const featuredObservation = computed(() => feature.value?.observation ?? null);
 const featuredId = computed(() => feature.value?.selection_mode === "manual" ? featuredObservation.value?.id ?? null : null);
-const featuredLabel = computed(() => feature.value?.selection_mode === "manual" ? "指定馆藏" : "最新记录");
+const featuredLabel = computed(() => feature.value?.selection_mode === "manual" ? "指定记录" : "最新记录");
 
 async function loadHome(): Promise<void> {
   loadError.value = "";
@@ -161,7 +161,7 @@ onMounted(() => {
         <article><span>已确认物种</span><strong>{{ stats?.species_count ?? "—" }}</strong><small>SPECIES</small></article>
         <article><span>田野记录</span><strong>{{ stats?.observation_count ?? "—" }}</strong><small>RECORDS</small></article>
         <article><span>照片凭证</span><strong>{{ stats?.photo_count ?? "—" }}</strong><small>PHOTOS</small></article>
-        <article><span>声音标本</span><strong>{{ stats?.audio_count ?? "—" }}</strong><small>AUDIO</small></article>
+        <article><span>鸟类录音</span><strong>{{ stats?.audio_count ?? "—" }}</strong><small>AUDIO</small></article>
       </div>
       <div class="v2-board-grid">
         <RouterLink class="v2-quest-card v2-quest-primary" to="/dex">
@@ -182,7 +182,7 @@ onMounted(() => {
         </RouterLink>
         <RouterLink class="v2-quest-card" to="/collections">
           <span class="v2-card-rune">Ⅴ</span><p>COLLECTION PLAN</p><h3>收集计划</h3>
-          <small>把相似鸟种与不同形态编成自己的专题收藏</small><b>查看收藏 →</b>
+          <small>把相似鸟种与不同形态编成自己的专题收集</small><b>查看收集 →</b>
         </RouterLink>
       </div>
     </section>
@@ -209,7 +209,7 @@ onMounted(() => {
         <p>集中保管地图与飞羽精灵使用的外部服务。密钥不会显示在页面中，也不会写入备份。</p>
       </div>
       <div class="v2-api-overview">
-        <article><span>地图服务</span><strong>高德地图</strong><small>{{ integrationError || (integrations?.amap.configured ? `已配置 · ${integrations.amap.key_hint || "密钥已隐藏"}` : "尚未配置") }}</small></article>
+        <article><span>地图服务</span><strong>{{ integrations?.tianditu.configured ? "天地图" : "OpenStreetMap" }}</strong><small>{{ integrationError || `${integrations?.tianditu.configured ? "国内底图已配置" : "备用底图"} · ${integrations?.amap.configured ? "高德搜索已配置" : "高德搜索未配置"}` }}</small></article>
         <article><span>精灵对话</span><strong>{{ integrations?.llm.provider === "openai_compatible" ? "外部大模型" : "本地 Ollama" }}</strong><small>{{ integrationError || (integrations?.llm.provider === "openai_compatible" ? `${integrations.llm.model || "模型未填写"}${integrations.llm.api_key_hint ? ` · ${integrations.llm.api_key_hint}` : " · Key 未配置"}` : `${integrations?.local_model.model || "正在检查"} · 对话留在本机`) }}</small></article>
         <button class="v2-api-manage" type="button" @click="apiManagerDialog?.open()"><span>配置册</span><strong>管理 API 与模型</strong><small>打开安全配置界面 →</small></button>
       </div>
