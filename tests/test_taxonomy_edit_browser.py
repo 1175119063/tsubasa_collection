@@ -30,7 +30,7 @@ def test_old_backend_reports_restart_and_keeps_taxonomy_draft(browser_app, missi
     expect(save).to_be_enabled()
     save.click()
     expect(editor).to_have_count(0)
-    expect(page.locator(".v2-taxonomy-breadcrumb")).to_contain_text("文鸟属更正")
+    expect(page.locator("[data-taxonomy-current]")).to_contain_text("文鸟属更正")
 
 
 def test_tree_rename_and_move_branch_with_impact_preview(browser_app, tmp_path):
@@ -58,7 +58,7 @@ def test_tree_rename_and_move_branch_with_impact_preview(browser_app, tmp_path):
     expect(editor.get_by_label("修改影响预览")).to_contain_text("涉及 2 个物种、2 笔观察")
     save.click()
     expect(editor).to_have_count(0)
-    expect(page.locator(".v2-taxonomy-breadcrumb")).to_contain_text("文鸟属更正")
+    expect(page.locator("[data-taxonomy-current]")).to_contain_text("文鸟属更正")
     assert f"node={genus_id}" in page.url
     page.get_by_role("button", name="修改分类", exact=True).click()
     editor.get_by_role("combobox", name="操作", exact=True).select_option("move")
@@ -70,7 +70,7 @@ def test_tree_rename_and_move_branch_with_impact_preview(browser_app, tmp_path):
     page.screenshot(path=str(tmp_path / "taxonomy-move-preview.png"))
     save.click()
     expect(editor).to_have_count(0)
-    expect(page.locator(".v2-taxonomy-breadcrumb")).to_contain_text("鸦科")
+    expect(page.locator("[data-taxonomy-parent]")).to_contain_text("鸦科")
     assert len(httpx.get(f"{base_url}/api/observations").json()) == 3
 
 
@@ -99,7 +99,7 @@ def test_species_move_from_tree_and_profile_save(browser_app, tmp_path):
     editor.get_by_role("button", name="预览修改影响", exact=True).click()
     editor.get_by_role("button", name="确认保存分类", exact=True).click()
     expect(editor).to_have_count(0)
-    expect(page.locator(".v2-taxonomy-breadcrumb")).to_contain_text("新属")
+    expect(page.locator("[data-taxonomy-parent]")).to_contain_text("新属")
     page.goto(f"{base_url}/dex?species={first['species_id']}")
     page.get_by_role("button", name="修改图鉴", exact=True).click()
     profile = page.locator("dialog.profile-dialog[open]")

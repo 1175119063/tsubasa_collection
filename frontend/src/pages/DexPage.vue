@@ -295,9 +295,8 @@ onMounted(loadSpecies);
     </aside></div>
 
     <section class="v2-dex-content">
-      <header class="v2-dex-header">
-        <div v-if="taxonomyMode"><p class="v2-kicker">PERSONAL TAXONOMY</p><h2>沿分类脉络重返相遇</h2></div>
-        <div v-else><p class="v2-kicker">COLLECTED SPECIES</p><h2>已确认的飞羽</h2></div>
+      <header v-if="!taxonomyMode" class="v2-dex-header">
+        <div><p class="v2-kicker">COLLECTED SPECIES</p><h2>已确认的飞羽</h2></div>
         <button
           class="v2-view-mark"
           :class="{ 'is-taxonomy': taxonomyMode }"
@@ -321,6 +320,7 @@ onMounted(loadSpecies);
         @open-species="openDossier"
         @view-observations="viewSpeciesObservations"
         @edit-taxonomy="editingTaxonomy = $event"
+        @leave="leaveTaxonomy"
       />
       <template v-else>
         <div class="v2-species-grid"><DiscoveryCard v-for="item in filtered" :key="item.id" :species="item" @click="openDossier(item.id)" /></div>

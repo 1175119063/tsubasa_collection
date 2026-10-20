@@ -12,6 +12,7 @@ import type {
   UpdateStatus,
 } from "@/api/types";
 import DiscoveryCard from "@/components/DiscoveryCard.vue";
+import FieldIcon from "@/components/FieldIcon.vue";
 import ApiManagerDialog from "@/components/home/ApiManagerDialog.vue";
 import BackupDialog from "@/components/home/BackupDialog.vue";
 import HomeCoverDialog from "@/components/home/HomeCoverDialog.vue";
@@ -128,11 +129,13 @@ onMounted(() => {
       <div class="v2-hero-shade"></div>
       <div class="v2-hero-copy">
         <p class="v2-kicker">PERSONAL EXPEDITION ARCHIVE · 个人探索档案</p>
-        <h1>记录只属于你的探索<br /><em>收集每一支散落的飞羽</em></h1>
-        <p>每次相遇都是一页新情报。把照片、足迹与时间装订成一本持续生长的自然调查手册。</p>
+        <h1>循着飞羽，<br /><em>收藏与自然的相遇。</em></h1>
+        <p>把照片、足迹与时间，装订成一本持续生长的手册。<br />从一次驻足开始，慢慢认识身边的旷野。</p>
         <div class="v2-hero-actions">
           <RouterLink class="v2-button v2-button-primary" to="/dex">打开鸟类调查册</RouterLink>
           <RouterLink class="v2-button v2-button-ghost" to="/observations?new=1">登记新发现</RouterLink>
+        </div>
+        <div class="field-home-tools" aria-label="手册管理">
           <button class="v2-button v2-button-ghost" type="button" @click="homeCoverDialog?.open()">选择首页封面</button>
           <button class="v2-button v2-button-ghost" type="button" @click="backupDialog?.open()">完整备份资料库</button>
           <button class="v2-button v2-button-ghost" type="button" :disabled="updateBusy" @click="checkUpdate">
@@ -165,22 +168,27 @@ onMounted(() => {
       </div>
       <div class="v2-board-grid">
         <RouterLink class="v2-quest-card v2-quest-primary" to="/dex">
+          <FieldIcon name="dex" />
           <span class="v2-card-rune">Ⅰ</span><p>FIELD GUIDE</p><h3>鸟类调查册</h3>
           <small>翻阅已确认物种、生态画像与照片凭证</small><b>进入调查册 →</b>
         </RouterLink>
         <RouterLink class="v2-quest-card" to="/observations">
+          <FieldIcon name="observations" />
           <span class="v2-card-rune">Ⅱ</span><p>FIELD NOTES</p><h3>田野记录</h3>
           <small>按时间回看每一次相遇与拍摄详情</small><b>翻阅记录 →</b>
         </RouterLink>
         <RouterLink class="v2-quest-card" to="/locations">
+          <FieldIcon name="locations" />
           <span class="v2-card-rune">Ⅲ</span><p>REGION MAP</p><h3>区域档案</h3>
           <small>整理反复到访的湿地、森林与城市角落</small><b>查看区域 →</b>
         </RouterLink>
         <RouterLink class="v2-quest-card" to="/trips">
+          <FieldIcon name="trips" />
           <span class="v2-card-rune">Ⅳ</span><p>EXPEDITION LOG</p><h3>远征日志</h3>
           <small>把同一次外出中的发现编入一段旅程</small><b>查看远征 →</b>
         </RouterLink>
         <RouterLink class="v2-quest-card" to="/collections">
+          <FieldIcon name="collections" />
           <span class="v2-card-rune">Ⅴ</span><p>COLLECTION PLAN</p><h3>收集计划</h3>
           <small>把相似鸟种与不同形态编成自己的专题收集</small><b>查看收集 →</b>
         </RouterLink>

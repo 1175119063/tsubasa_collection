@@ -34,6 +34,22 @@ const batchOpen = ref(false);
 const expandedMonths = ref(new Set<string>());
 const monthPreviewLimit = 5;
 
+// Determine first encounters from the full journal, before filtering or folding months.
+const firstEncounterIds = computed(() => {
+  const firstBySpecies = new Map<number, ObservationRecord>();
+  for (const item of observations.value) {
+    const entries = item.species_entries?.length ? item.species_entries : [{ species_id: item.species_id }];
+    for (const entry of entries) {
+      const previous = firstBySpecies.get(entry.species_id);
+      if (!previous || item.observed_at < previous.observed_at
+        || (item.observed_at === previous.observed_at && item.id < previous.id)) {
+        firstBySpecies.set(entry.species_id, item);
+      }
+    }
+  }
+  return new Set([...firstBySpecies.values()].map((item) => item.id));
+});
+
 function toggleMonth(key: string): void {
   if (expandedMonths.value.has(key)) expandedMonths.value.delete(key);
   else expandedMonths.value.add(key);
@@ -178,7 +194,7 @@ onBeforeUnmount(() => document.removeEventListener("feather:apply-observation-se
             <button v-if="group.items.length > monthPreviewLimit" class="observation-month-toggle" type="button" :aria-expanded="expandedMonths.has(group.key)" :aria-controls="`month-records-${group.key}`" @click="toggleMonth(group.key)">共 {{ group.items.length }} 页，点击{{ expandedMonths.has(group.key) ? '收起' : '展开' }}</button>
             <b v-else>共 {{ group.items.length }} 页</b>
           </header>
-          <div :id="`month-records-${group.key}`" class="v2-field-grid"><ObservationCard v-for="item in (expandedMonths.has(group.key) ? group.items : group.items.slice(0, monthPreviewLimit))" :key="item.id" :observation="item" @click="openObservation(item)" /></div>
+          <div :id="`month-records-${group.key}`" class="v2-field-grid"><ObservationCard v-for="item in (expandedMonths.has(group.key) ? group.items : group.items.slice(0, monthPreviewLimit))" :key="item.id" :observation="item" :is-first-encounter="firstEncounterIds.has(item.id)" @click="openObservation(item)" /></div>
         </section>
       </div>
       <div v-if="!loading && !error && !filtered.length" class="v2-empty"><strong>{{ observations.length ? '没有符合条件的记录' : '从一次相遇开始' }}</strong><span>{{ observations.length ? '换一个月份或区域，重新翻阅田野记录。' : '添加一张照片，记下你遇见的第一只鸟。' }}</span><button class="v2-button v2-button-primary" type="button" @click="observations.length ? reset() : openNew()">{{ observations.length ? '查看全部记录' : '登记第一笔观察' }}</button></div>

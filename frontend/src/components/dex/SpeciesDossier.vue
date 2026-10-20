@@ -10,6 +10,7 @@ export interface DossierObservation {
   sex?: string | null;
   life_stage?: string | null;
   subspecies?: { id: number } | null;
+  audio?: Array<{ url: string }>;
 }
 
 export interface IntelItem {
@@ -59,11 +60,23 @@ const iucnLabels: Record<string, string> = { NE: "待定", LC: "无危", NT: "�
 const ecologyAssets: Record<string, string> = { raptor: "raptor-silhouette.png", songbird: "songbird-silhouette.png", landfowl: "landfowl-silhouette.png", scansorial: "scansorial-silhouette.png", wader: "wader-silhouette.png", waterfowl: "waterfowl-silhouette.png" };
 const bodySizes = ["small", "small_medium", "medium", "medium_large", "large"];
 
-const progress = computed(() => {
+const completeness = computed(() => {
   const detail = props.detail;
-  const checks = [Boolean(detail.introduction), detail.ecology.group !== "unknown", detail.ecology.body_size !== "unknown", detail.ecology.habitats.length > 0, detail.behaviors.length > 0, detail.individuals.length > 0];
-  return Math.round(checks.filter(Boolean).length / checks.length * 100);
+  return [
+    { label: "分类信息", complete: ["order", "family", "genus"].every((rank) => {
+      const node = detail.classification[rank as keyof typeof detail.classification];
+      return Boolean(node?.chinese_name?.trim() && node?.scientific_name?.trim());
+    }), hint: "目、科、属的中文名与学名" },
+    { label: "物种介绍", complete: Boolean(detail.introduction?.trim()), hint: "已填写物种简介" },
+    { label: "照片凭证", complete: Boolean(detail.cover.photo_url), hint: "已收录物种照片" },
+    { label: "观察地点", complete: detail.observations.some((item) => Boolean(item.locality?.trim() && item.admin1_name?.trim())), hint: "观察中有行政区和具体地点" },
+    { label: "声音记录", complete: detail.species_audio.some((item) => Boolean(item.url)) || detail.observations.some((item) => item.audio?.some((audio) => Boolean(audio.url))), hint: "独立物种录音或观察附带录音" },
+    { label: "生态习性", complete: Boolean(detail.ecology.group && detail.ecology.group !== "unknown"), hint: "已填写生态类群" },
+    { label: "体型大小", complete: Boolean(detail.ecology.body_size && detail.ecology.body_size !== "unknown"), hint: "已填写体型级别" },
+    { label: "偏好生境", complete: detail.ecology.habitats.length > 0, hint: "已填写至少一种生境" },
+  ];
 });
+const completedCount = computed(() => completeness.value.filter((item) => item.complete).length);
 const recent = computed(() => [...props.detail.observations].sort((a, b) => b.observed_at.localeCompare(a.observed_at)).slice(0, 4));
 
 function formatDate(value: string): string {
@@ -86,7 +99,20 @@ function intelText(item: IntelItem): string {
       <h2>{{ detail.chinese_name }}</h2><em>{{ detail.scientific_name }}</em>
       <div class="v2-taxonomy-line">{{ detail.classification.order.chinese_name }} / {{ detail.classification.family.chinese_name }} / {{ detail.classification.genus.chinese_name }}</div>
       <div class="v2-status-row"><span class="v2-iucn" :class="`v2-iucn-${detail.iucn_status.toLowerCase()}`">{{ detail.iucn_status }} {{ iucnLabels[detail.iucn_status] }}</span><span>累计 {{ detail.observation_count }} 次记录</span></div>
-      <div class="v2-progress"><span><i :style="{ width: `${progress}%` }"></i></span><b>调查情报 {{ progress }}%</b></div>
+      <div class="dossier-completeness" tabindex="0" role="group"
+        :aria-label="`档案完整度：已完善 ${completedCount} / ${completeness.length} 项。${completeness.map(item => `${item.label}：${item.complete ? '已完善' : '待补充'}`).join('；')}`">
+        <div class="dossier-completeness-heading"><strong>档案完整度</strong><span>{{ completedCount }} / {{ completeness.length }} 项 <small>查看构成 ⓘ</small></span></div>
+        <div class="dossier-completeness-segments" aria-hidden="true"><span v-for="item in completeness" :key="item.label" :class="{ 'is-complete': item.complete }"></span></div>
+        <div class="dossier-completeness-tooltip" aria-hidden="true">
+          <strong>资料完善情况</strong><p>每段对应一项资料；亮色为已完善。</p>
+          <ul><li v-for="item in completeness" :key="item.label"><span><b>{{ item.label }}</b><small>{{ item.hint }}</small></span><em :class="{ 'is-complete': item.complete }">{{ item.complete ? "✓ 已完善" : "待补充" }}</em></li></ul>
+        </div>
+      </div>
+      <RouterLink class="dossier-first-encounter" :to="{ path: '/observations', query: { observation: detail.first_encounter.observation_id } }">
+        <span class="dossier-encounter-label">首次遭遇 <i>查看记录 ↗</i></span>
+        <strong>{{ formatDate(detail.first_encounter.observed_at) }}</strong>
+        <span>{{ detail.first_encounter.admin1_name }} · {{ detail.first_encounter.locality }}</span>
+      </RouterLink>
     </div>
     <div class="v2-ecology-panel">
       <section class="v2-ecology-group"><span class="v2-ecology-label">生态习性</span><div class="v2-ecology-group-row"><span class="v2-ecology-disc"><span v-if="detail.ecology.group === 'unknown'" class="v2-ecology-question">?</span><img v-else :src="`/static/assets/${ecologyAssets[detail.ecology.group]}?v=20260816-1`" alt="" /></span><strong>{{ ecologyLabels[detail.ecology.group] || detail.ecology.group }}</strong></div></section>
@@ -97,7 +123,6 @@ function intelText(item: IntelItem): string {
   <section class="v2-dossier-paper">
     <div class="v2-dossier-main">
       <article><p class="v2-kicker">调查者手记</p><h3>物种简介</h3><p class="v2-note-copy">{{ detail.introduction || "尚未填写物种简介。" }}</p></article>
-      <article><p class="v2-kicker">首次相遇</p><h3>首次遭遇</h3><RouterLink class="v2-first-encounter" :to="{ path: '/observations', query: { observation: detail.first_encounter.observation_id } }"><strong>{{ formatDate(detail.first_encounter.observed_at) }}</strong><span>{{ detail.first_encounter.admin1_name }} · {{ detail.first_encounter.locality }}</span></RouterLink></article>
       <article><p class="v2-kicker">最近照片</p><h3>最近的照片凭证</h3><div class="v2-evidence-grid"><RouterLink v-for="item in recent" :key="item.id" :to="{ path: '/observations', query: { observation: item.id } }"><img :src="item.thumbnail_url" alt="" /><span>{{ formatDate(item.observed_at) }}</span></RouterLink></div></article>
       <article><p class="v2-kicker">记录管理</p><h3>观察记录与图鉴封面</h3><div class="v2-dex-observation-grid"><section v-for="item in detail.observations" :key="item.id" class="v2-dex-observation" :class="{ 'is-current': item.id === detail.cover.observation_id }"><RouterLink :to="{ path: '/observations', query: { observation: item.id } }"><img :src="item.thumbnail_url" alt="" /><span>{{ formatDate(item.observed_at) }} · {{ item.locality }}</span></RouterLink><div><button type="button" :disabled="item.id === detail.cover.observation_id" @click="emit('setCover', item.id)">{{ item.id === detail.cover.observation_id ? "当前封面" : "设为封面" }}</button><button type="button" class="is-danger" @click="emit('deleteObservation', item.id)">删除记录</button></div></section></div></article>
       <article><p class="v2-kicker">声音档案</p><h3>独立物种录音</h3><div class="v2-species-audio-list"><section v-for="audio in detail.species_audio" :key="audio.id"><strong>{{ audio.title || "未命名录音" }}</strong><small>{{ audio.recorded_at?.replace("T", " ") || "时间未记录" }}{{ audio.locality ? ` · ${audio.locality}` : "" }}</small><audio controls preload="metadata" :src="audio.url"></audio><p v-if="audio.notes">{{ audio.notes }}</p><button type="button" class="is-danger" @click="emit('deleteAudio', audio.id)">删除录音</button></section><p v-if="!detail.species_audio.length" class="v2-intel-missing">尚未添加独立物种录音。</p></div></article>

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import discoveryStamp from "@/assets/new-discovery-stamp.png";
 import type { ObservationRecord, ObservationSpeciesEntry } from "@/api/types";
 
-const props = defineProps<{ observation: ObservationRecord }>();
+const props = defineProps<{ observation: ObservationRecord; isFirstEncounter?: boolean }>();
 
 const labels: Record<string, string> = {
   spring: "春", summer: "夏", autumn: "秋", winter: "冬", other: "其他",
@@ -34,12 +35,13 @@ const dateTime = computed(() => props.observation.observed_at.replace("T", " ").
 </script>
 
 <template>
-  <button class="v2-field-card" type="button">
+  <button class="v2-field-card" :data-season="observation.season" type="button">
     <span class="v2-field-photo">
       <img :src="observation.thumbnail_url" :alt="title" loading="lazy" />
-      <i>#{{ String(observation.id).padStart(4, '0') }}</i>
+      <i>#{{ String(observation.id).padStart(7, '0') }}</i>
       <span v-if="count > 1" class="observation-photo-count">{{ count }} 种同框</span>
       <span v-else-if="observation.photo_count > 1" class="observation-photo-count">{{ observation.photo_count }} 张</span>
+      <img v-if="isFirstEncounter" class="observation-discovery-stamp" :src="discoveryStamp" alt="新发现" width="1254" height="1254" />
     </span>
     <span class="v2-field-copy">
       <strong :title="title">{{ title }}</strong>

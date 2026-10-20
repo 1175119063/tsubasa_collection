@@ -59,12 +59,12 @@ const seasonLabels: Record<string, string> = { spring: "春", summer: "夏", aut
     <div class="v2-observation-hero-copy">
       <p class="v2-kicker">田野记录 · OBSERVATION {{ observation.id }}<template v-if="entries.length > 1"> · {{ speciesIndex + 1 }}/{{ entries.length }}</template></p>
       <h2>{{ entry.species_name }}</h2><em>{{ entry.species_scientific_name }}</em>
+      <div class="observation-detail-tags"><span>{{ seasonLabels[observation.season] || observation.season || '未记录季节' }}</span><span>{{ entry.photo_type === 'group' ? '群体观察' : '个体观察' }}</span><span>{{ photos.length }} 张照片</span></div>
       <dl>
         <div><dt>个体信息</dt><dd>{{ individualInfo }}</dd></div>
         <div><dt>亚种</dt><dd>{{ subspecies }}</dd></div>
         <div><dt>拍摄时间</dt><dd>{{ observation.observed_at.replace("T", " ") }}</dd></div>
         <div v-if="photos.length > 1"><dt>当前照片</dt><dd>{{ activePhoto.observed_at.replace("T", " ") }} · 共 {{ photos.length }} 张</dd></div>
-        <div><dt>季节</dt><dd>{{ seasonLabels[observation.season] || observation.season || '未记录' }}</dd></div>
         <div><dt>拍摄地点</dt><dd>{{ observation.country_name }} · {{ observation.admin1_name }} · {{ observation.locality }}</dd></div>
         <div><dt>坐标</dt><dd>{{ observation.latitude }}, {{ observation.longitude }}</dd></div>
         <div><dt>所属远征</dt><dd>{{ observation.trip ? `${observation.trip.catalog_number} · ${observation.trip.name}` : "未关联" }}</dd></div>

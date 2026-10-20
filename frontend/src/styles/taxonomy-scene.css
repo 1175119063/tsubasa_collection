@@ -1,0 +1,55 @@
+/* Keep the supplied illustration and its seven portrait sockets in one coordinate system. */
+.taxonomy-scene-scroll { max-width: 100%; margin-top: 13px; overflow-x: auto; border-radius: 8px; border: 1px solid #9a987b66; }
+.v2-taxonomy-stage.is-illustrated { container-type: inline-size; width: 100%; min-width: 800px; height: auto; min-height: 0; aspect-ratio: 1598 / 984; margin: 0; border: 0; background: #e9e7d4; isolation: isolate; touch-action: auto; }
+.is-illustrated .taxonomy-scene-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; filter: saturate(.52) brightness(1.08); pointer-events: none; }
+.v2-taxonomy-stage.is-illustrated::before { inset: 0; z-index: 1; border: 0; background: #f0efdc38; }
+.is-illustrated .v2-taxonomy-lines { visibility: hidden; }
+.is-illustrated .v2-taxonomy-node-position { width: 10.7%; aspect-ratio: 1; transform: translate(-50%, -50%); }
+.is-illustrated[data-taxonomy-motion="idle"] .v2-taxonomy-node-position.is-child { transition: none; }
+.is-illustrated .v2-taxonomy-node { position: relative; width: 100%; height: 100%; display: block; text-align: center; }
+.is-illustrated .v2-taxonomy-portrait { width: 100%; height: 100%; border: 2px solid #eee9d5; outline: 1px solid #6b735b99; box-shadow: 0 2px 6px #293b2b33; }
+.is-illustrated .v2-taxonomy-portrait img { filter: saturate(.72) sepia(.18) contrast(.92); }
+.is-illustrated .v2-taxonomy-portrait.has-photo::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(ellipse at 35% 25%, #fff0c34d, #dbb66a26 58%, #c69b4f40); box-shadow: inset 0 0 18px #efcf8566; pointer-events: none; }
+.taxonomy-placeholder { display: block; width: 100%; height: 100%; color: #a68c54; }
+.is-illustrated .v2-taxonomy-portrait:not(.has-photo) { background: radial-gradient(ellipse at 35% 30%, #f5efdb, #ded5b9); }
+.is-illustrated .v2-taxonomy-node.is-current .v2-taxonomy-portrait { box-shadow: 0 0 0 2px #ecddb7, 0 3px 10px #293b2b40; }
+.is-illustrated .v2-taxonomy-node.is-parent { opacity: 1; }
+.is-illustrated .v2-taxonomy-node:not(.is-current):hover .v2-taxonomy-portrait { transform: none; box-shadow: 0 0 0 3px #f3e3b6, 0 3px 10px #293b2b40; }
+.is-illustrated .v2-taxonomy-node.is-context { cursor: default; }
+.is-illustrated .v2-taxonomy-node-copy { position: absolute; left: 50%; top: 100%; width: max-content; max-width: 19cqw; margin: 5px 0 0; padding: 3px 9px; transform: translateX(-50%); border-radius: 4px; background: #f8f5e8ed; box-shadow: 0 2px 6px #303a2526; }
+.is-illustrated .v2-taxonomy-node-copy strong { margin: 0; font-size: clamp(14px, 1.55cqw, 23px); }
+.is-illustrated .v2-taxonomy-node-copy em { color: #536149; font-size: clamp(9px, .9cqw, 13px); }
+.is-illustrated .v2-taxonomy-node.is-current .v2-taxonomy-node-copy,
+.is-illustrated .v2-taxonomy-node.is-parent .v2-taxonomy-node-copy { left: calc(100% + 16px); top: 50%; margin: 0; transform: translateY(-50%); justify-items: start; text-align: left; }
+.is-illustrated .taxonomy-empty-slot { position: absolute; z-index: 1; width: 10.7%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(ellipse at 35% 30%, #f5efdb, #ded5b9); box-shadow: inset 0 0 18px #aa8d4933; pointer-events: none; }
+.is-illustrated .v2-taxonomy-page-button { top: 30%; border-radius: 4px; background: #f8f5e8ed; }
+
+/* A compact working view: the full tree and summary share the first viewport. */
+.is-taxonomy-view .v2-dex-content { padding: 16px 24px; }
+.is-taxonomy-view .v2-taxonomy-browser { margin-top: 0; }
+.is-taxonomy-view .v2-taxonomy-toolbar { gap: 8px; }
+.is-taxonomy-view .v2-taxonomy-context { flex: 1; justify-content: flex-start; align-items: center; gap: 16px; padding: 0; border: 0; min-height: 35px; }
+.is-taxonomy-view .v2-taxonomy-summary { margin: 0; border-radius: 5px; }
+.is-taxonomy-view .v2-taxonomy-summary > div { min-height: 76px; padding: 10px 20px; }
+.is-taxonomy-view .v2-taxonomy-summary strong { font-size: 25px; line-height: 1.2; }
+.is-taxonomy-view .v2-taxonomy-leaf-actions { margin: 0; }
+@media (min-width: 781px) {
+  .v2-dex-layout.is-taxonomy-view { --taxonomy-header-height: 92px; height: max(600px, calc(100dvh - var(--taxonomy-header-height))); min-height: 0; }
+  .is-taxonomy-view > .v2-sidebar-column { min-height: 0; }
+  .is-taxonomy-view .v2-filter-book { max-height: 100%; }
+  .is-taxonomy-view .v2-dex-content { height: 100%; min-height: 0; }
+  .is-taxonomy-view .v2-taxonomy-browser { height: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .is-taxonomy-view .v2-taxonomy-toolbar, .is-taxonomy-view .v2-taxonomy-summary, .is-taxonomy-view .v2-taxonomy-leaf-actions { flex-shrink: 0; }
+  .is-taxonomy-view .taxonomy-scene-scroll { flex: 1; min-height: 0; margin: 0; display: grid; place-items: center; border: 0; container-type: size; }
+  .is-taxonomy-view .v2-taxonomy-stage.is-illustrated { min-width: 0; width: min(100cqw, calc(100cqh * 1598 / 984)); }
+}
+@media (min-width: 781px) and (max-width: 1120px) {
+  .v2-dex-layout.is-taxonomy-view { --taxonomy-header-height: 129px; }
+}
+@media (max-width: 780px) {
+  .is-taxonomy-view .v2-dex-content { padding: 16px; }
+  .is-taxonomy-view .v2-taxonomy-toolbar { flex-wrap: wrap; }
+  .is-taxonomy-view .v2-taxonomy-context { min-width: 140px; }
+  .is-taxonomy-view .v2-taxonomy-summary { margin-top: 10px; }
+  .is-taxonomy-view .v2-taxonomy-summary > div { padding: 10px; }
+}

@@ -28,6 +28,9 @@
 .observations-page .v2-field-photo::after { display: none; }
 .observations-page .v2-field-photo i { left: 10px; bottom: 10px; padding: 5px 7px; letter-spacing: .08em; border: 1px solid rgba(255,255,255,.25); }
 .observation-photo-count { position: absolute; right: 10px; top: 10px; padding: 5px 8px; background: var(--paper-light); color: var(--ink); font: 11px var(--sans); }
+.observations-page .v2-field-photo { isolation: isolate; }
+/* Transparent gold ink keeps its color over both light and dark photographs. */
+.observations-page .v2-field-photo > .observation-discovery-stamp { position: absolute; right: 8px; bottom: 8px; width: min(31%, 96px); height: auto; object-fit: contain; filter: brightness(1.25) saturate(.85); pointer-events: none; user-select: none; transform: none; transition: none; }
 .observations-page .v2-field-copy { padding: 14px 15px 12px; }
 .observations-page .v2-field-copy > strong { font-size: 20px; }
 .observations-page .v2-field-copy > em { min-height: 15px; margin: 3px 0 12px; font-size: 12px; }

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import FeatherAssistant from "@/components/FeatherAssistant.vue";
+import FieldIcon from "@/components/FieldIcon.vue";
 
 const route = useRoute();
 const currentName = computed(() => String(route.name ?? "home"));
@@ -36,9 +37,9 @@ const navItems = [
         :key="item.name"
         :class="{ 'is-active': currentName === item.name || (currentName === 'map' && item.name === 'locations') }"
         :to="item.to"
-      >{{ item.label }}</RouterLink>
+      ><FieldIcon :name="item.name" /><span>{{ item.label }}</span></RouterLink>
     </nav>
-    <span class="v2-edition-mark">VUE 3 · 正式版</span>
+    <span class="v2-edition-mark"><i aria-hidden="true"></i> 私人自然手册</span>
   </header>
   <slot />
   <footer class="v2-footer">

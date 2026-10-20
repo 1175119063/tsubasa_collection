@@ -83,23 +83,14 @@ function compareNodes(a: TaxonomyNode, b: TaxonomyNode): number {
     || Number(a.sourceId) - Number(b.sourceId);
 }
 
-function bestSpecies(
+function firstSpeciesWithCover(
   ids: number[],
   speciesById: Map<number, SpeciesSummary>,
 ): SpeciesSummary | undefined {
   return ids
     .map((id) => speciesById.get(id))
     .filter((item): item is SpeciesSummary => Boolean(item?.cover_url))
-    .sort((a, b) => b.observation_count - a.observation_count || a.id - b.id)[0];
-}
-
-function addPortrait(
-  urls: string[],
-  candidate: SpeciesSummary | undefined,
-): void {
-  if (candidate?.cover_url && !urls.includes(candidate.cover_url) && urls.length < 4) {
-    urls.push(candidate.cover_url);
-  }
+    .sort((a, b) => a.id - b.id)[0];
 }
 
 /**
@@ -177,17 +168,9 @@ export function buildPersonalTaxonomyTree(
     node.speciesCount = node.descendantSpeciesIds.length;
     node.observationCount = children.reduce((total, child) => total + child.observationCount, 0);
 
-    const urls: string[] = [];
-    for (const child of children) {
-      addPortrait(urls, bestSpecies(child.descendantSpeciesIds, speciesById));
-    }
-    for (const candidate of node.descendantSpeciesIds
-      .map((id) => speciesById.get(id))
-      .filter((item): item is SpeciesSummary => Boolean(item))
-      .sort((a, b) => b.observation_count - a.observation_count || a.id - b.id)) {
-      addPortrait(urls, candidate);
-    }
-    node.portraitUrls = urls;
+    // Use the earliest collected species with a cover, independent of branch sorting.
+    const representative = firstSpeciesWithCover(node.descendantSpeciesIds, speciesById);
+    node.portraitUrls = representative?.cover_url ? [representative.cover_url] : [];
     return node;
   };
 

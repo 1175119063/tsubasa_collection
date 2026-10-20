@@ -1,0 +1,181 @@
+/* Content-specific treatments: specimen plates, field notes, and open dossiers. */
+.v2-discovery-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px 12px 12px 4px;
+  background: linear-gradient(100deg, #e1ddca 0, #fcfaf1 7px, #faf6e9 100%);
+  box-shadow: 0 2px 0 #d6d3c1, 0 5px 0 -2px #f8f4e6, 0 6px 0 -2px #cdd0bc, 0 13px 22px -14px #223d3266;
+}
+.v2-discovery-photo { width: calc(100% - 24px); margin: 12px 12px 0; border-radius: 3px 7px 3px 3px; box-shadow: 0 1px 4px #243c3222; }
+.v2-discovery-photo::after { inset: 7px; border-color: #fff5; pointer-events: none; }
+.v2-discovery-copy { width: 100%; flex: 1; display: flex; flex-direction: column; padding: 17px 22px 20px; }
+.field-card-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.field-card-heading .v2-card-code { margin: 0; font-size: 9px; letter-spacing: .15em; }
+.field-card-arrow { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid #a2af8e66; border-radius: 50%; color: #5a7351; font: 14px var(--sans); transition: background .2s, color .2s; }
+.v2-discovery-card:hover .field-card-arrow { background: #38573e; color: #fff9e8; }
+.v2-discovery-copy > strong { font-size: 25px; line-height: 1.45; text-wrap: pretty; }
+.v2-discovery-copy > em { margin-bottom: 19px; line-height: 1.5; overflow-wrap: anywhere; }
+.v2-discovery-copy .v2-card-facts { margin-top: auto; align-items: center; gap: 12px; }
+.v2-card-facts i:first-child { white-space: normal; line-height: 1.7; }
+.v2-card-facts .field-record-total { flex: 0 0 auto; color: #56674c; font-size: 10px; }
+.field-record-total b { margin-right: 3px; font: 22px Georgia, serif; color: #35563b; }
+
+/* The observation is a dated field note rather than another species plate. */
+.observations-page .v2-field-card { --season-accent: #7f9362; border-radius: 7px; background: #fcfaf1; }
+.observations-page .v2-field-card[data-season="summer"] { --season-accent: #4f8067; }
+.observations-page .v2-field-card[data-season="autumn"] { --season-accent: #ba8b43; }
+.observations-page .v2-field-card[data-season="winter"] { --season-accent: #7a929b; }
+.observations-page .v2-field-card[data-season="other"] { --season-accent: #92836b; }
+.observations-page .v2-field-photo { border-bottom: 3px solid var(--season-accent); }
+.observations-page .v2-field-photo i { background: #203c32df; border-radius: 3px; backdrop-filter: blur(4px); font-size: 10px; }
+.observations-page .v2-field-copy { display: flex; flex-direction: column; padding: 18px 16px 14px; }
+.observations-page .v2-field-copy > strong { line-height: 1.45; font-size: 21px; }
+.observations-page .v2-field-copy > em { margin: 3px 0 16px; line-height: 1.5; overflow-wrap: anywhere; }
+.observations-page .v2-field-copy > .observation-card-meta { align-items: baseline; gap: 9px; font-size: 11px; }
+.observations-page .v2-field-copy time { font-variant-numeric: tabular-nums; }
+.observations-page .v2-field-copy > b { margin-top: auto; padding-top: 12px; border-top: 0; }
+.observations-page .v2-field-copy > b > span:first-child { padding: 4px 8px; background: #eef0e4; border-radius: 3px; border-left: 2px solid var(--season-accent); }
+
+/* Open species dossier: photo + identity, then a full-width ecology strip. */
+.v2-dossier-hero { grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); min-height: 0; }
+.v2-dossier-image { height: clamp(340px, 35vw, 500px); aspect-ratio: auto; padding: 22px; background: radial-gradient(ellipse at center, #405941, #1b3228); }
+.v2-dossier-image img { object-fit: contain; box-shadow: 0 10px 24px #091c1938; }
+.v2-dossier-title { align-self: stretch; display: flex; flex-direction: column; justify-content: center; padding: 58px clamp(28px, 4vw, 62px) 40px; background: var(--contours) center / cover, linear-gradient(125deg, #294a37, #172f26); }
+.v2-dossier-title h2 { font-size: clamp(34px, 4.3vw, 62px); line-height: 1.3; overflow-wrap: anywhere; }
+.v2-dossier-title > em { color: #c3cdb8; line-height: 1.5; }
+.v2-dossier-title .v2-taxonomy-line { line-height: 1.9; padding: 14px 0; margin-top: 20px; border-block: 1px solid #d9bd802b; }
+.v2-dossier-title .v2-status-row { flex-wrap: wrap; gap: 10px; }
+.v2-dossier-title .v2-progress { margin-top: 26px; }
+.v2-ecology-panel { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 28px; padding: 26px 38px; min-height: 0; border-left: 0; border-top: 1px solid #d9bd8033; background: #223c2e; }
+.v2-ecology-panel > section { min-width: 0; padding: 0 22px; }
+.v2-ecology-panel > section + section { border-left: 1px solid #d9bd802b; }
+.v2-ecology-label { color: #d3d9c7; font-size: 11px; letter-spacing: .08em; }
+.v2-ecology-group-row { margin-top: 12px; }
+.v2-ecology-disc { width: 58px; height: 58px; box-shadow: 0 0 0 4px #ffffff0c; }
+.v2-ecology-disc img { max-width: 49px; max-height: 49px; }
+.v2-body-size { margin-top: 0; min-width: 0; }
+.v2-body-size-row { margin-top: 18px; }
+.v2-habitat-list { margin-top: 17px; }
+.v2-dossier-paper { grid-template-columns: minmax(0, 1fr) 320px; }
+.v2-dossier-main { padding: 32px; gap: 22px; }
+.v2-dossier-main > article { position: relative; padding: 26px; background: #fffdf5; border: 1px solid #a6ad924d; border-radius: 6px; box-shadow: 0 5px 16px -12px #203c3266; }
+.v2-dossier-main h3 { font-size: 23px; }
+.v2-dossier-main .v2-kicker { font-size: 9px; margin-bottom: 9px; }
+.v2-intel-column { padding: 32px 22px; gap: 16px; background: linear-gradient(100deg, #e2e6d5, #ececdd); }
+.v2-intel-column article { padding: 20px 18px; border: 1px solid #9ca98b55; background: #fffdf36b; border-radius: 5px; }
+.v2-intel-column h3 { display: flex; align-items: center; gap: 9px; }
+.v2-intel-column h3::before { content: ""; width: 4px; height: 14px; background: #8b9d73; border-radius: 2px; }
+.v2-intel-chip { background: #f8f7e9; border-radius: 4px; line-height: 1.6; }
+.v2-intel-chip:not(.is-static):hover { background: #e0e7d2; border-color: #7f956e; }
+.v2-intel-missing { color: #6d7866; }
+.v2-dex-edit-actions .v2-button { border-radius: 4px; }
+.v2-dex-edit-actions .v2-button-ghost { color: #35543d; background: #f8f8eb; border-color: #8fa17e; }
+.v2-dex-edit-actions .v2-button-ghost:hover { background: #e4ead7; }
+.v2-first-encounter { padding: 22px; background: var(--contours) right / 350px, #edf0e1; border-radius: 3px 8px 8px 3px; gap: 10px; }
+.v2-first-encounter strong { font-size: 24px; }
+.v2-evidence-grid a, .v2-dex-observation { border-radius: 5px; overflow: hidden; box-shadow: var(--surface-shadow); }
+.v2-dex-observation { background: #f9f7ec; }
+.v2-dex-observation.is-current { box-shadow: 0 0 0 2px #ad8e4b33; }
+.v2-species-audio-list section { background: #f1f2e6; border-radius: 6px; }
+
+/* One encounter: framed photograph, readable information slips and ruled notes. */
+.observation-detail-dialog { --observation-hero-bg: #203c2f; }
+.observation-detail-dialog .v2-observation-hero-photo { background: radial-gradient(ellipse at center, #45604a, #20392d); box-shadow: inset -8px 0 25px #071c191c; }
+.observation-detail-dialog .v2-observation-hero-photo > img { inset: 18px; width: calc(100% - 36px); height: calc(100% - 36px); }
+.observation-detail-dialog .v2-observation-hero-copy { background: linear-gradient(140deg, #2e4b38, #1a3228); padding: 38px 28px 28px; }
+.observation-detail-dialog .v2-observation-hero-copy > em { color: #c7d1be; }
+.observation-detail-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 19px; }
+.observation-detail-tags span { padding: 5px 10px; color: #e6dab6; border: 1px solid #cdb47b40; border-radius: 3px; background: #d9bd800c; font: 11px var(--sans); }
+.observation-detail-dialog .v2-observation-hero-copy dl { margin-top: 20px; padding: 5px 14px; background: #ffffff06; border: 1px solid #c6d3b826; border-radius: 5px; }
+.observation-detail-dialog .v2-observation-hero-copy dl > div { padding: 10px 0; border-color: #c6d3b81a; }
+.observation-detail-dialog .v2-observation-hero-copy dl > div:last-child { border-bottom: 0; }
+.observation-detail-dialog .v2-observation-hero-copy dd { line-height: 1.75; font-weight: 400; }
+.observation-detail-dialog .v2-detail-actions .v2-button { border-radius: 4px; }
+.observation-detail-dialog .v2-observation-notes { margin: 22px 26px 0; padding: 20px 24px; border: 1px solid #a6ad9259; border-left: 3px solid #92a27a; border-radius: 4px; background: #fffdf4; box-shadow: var(--surface-shadow); }
+.observation-detail-dialog .v2-observation-notes h3 { font-size: 21px; }
+.observation-detail-dialog .v2-observation-notes > p { min-height: 32px; margin-bottom: 0; line-height: 32px; background: repeating-linear-gradient(transparent 0 31px, #a6ad922e 31px 32px); }
+.observation-detail-dialog .v2-observation-danger-zone { margin-top: 20px; border-top: 0; }
+.observation-photo-navigation { border-radius: 20px; box-shadow: 0 3px 12px #0003; }
+.observation-photo-navigation button { border-radius: 50%; }
+
+/* Regional files, expedition cards and smaller evidence retain a common finish. */
+.v2-region-copy > small, .v2-expedition-copy > small { align-self: flex-start; width: fit-content; padding: 5px 8px; background: #e9eddd; border: 1px solid #9ba98940; border-radius: 3px; letter-spacing: .08em; }
+.v2-card-stat-grid { background: #e7ecde66; padding: 13px 4px; border-block: 1px solid #8c9b7638; border-radius: 4px; }
+.v2-card-stat-grid strong { color: #46613d; }
+.v2-expedition-card { border-radius: 5px 12px 12px 5px; }
+.v2-expedition-copy { border-left: 3px solid #a9ad8766; }
+.collection-plan-copy > em { color: #5e7550; }
+.collection-plan-copy > strong { line-height: 1.5; }
+.v2-archive-hero-copy .v2-hero-stat-grid { padding: 8px 0; border: 1px solid #d9bd8033; background: #ffffff05; border-radius: 6px; }
+.v2-archive-hero-copy .v2-detail-actions { flex-wrap: wrap; }
+.v2-archive-hero-copy .v2-button { border-radius: 4px; }
+.v2-mini-species, .v2-detail-evidence, .v2-location-trip, .v2-trip-route-stop { border-radius: 5px; overflow: hidden; box-shadow: 0 4px 12px -8px #203c3266; }
+
+/* Leaf plates: asymmetric tips, sage surfaces and veins below the photographs. */
+:root {
+  --leaf-veins: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='240' viewBox='0 0 320 240'%3E%3Cg fill='none' stroke='%234e713c' stroke-opacity='.12' stroke-width='1'%3E%3Cpath d='M340 0Q240 110 195 260M312 28Q263 32 233 14M289 59Q247 67 211 43M267 92Q225 105 190 75M249 125Q206 141 166 111M230 162Q188 180 143 148M214 200Q169 219 123 185M289 59Q309 104 339 116M267 92Q280 145 316 160M249 125Q256 183 292 204M230 162Q233 218 267 245'/%3E%3C/g%3E%3C/svg%3E");
+}
+:is(.v2-discovery-card, .v2-region-card, .v2-expedition-card, .collection-plan-card),
+.observations-page .v2-field-card {
+  border: 1px solid #80966a;
+  border-radius: 7px 34px 7px 34px;
+  background: linear-gradient(135deg, #edf2dd, #d5e0bd);
+  box-shadow: inset 0 1px 0 #ffffffb3, 0 3px 0 #aebd964d, 0 10px 20px -9px #30452b66;
+}
+:is(.v2-discovery-card, .v2-region-card, .v2-expedition-card, .collection-plan-card):hover,
+.observations-page .v2-field-card:hover {
+  border-color: #456d3b;
+  box-shadow: inset 0 1px 0 #ffffffcc, 0 3px 0 #9caf824d, 0 17px 28px -11px #30452b80;
+}
+.v2-discovery-photo { border-radius: 4px 25px 4px 4px; }
+.v2-region-photo { border-radius: 4px 27px 4px 4px; }
+.v2-discovery-copy, .v2-region-copy, .v2-expedition-copy, .collection-plan-copy,
+.observations-page .v2-field-copy {
+  background: var(--leaf-veins) right bottom / 260px 195px no-repeat;
+}
+.v2-discovery-copy { padding-bottom: 23px; }
+.observations-page .v2-field-copy { padding-bottom: 20px; }
+.v2-discovery-copy > strong, .v2-region-copy > strong, .collection-plan-copy > strong,
+.observations-page .v2-field-copy > strong { color: #25452c; }
+.v2-discovery-copy > em, .v2-region-copy > em, .v2-expedition-copy > em,
+.observations-page .v2-field-copy > em { color: #506545; }
+.field-card-arrow { background: #f2f5e5b3; border-color: #78945c88; border-radius: 50% 4px 50% 50%; }
+.v2-card-facts, .v2-card-stat-grid { border-color: #78945c66; }
+.v2-card-stat-grid { background: #f1f4e2a6; }
+.v2-region-copy > small, .v2-expedition-copy > small { background: #f4f4df; border-color: #879d6c66; color: #596f3e; }
+.observations-page .v2-field-copy > b > span:first-child { background: #f3f5e5b3; }
+.v2-expedition-copy { border-left-color: #71945966; }
+.collection-plan-copy > em { color: #446333; }
+
+@media (max-width: 1120px) {
+  .v2-dossier-hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .v2-dossier-title { padding: 52px 28px 32px; }
+  .v2-ecology-panel { padding: 24px 16px; gap: 10px; }
+  .v2-ecology-panel > section { padding-inline: 12px; }
+  .v2-dossier-paper { grid-template-columns: minmax(0, 1fr) 270px; }
+  .v2-dossier-main { padding: 22px; }
+  .v2-dossier-main > article { padding: 20px; }
+}
+@media (max-width: 780px) {
+  .v2-discovery-copy { padding: 14px 16px 18px; }
+  .v2-discovery-copy > strong { font-size: 22px; }
+  .v2-discovery-copy .v2-card-facts { align-items: flex-start; }
+  .observations-page .v2-field-copy { padding: 12px; }
+  .observations-page .v2-field-copy > strong { font-size: 18px; }
+  .observations-page .v2-field-copy > b > span:first-child { padding: 3px 5px; }
+  .v2-dossier-hero, .v2-dossier-paper { display: block; }
+  .v2-dossier-image { height: 40dvh; min-height: 240px; padding: 14px; }
+  .v2-dossier-title { padding: 30px 24px; }
+  .v2-dossier-title h2 { font-size: 38px; }
+  .v2-ecology-panel { display: flex; flex-direction: column; align-items: stretch; gap: 20px; padding: 24px; }
+  .v2-ecology-panel > section { padding: 0; }
+  .v2-ecology-panel > section + section { border-left: 0; border-top: 1px solid #d9bd802b; padding-top: 20px; }
+  .v2-body-size { margin-top: 0; }
+  .v2-dossier-main { padding: 16px; gap: 16px; }
+  .v2-dossier-main > article { padding: 20px 16px; }
+  .v2-evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2-intel-column { padding: 24px 16px; }
+  .observation-detail-dialog .v2-observation-hero-copy { padding: 26px 22px; }
+  .observation-detail-dialog .v2-observation-hero-photo > img { inset: 12px; width: calc(100% - 24px); height: calc(100% - 24px); }
+  .observation-detail-dialog .v2-observation-notes { margin: 16px 16px 0; padding: 18px; }
+}

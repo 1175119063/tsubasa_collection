@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import TaxonomyNodeView from "@/components/dex/TaxonomyNode.vue";
+import TaxonomyPortrait from "@/components/dex/TaxonomyPortrait.vue";
+import TaxonomyPlaceholder from "@/components/dex/TaxonomyPlaceholder.vue";
+import treeArtwork from "@/assets/taxonomy-tree.png";
 import type {
   PersonalTaxonomyTree,
   TaxonomyNode,
   TaxonomyNodeKey,
 } from "@/components/dex/taxonomy-model";
-import { taxonomyPath, taxonomyRankLabel } from "@/components/dex/taxonomy-model";
+import { taxonomyRankLabel } from "@/components/dex/taxonomy-model";
 
 const props = defineProps<{
   tree: PersonalTaxonomyTree;
@@ -18,6 +21,7 @@ const emit = defineEmits<{
   openSpecies: [speciesId: number];
   viewObservations: [speciesId: number];
   editTaxonomy: [key: TaxonomyNodeKey];
+  leave: [];
 }>();
 
 const stage = ref<HTMLElement>();
@@ -38,7 +42,6 @@ const parent = computed(() => current.value.parentKey ? props.tree.nodes[current
 const children = computed(() => current.value.childKeys.map((key) => props.tree.nodes[key]).filter(Boolean));
 const maxWindowStart = computed(() => Math.max(0, children.value.length - capacity.value));
 const visibleChildren = computed(() => children.value.slice(windowStart.value, windowStart.value + capacity.value));
-const path = computed(() => taxonomyPath(props.tree, current.value.key));
 const hasOverflow = computed(() => children.value.length > capacity.value);
 const visibleRange = computed(() => {
   if (!children.value.length) return "";
@@ -52,31 +55,26 @@ interface Point { x: number; y: number }
 interface Line { x1: number; y1: number; x2: number; y2: number }
 
 const currentPoint = computed<Point>(() => {
-  return { x: 50, y: 50 };
+  return { x: 50, y: 56.8 };
 });
 
 const parentPoint = computed<Point>(() => {
-  return { x: 50, y: 82 };
+  return { x: 50, y: 85.5 };
 });
 
+// Circle centers in the supplied 1598 × 984 artwork; never redistribute them.
+const childSlots: Point[] = [
+  { x: 18.15, y: 40.95 }, { x: 31.05, y: 24.4 }, { x: 50, y: 16.1 },
+  { x: 68.95, y: 24.4 }, { x: 81.85, y: 40.95 },
+];
 const childPoints = computed<Point[]>(() => {
   const count = visibleChildren.value.length;
-  if (count === 0) return [];
-  const pointSets: Record<number, Point[]> = {
-    1: [{ x: 50, y: 15 }],
-    2: [{ x: 29, y: 21 }, { x: 71, y: 21 }],
-    3: [{ x: 23, y: 27 }, { x: 50, y: 15 }, { x: 77, y: 27 }],
-    4: [
-      { x: 17, y: 30 }, { x: 38, y: 18 },
-      { x: 62, y: 18 }, { x: 83, y: 30 },
-    ],
-    5: [
-      { x: 14, y: 31 }, { x: 31, y: 19 }, { x: 50, y: 14 },
-      { x: 69, y: 19 }, { x: 86, y: 31 },
-    ],
+  const slots: Record<number, number[]> = {
+    0: [], 1: [2], 2: [1, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4],
   };
-  return pointSets[count] ?? pointSets[5];
+  return slots[count].map((index) => childSlots[index]);
 });
+const emptySlots = computed(() => childSlots.filter((point) => !childPoints.value.includes(point)));
 
 function insetLine(from: Point, to: Point, fromInset: number, toInset: number): Line {
   const dx = to.x - from.x;
@@ -212,25 +210,15 @@ onBeforeUnmount(() => {
 <template>
   <section class="v2-taxonomy-browser" data-taxonomy-browser>
     <div class="v2-taxonomy-toolbar">
-    <nav class="v2-taxonomy-breadcrumb" data-taxonomy-breadcrumb aria-label="当前分类路径">
-      <template v-for="(node, index) in path" :key="node.key">
-        <button type="button" :aria-current="node.key === current.key ? 'page' : undefined" @click="select(node.key)">
-          <span>{{ taxonomyRankLabel(node.rank) }}</span>{{ node.chineseName }}
-        </button>
-        <i v-if="index < path.length - 1" aria-hidden="true">/</i>
-      </template>
-    </nav>
-    <button v-if="current.rank !== 'class'" class="v2-taxonomy-edit-button" type="button" @click="emit('editTaxonomy', current.key)">修改分类</button>
+      <div class="v2-taxonomy-context"><span>{{ currentChildLabel }}</span><span v-if="hasOverflow">{{ visibleRange }}</span></div>
+      <button class="v2-taxonomy-edit-button" type="button" data-taxonomy-switch aria-label="返回鸟类图鉴浏览" @click="emit('leave')">返回图鉴</button>
+      <button v-if="current.rank !== 'class'" class="v2-taxonomy-edit-button" type="button" @click="emit('editTaxonomy', current.key)">修改分类</button>
     </div>
 
-    <div class="v2-taxonomy-context">
-      <span>{{ currentChildLabel }}</span>
-      <span v-if="hasOverflow">{{ visibleRange }}</span>
-    </div>
-
+    <div class="taxonomy-scene-scroll">
     <section
       ref="stage"
-      class="v2-taxonomy-stage"
+      class="v2-taxonomy-stage is-illustrated"
       data-taxonomy-child-track
       :data-taxonomy-motion="isAnimating ? (motionDirection > 0 ? 'forward' : 'backward') : 'idle'"
       :data-taxonomy-window-start="windowStart"
@@ -246,6 +234,9 @@ onBeforeUnmount(() => {
       @pointerup="pointerUp"
       @pointercancel="pointerStartX = null"
     >
+      <img class="taxonomy-scene-art" :src="treeArtwork" alt="" aria-hidden="true" />
+      <span v-for="point in emptySlots" :key="point.x" class="taxonomy-empty-slot" aria-hidden="true"
+        :style="{ left: `${point.x}%`, top: `${point.y}%` }"><TaxonomyPlaceholder /></span>
       <svg class="v2-taxonomy-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <line
           v-for="(line, index) in childLines"
@@ -265,12 +256,6 @@ onBeforeUnmount(() => {
           :y2="parentLine.y2"
         />
       </svg>
-
-      <div v-if="!children.length" class="v2-taxonomy-leaf-note">
-        <span>TERMINAL SPECIES</span>
-        <strong>已经抵达分类树末端</strong>
-        <p>种是本视图的末端节点；亚种仍保留在物种档案与每笔观察中。</p>
-      </div>
 
       <button v-if="hasOverflow" class="v2-taxonomy-page-button is-previous" type="button" :disabled="windowStart === 0" aria-label="上一组子节点" @click="moveWindow(-1)">‹</button>
       <button v-if="hasOverflow" class="v2-taxonomy-page-button is-next" type="button" :disabled="windowStart === maxWindowStart" aria-label="下一组子节点" @click="moveWindow(1)">›</button>
@@ -307,11 +292,16 @@ onBeforeUnmount(() => {
       >
         <TaxonomyNodeView :node="parent" role="parent" @select="select" />
       </div>
-      <div v-else class="v2-taxonomy-root-note">
-        <span>ROOT OF YOUR ARCHIVE</span>
-        <p>这里是由全部个人观察共同生长出的根节点。</p>
+      <div v-else class="v2-taxonomy-node-position is-parent taxonomy-phylum"
+        :style="{ '--taxon-x': `${parentPoint.x}%`, '--taxon-y': `${parentPoint.y}%` }"
+        role="group" aria-label="鸟纲的上级分类：脊索动物门 Chordata" data-taxonomy-phylum>
+        <div class="v2-taxonomy-node is-parent is-context">
+          <TaxonomyPortrait :urls="current.portraitUrls" label="鸟纲所属脊索动物门（以已记录鸟类为代表）" />
+          <span class="v2-taxonomy-node-copy"><strong>脊索动物门</strong><em>Chordata</em></span>
+        </div>
       </div>
     </section>
+    </div>
 
     <footer class="v2-taxonomy-summary">
       <div><span>当前层级</span><strong>{{ taxonomyRankLabel(current.rank) }}</strong><small>{{ current.scientificName }}</small></div>

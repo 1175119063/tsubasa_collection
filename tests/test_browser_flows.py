@@ -197,6 +197,18 @@ def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
     assert "view=taxonomy" in page.url
     assert "rank=class" in page.url
     assert page.locator('[data-taxonomy-current][data-rank="class"]').count() == 1
+    assert "脊索动物门" in page.locator('[data-taxonomy-phylum]').inner_text()
+    assert page.locator('[data-taxonomy-phylum] button').count() == 0
+    assert page.locator('.is-taxonomy-view .v2-dex-header').count() == 0
+    for width, height in [(1920, 1080), (1440, 900), (1366, 768)]:
+        page.set_viewport_size({'width': width, 'height': height})
+        summary = page.locator('.v2-taxonomy-summary').bounding_box()
+        tree = page.locator('[data-taxonomy-child-track]').bounding_box()
+        assert summary and tree
+        assert tree['y'] >= 92
+        assert tree['y'] + tree['height'] <= summary['y'] + 1
+        assert summary['y'] + summary['height'] <= height
+    page.set_viewport_size({'width': 1600, 'height': 1000})
 
     current_box = page.locator("[data-taxonomy-current]").bounding_box()
     child_box = page.locator("[data-taxonomy-child]").first.bounding_box()
@@ -235,8 +247,9 @@ def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
     )
     assert catalog_marker.inner_text() == created["catalog_number"]
 
-    assert page.locator("[data-taxonomy-breadcrumb] button").count() == 5
-    page.get_by_text("已经抵达分类树末端", exact=True).wait_for()
+    assert page.locator("[data-taxonomy-breadcrumb]").count() == 0
+    assert page.get_by_text("已经抵达分类树末端", exact=True).count() == 0
+    assert page.locator(".taxonomy-empty-slot .taxonomy-placeholder").count() == 5
     current_box = page.locator("[data-taxonomy-current]").bounding_box()
     parent_box = page.locator("[data-taxonomy-parent]").bounding_box()
     stage_box = page.locator("[data-taxonomy-child-track]").bounding_box()
@@ -256,7 +269,7 @@ def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
     avatar_center_y = current_avatar_box["y"] + current_avatar_box["height"] / 2
     parent_center_x = parent_avatar_box["x"] + parent_avatar_box["width"] / 2
     assert abs(avatar_center_x - (stage_box["x"] + stage_box["width"] / 2)) <= 1
-    assert abs(avatar_center_y - (stage_box["y"] + stage_box["height"] / 2)) <= 1
+    assert abs(avatar_center_y - (stage_box["y"] + stage_box["height"] * .568)) <= 1
     assert abs(parent_center_x - avatar_center_x) <= 1
     assert parent_avatar_box["y"] > current_avatar_box["y"] + current_avatar_box["height"]
     assert current_copy_box["x"] >= current_avatar_box["x"] + current_avatar_box["width"] + 12
@@ -297,7 +310,7 @@ def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
     assert "view=taxonomy" not in page.url
 
 
-def test_personal_taxonomy_carousel_and_generated_portrait(browser_app):
+def test_personal_taxonomy_carousel_and_first_portrait(browser_app):
     page, base_url, _data_dir = browser_app
     for index, suffix in enumerate("甲乙丙丁戊己"):
         payload = observation_payload()
@@ -347,6 +360,13 @@ def test_personal_taxonomy_carousel_and_generated_portrait(browser_app):
     assert len({metric["scientificSize"] for metric in node_metrics}) == 1
     stage_box = page.locator("[data-taxonomy-child-track]").bounding_box()
     assert stage_box
+    # Portraits must occupy the five sockets in the supplied illustration.
+    sockets = [(18.15, 40.95), (31.05, 24.4), (50, 16.1), (68.95, 24.4), (81.85, 40.95)]
+    for index, (x, y) in enumerate(sockets):
+        avatar = children.nth(index).locator('[data-taxonomy-avatar]').bounding_box()
+        assert avatar
+        assert abs(avatar['x'] + avatar['width'] / 2 - (stage_box['x'] + stage_box['width'] * x / 100)) < 1
+        assert abs(avatar['y'] + avatar['height'] / 2 - (stage_box['y'] + stage_box['height'] * y / 100)) < 1
     child_boxes = [children.nth(index).bounding_box() for index in range(5)]
     assert all(child_boxes)
     for child_box in child_boxes:
@@ -365,11 +385,11 @@ def test_personal_taxonomy_carousel_and_generated_portrait(browser_app):
     current_portraits = page.locator(
         "[data-taxonomy-current] [data-taxonomy-avatar] img"
     )
-    assert current_portraits.count() == 4
-    sources = current_portraits.evaluate_all(
-        "nodes => nodes.map(node => node.getAttribute('src'))"
-    )
-    assert len(set(sources)) == 4
+    assert current_portraits.count() == 1
+    species_response = httpx.get(f"{base_url}/api/species")
+    species_response.raise_for_status()
+    first_species = min(species_response.json(), key=lambda item: item["id"])
+    assert current_portraits.get_attribute("src") == first_species["cover_url"]
 
     track = page.locator("[data-taxonomy-child-track]")
     track.focus()
@@ -611,6 +631,59 @@ def test_browser_can_view_and_extend_multi_photo_observation(browser_app, tmp_pa
     ]
 
 
+def test_species_dossier_completeness_and_compact_layout(browser_app):
+    page, base_url, _data_dir = browser_app
+    created = post_observation(base_url)
+    species_id = created["species_id"]
+    detail = httpx.get(f"{base_url}/api/species/{species_id}").json()
+    detail["introduction"] = "  "
+    detail["ecology"] = {"group": "unknown", "body_size": "unknown", "habitats": []}
+    detail["species_audio"] = []
+    for item in detail["observations"]:
+        item["audio"] = []
+    page.route(f"**/api/species/{species_id}", lambda route: route.fulfill(json=detail))
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{base_url}/dex?species={species_id}")
+    dossier = page.locator("dialog.v2-dossier[open]")
+    meter = dossier.locator(".dossier-completeness")
+    meter.wait_for()
+    assert "3 / 8" in meter.get_attribute("aria-label")
+    assert dossier.get_by_text("调查情报", exact=False).count() == 0
+    segments = meter.locator(".dossier-completeness-segments > span")
+    assert segments.count() == 8
+    assert meter.locator(".is-complete").count() == 6  # Three segments and three status labels.
+    widths = segments.evaluate_all("nodes => nodes.map(n => n.getBoundingClientRect().width)")
+    assert max(widths) - min(widths) < 1
+    meter.hover()
+    tooltip = meter.locator(".dossier-completeness-tooltip")
+    assert tooltip.is_visible()
+    assert "待补充" in tooltip.inner_text()
+    page.mouse.move(0, 0)
+    meter.focus()
+    assert tooltip.is_visible()
+    for width, height in [(1366, 768), (1440, 900), (1920, 1080)]:
+        page.set_viewport_size({"width": width, "height": height})
+        intro = dossier.locator(".v2-dossier-main > article").first.bounding_box()
+        bounds = dossier.bounding_box()
+        assert intro and bounds
+        assert intro["y"] + 120 < bounds["y"] + bounds["height"]
+    detail["observations"][0]["audio"] = [{"url": "/test-observation.mp3"}]
+    page.reload()
+    meter.wait_for()
+    assert "4 / 8" in meter.get_attribute("aria-label")
+    detail["observations"][0]["audio"] = []
+    detail["species_audio"] = [{"id": 1, "url": "/test-species.mp3"}]
+    detail["introduction"] = "已填写简介"
+    detail["ecology"] = {"group": "songbird", "body_size": "small", "habitats": ["forest"]}
+    page.reload()
+    meter.wait_for()
+    assert "8 / 8" in meter.get_attribute("aria-label")
+    assert dossier.locator(".dossier-first-encounter").count() == 1
+    dossier.locator(".dossier-first-encounter").click()
+    page.wait_for_url("**/observations?observation=*")
+    assert f"observation={created['observation_id']}" in page.url
+
+
 def test_browser_can_edit_species_profile_and_open_audio_form(browser_app, tmp_path):
     page, base_url, _data_dir = browser_app
     created = post_observation(base_url)
@@ -813,7 +886,7 @@ def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app
     radio_sizes = plan_form.locator('.collection-template-grid input[type="radio"]').evaluate_all(
         "elements => elements.map(element => [element.offsetWidth, element.offsetHeight])"
     )
-    assert radio_sizes == [[46, 46]] * 4
+    assert radio_sizes == [[16, 16]] * 4
     plan_form.get_by_role("button", name="设置计划 Logo", exact=True).click()
     logo_dialog = page.locator("dialog.collection-logo-modal[open]")
     logo_dialog.wait_for(state="visible")

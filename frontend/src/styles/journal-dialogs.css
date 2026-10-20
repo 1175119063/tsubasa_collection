@@ -1,0 +1,149 @@
+/* Shared finish for the configuration, place, trip and collection editors. */
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) {
+  --editor-border: #a8ad9466;
+  width: min(960px, calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: hidden;
+  color: var(--ink);
+  background: #f3f0e3;
+  border: 1px solid #c5b78c;
+  border-radius: 10px;
+  box-shadow: 0 28px 90px #10251e66, 0 0 0 4px #e8d5a51a;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog) > form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100dvh - 50px);
+  background: transparent;
+}
+.v2-page .v2-api-dialog { width: min(1120px, calc(100vw - 48px)); height: min(900px, calc(100dvh - 48px)); }
+.v2-page .v2-api-dialog[open] { display: flex; flex-direction: column; }
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.dialog-header, header) {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: 20px;
+  padding: 24px 30px;
+  color: #faf6e7;
+  background: var(--contours) right center / 430px no-repeat, linear-gradient(115deg, #52634c, #354f40);
+  border-bottom: 3px solid #c8ae75;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.dialog-header, header) h2 {
+  margin: 0; color: #faf6e7; font: 500 27px/1.35 var(--serif); letter-spacing: .04em;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.dialog-header, header) :is(.eyebrow, .v2-kicker) {
+  margin: 0 0 9px; color: #e0c891; font: 600 9px/1.4 var(--sans); letter-spacing: .22em;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.dialog-header, header) > button {
+  display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px;
+  padding: 0; color: #f3e8cd; font: 28px/1 var(--sans); border: 1px solid #e5d4a75c;
+  border-radius: 50%; background: #ffffff08; cursor: pointer;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.dialog-header, header) > button:hover { background: #e6d3a521; }
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.form-scroll, .v2-api-dialog-body) {
+  flex: 1 1 auto; min-height: 0; height: auto; padding: 24px 30px;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #9da78c #eeecdf;
+  background: var(--paper-texture) 0 0 / 5px 5px, #f1efe2;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog) :is(fieldset, .form-section) {
+  min-width: 0; margin: 0; padding: 20px; border: 1px solid var(--editor-border); border-radius: 7px;
+  background: #fffdf4cc; box-shadow: 0 3px 12px #35473108;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog) .form-scroll fieldset + fieldset { margin-top: 24px; }
+.v2-page :is(.location-form-dialog, .trip-form-dialog) legend { padding: 0 8px; font: 500 16px/1.5 var(--serif); }
+.v2-page :is(.location-form-dialog, .trip-form-dialog) legend span { color: #9d7d40; font: 12px var(--sans); }
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) label { color: #536252; font: 12px/1.6 var(--sans); }
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-width: 0; width: 100%; min-height: 42px; margin-top: 6px; padding: 10px 12px;
+  color: #2d4839; background: #fffef8; border: 1px solid #b0b59d99; border-radius: 5px;
+  font: 13px/1.5 var(--sans); box-shadow: inset 0 1px 3px #30463206;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(input, select, textarea):focus-visible { outline: 2px solid #b1955a; outline-offset: 2px; }
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(input[type="checkbox"], input[type="radio"]) {
+  appearance: auto; width: 16px; height: 16px; min-height: 0; flex: 0 0 16px;
+  margin: 0; padding: 0; accent-color: #617450; box-shadow: none;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog) .dialog-footer {
+  flex: 0 0 auto; gap: 16px; min-height: 76px; padding: 16px 30px;
+  background: linear-gradient(100deg, #eee9d7, #e4e4d1); border-top: 1px solid #b5ad8a80;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog) .dialog-footer > span { color: #626f5b; font: 12px/1.5 var(--sans); }
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.primary-button, .v2-button-primary) {
+  flex-shrink: 0; min-height: 42px; margin: 0; padding: 11px 22px; border: 1px solid #425b3b;
+  border-radius: 5px; color: #fff7df; background: linear-gradient(#607650, #435e3d);
+  font: 600 13px/1.5 var(--sans); box-shadow: 0 3px 8px #334a2c26, inset 0 1px 0 #fff3;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.primary-button, .v2-button-primary):hover { background: #526d46; }
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.secondary-button, .v2-api-secondary) {
+  min-height: 42px; margin: 0; padding: 10px 18px; border: 1px solid #a4ad916e; border-radius: 5px;
+  color: #42593c; background: #f9f7ec; font: 500 13px/1.5 var(--sans); box-shadow: none;
+}
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.secondary-button, .v2-api-secondary):hover { background: #e9ecdb; border-color: #8b9b78; }
+.v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.field-hint, .section-note) { color: #76816b; font: 12px/1.7 var(--sans); }
+
+/* Configuration cards keep each service and its actions together. */
+.v2-api-dialog .v2-api-security-note { border-radius: 5px; background: #e9e5d2; font-size: 11px; }
+.v2-api-dialog .v2-api-config-card {
+  grid-template-columns: minmax(180px, .7fr) minmax(0, 1.7fr); gap: 16px 24px;
+  margin-bottom: 18px; padding: 24px; background: #fffdf4e6;
+  border: 1px solid var(--editor-border); border-radius: 7px; box-shadow: 0 3px 12px #35473108;
+}
+.v2-api-dialog .v2-api-config-title { grid-row: span 3; padding-right: 20px; border-right: 1px solid #b8bda04d; }
+.v2-api-dialog .v2-api-config-title h3 { margin: 10px 0; font: 500 23px/1.4 var(--serif); }
+.v2-api-dialog .v2-api-config-title small { display: block; overflow-wrap: anywhere; }
+.v2-api-dialog .v2-api-fields { gap: 12px; min-width: 0; }
+.v2-api-dialog .v2-api-fields label > span { margin: 0; font-weight: 500; }
+.v2-api-dialog .v2-api-check { display: flex; width: auto; justify-self: start; gap: 8px; }
+.v2-api-dialog .v2-api-check span { white-space: nowrap; line-height: 1.6; }
+.v2-api-dialog .v2-api-actions { gap: 10px; padding-top: 14px; border-top: 1px solid #bbc1a94d; }
+.v2-api-dialog .v2-api-actions p:empty { display: none; }
+.v2-api-dialog .v2-api-routing-note { margin: 0; }
+.v2-api-dialog .v2-api-future { padding: 16px 20px; border-radius: 6px; }
+
+/* Place and expedition fields retain their native controls and map interaction. */
+.location-form-dialog .location-map-picker { border-radius: 6px; background: #eff0e3; }
+.location-form-dialog #location-map { border-radius: 5px; }
+.trip-form-dialog .trip-location-row { grid-template-columns: 28px 60px minmax(0, 1fr) 32px 32px 50px; padding: 12px; border-radius: 5px; background: #f0f2e6; }
+.trip-form-dialog .trip-location-row > label { display: flex; align-items: center; gap: 6px; }
+.trip-form-dialog .trip-location-row > span strong { color: #3e573b; font: 600 13px/1.6 var(--sans); }
+.trip-form-dialog .trip-location-row > span small { font: 11px/1.6 var(--sans); }
+.trip-form-dialog .trip-location-row button { border-radius: 4px; color: #526746; font: 12px var(--sans); }
+.trip-form-dialog .trip-location-row button:disabled { opacity: .45; }
+.trip-form-dialog .trip-location-add { align-items: end; }
+.trip-form-dialog .trip-location-add select { margin: 0; }
+
+/* A quieter choice grid replaces the oversized radio circles. */
+.v2-page .collection-form-dialog { width: min(1060px, calc(100vw - 48px)); }
+.collection-form-dialog .collection-form-scroll { align-items: start; gap: 18px; }
+.collection-form-dialog .form-section > label { display: block; }
+.collection-form-dialog .form-section > label + label { margin-top: 18px; }
+.collection-form-dialog .section-heading { margin: 0 0 12px; padding: 0; min-height: 0; border: 0; }
+.collection-form-dialog .section-heading .eyebrow { margin: 0 0 8px; color: #9a7f47; font: 600 9px var(--sans); letter-spacing: .16em; }
+.collection-form-dialog .section-heading h3 { margin: 0; color: #3f583c; font: 500 20px/1.4 var(--serif); }
+.collection-form-dialog .section-note { margin: 0 0 16px; }
+.collection-form-dialog .collection-template-grid { grid-auto-rows: auto; }
+.collection-form-dialog .collection-template-grid label { height: auto; min-height: 78px; gap: 10px; padding: 12px; border-radius: 5px; background: #fbfaf2; }
+.collection-form-dialog .collection-template-grid label:hover { border-color: #91a27e; }
+.collection-form-dialog .collection-template-grid label:has(input:checked) { background: #e9eddc; border-color: #8c9c73; box-shadow: inset 3px 0 0 #9b834d; }
+.collection-form-dialog .collection-template-grid b { color: #42573c; font-size: 12px; }
+.collection-form-dialog .collection-template-grid small { line-height: 1.5; }
+.collection-form-dialog .collection-label-editor button { padding: 7px 10px; border-radius: 4px; font: 12px var(--sans); }
+
+@media (max-width: 760px) {
+  .v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
+  .v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog) > form { max-height: calc(100dvh - 26px); }
+  .v2-page :is(.location-form-dialog, .trip-form-dialog, .collection-form-dialog, .v2-api-dialog) :is(.dialog-header, header, .dialog-footer, .form-scroll, .v2-api-dialog-body) { padding: 18px; }
+  .v2-api-dialog .v2-api-config-card { display: block; padding: 18px; }
+  .v2-api-dialog .v2-api-config-title { padding: 0 0 14px; border: 0; border-bottom: 1px solid #bbc1a94d; }
+  .v2-api-dialog .v2-api-fields { margin-top: 16px; }
+  .v2-api-dialog .v2-api-routing-note { margin-top: 12px; }
+  .collection-form-dialog .collection-form-scroll { grid-template-columns: 1fr; }
+  .trip-form-dialog .trip-location-row { grid-template-columns: 24px minmax(0, 1fr) 32px 32px 50px; }
+  .trip-form-dialog .trip-location-row > label { grid-column: 2 / -1; }
+  .trip-form-dialog .trip-location-row > span { grid-column: auto; }
+  .trip-form-dialog .trip-location-row > span:nth-of-type(2) { grid-column: 1 / 3; }
+}

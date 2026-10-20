@@ -13,12 +13,12 @@ defineProps<{
       <img :src="species.cover_url" :alt="species.chinese_name" loading="lazy" />
     </span>
     <span class="v2-discovery-copy">
-      <span class="v2-card-code">{{ species.catalog_number }}</span>
+      <span class="field-card-heading"><span class="v2-card-code">{{ species.catalog_number }}</span><span class="field-card-arrow" aria-hidden="true">↗</span></span>
       <strong>{{ species.chinese_name }}</strong>
       <em>{{ species.scientific_name }}</em>
       <span class="v2-card-facts">
         <i>{{ species.order_name }} · {{ species.family_name }}</i>
-        <i>{{ species.observation_count }} 次记录</i>
+        <i class="field-record-total"><b>{{ species.observation_count }}</b> 次记录</i>
       </span>
     </span>
   </button>
