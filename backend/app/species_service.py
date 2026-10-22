@@ -363,20 +363,8 @@ class SpeciesServiceMixin:
                     for item in observations
                 ],
                 "behaviors": [
-                    {
-                        "id": item.id,
-                        "label": item.label,
-                        "linked": item.observation_id is not None,
-                        **(
-                                self._proof(item.observation, species.id)
-                            if item.observation is not None
-                            else {}
-                        ),
-                    }
-                    for item in sorted(
-                        species.behavior_tags,
-                        key=lambda value: (value.created_at, value.id),
-                    )
+                    self._behavior_dict(tag)
+                    for tag in sorted(species.behavior_tags, key=lambda v: (v.created_at, v.id))
                 ],
                 "individuals": [
                     *[
@@ -482,13 +470,6 @@ class SpeciesServiceMixin:
                 observation, selection.dimension, selection.value_key, species.id
             ):
                 raise DomainError("所选观察与对应档案项不一致", 422)
-        for behavior in payload.behaviors:
-            if (
-                behavior.observation_id is not None
-                and behavior.observation_id not in observations_by_id
-            ):
-                raise DomainError("行为标签只能关联该物种的观察记录", 422)
-
         individual_keys = [normalized_name(item.label) for item in payload.individuals]
         if len(individual_keys) != len(set(individual_keys)):
             raise DomainError("个体标签不能重复", 422)
@@ -523,9 +504,6 @@ class SpeciesServiceMixin:
             delete(EvidenceSelection).where(EvidenceSelection.species_id == species.id)
         )
         self.session.execute(
-            delete(SpeciesBehaviorTag).where(SpeciesBehaviorTag.species_id == species.id)
-        )
-        self.session.execute(
             delete(SpeciesIndividualTag).where(SpeciesIndividualTag.species_id == species.id)
         )
         self.session.execute(
@@ -543,15 +521,8 @@ class SpeciesServiceMixin:
                     value_key=selection.value_key,
                 )
             )
-        for behavior in payload.behaviors:
-            self.session.add(
-                SpeciesBehaviorTag(
-                    species_id=species.id,
-                    label=behavior.label,
-                    label_key=normalized_name(behavior.label),
-                    observation_id=behavior.observation_id,
-                )
-            )
+        if "behaviors" in payload.model_fields_set:
+            self._replace_behavior_tags(species, payload.behaviors)
         for individual in payload.individuals:
             self.session.add(
                 SpeciesIndividualTag(

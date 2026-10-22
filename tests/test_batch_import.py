@@ -4,8 +4,6 @@ import httpx
 import pytest
 from PIL import Image
 from playwright.sync_api import expect
-from test_browser_flows import browser_app as browser_app
-from test_browser_flows import observation_payload, post_location, post_observation
 
 
 def photo_file(tmp_path, name, captured_at, color=(65, 100, 80)):
@@ -22,9 +20,7 @@ def open_batch(page, base_url, paths):
     page.goto(f"{base_url}/observations")
     page.get_by_role("button", name="＋ 登记新发现", exact=True).click()
     dialog = page.locator("dialog.batch-dialog[open]")
-    dialog.get_by_label("批量选择照片", exact=True).set_input_files(
-        [str(path) for path in paths]
-    )
+    dialog.get_by_label("批量选择照片", exact=True).set_input_files([str(path) for path in paths])
     expect(dialog.locator(".batch-footer")).to_contain_text("照片已加入")
     return dialog
 
@@ -65,15 +61,20 @@ def assert_search_results_inline(page, field, search_label, select_label):
 
 
 @pytest.mark.parametrize("multiple", [True, False], ids=["button-multiple", "direct-single"])
-def test_species_search_selects_primary_and_other_species(browser_app, tmp_path, multiple):
+def test_species_search_selects_primary_and_other_species(
+    browser_app, tmp_path, multiple, observation_payload, post_location, post_observation
+):
     page, base_url, _ = browser_app
     munia = post_observation(base_url)
     payload = observation_payload()
-    payload["new_species"].update({
-        "chinese_name": "喜鹊", "scientific_name": "Pica serica",
-        "family": {"chinese_name": "鸦科", "scientific_name": "Corvidae"},
-        "genus": {"chinese_name": "鹊属", "scientific_name": "Pica"},
-    })
+    payload["new_species"].update(
+        {
+            "chinese_name": "喜鹊",
+            "scientific_name": "Pica serica",
+            "family": {"chinese_name": "鸦科", "scientific_name": "Corvidae"},
+            "genus": {"chinese_name": "鹊属", "scientific_name": "Pica"},
+        }
+    )
     magpie = post_observation(base_url, payload)
     location = post_location(base_url)
     first = photo_file(tmp_path, "search-first.jpg", "2026:08:25 07:10:00")
@@ -97,9 +98,7 @@ def test_species_search_selects_primary_and_other_species(browser_app, tmp_path,
     expect(primary.get_by_role("list").get_by_role("button")).to_have_count(2)
     assert_search_results_inline(page, primary, "搜索已有图鉴物种", "选择图鉴物种")
     query.fill("喜鹊")
-    result_button = assert_search_results_inline(
-        page, primary, "搜索已有图鉴物种", "选择图鉴物种"
-    )
+    result_button = assert_search_results_inline(page, primary, "搜索已有图鉴物种", "选择图鉴物种")
     page.screenshot(path=str(tmp_path / "species-search.png"))
     # Click where a person sees the result, without locator auto-scrolling it into view.
     box = result_button.bounding_box()
@@ -146,8 +145,9 @@ def test_species_search_selects_primary_and_other_species(browser_app, tmp_path,
         expect(choice).to_have_value(str(magpie["species_id"]))
         expect(others.locator(".additional-species-entry")).to_contain_text("白腰文鸟")
     with page.expect_response(
-        lambda response: response.url.endswith("/api/observations")
-        and response.request.method == "POST"
+        lambda response: (
+            response.url.endswith("/api/observations") and response.request.method == "POST"
+        )
     ) as saved:
         dialog.get_by_role("button", name="保存就绪照片（1）", exact=True).click()
     assert saved.value.status == 201
@@ -157,7 +157,8 @@ def test_species_search_selects_primary_and_other_species(browser_app, tmp_path,
     response.raise_for_status()
     detail = next(item for item in response.json() if item["id"] == result["observation_id"])
     assert {entry["species_id"] for entry in detail["species_entries"]} == {
-        munia["species_id"], magpie["species_id"]
+        munia["species_id"],
+        magpie["species_id"],
     }
 
 
@@ -189,7 +190,7 @@ def test_new_discovery_entries_and_unsaved_close_guard(browser_app, tmp_path):
 
 
 def test_batch_reuses_fields_preserves_exif_and_keeps_invalid_files_separate(
-    browser_app, tmp_path
+    browser_app, tmp_path, post_location, post_observation
 ):
     page, base_url, _ = browser_app
     original = post_observation(base_url)
@@ -222,7 +223,8 @@ def test_batch_reuses_fields_preserves_exif_and_keeps_invalid_files_separate(
         key=lambda item: item["observed_at"],
     )
     assert [item["observed_at"][:16] for item in imported] == [
-        "2026-08-25T07:10", "2026-08-25T08:20"
+        "2026-08-25T07:10",
+        "2026-08-25T08:20",
     ]
     assert all(item["season"] == "summer" for item in imported)
     assert all(item["location"]["id"] == location["id"] for item in imported)
@@ -234,7 +236,9 @@ def test_batch_reuses_fields_preserves_exif_and_keeps_invalid_files_separate(
     page.screenshot(path=str(tmp_path / "batch-import.png"), full_page=True)
 
 
-def test_batch_new_species_is_created_once_and_failed_photo_can_retry(browser_app, tmp_path):
+def test_batch_new_species_is_created_once_and_failed_photo_can_retry(
+    browser_app, tmp_path, post_location, post_observation
+):
     page, base_url, _ = browser_app
     post_observation(base_url)
     location = post_location(base_url)
@@ -246,9 +250,7 @@ def test_batch_new_species_is_created_once_and_failed_photo_can_retry(browser_ap
     taxonomy = httpx.get(f"{base_url}/api/taxonomy/tree").json()
     species_fields = form.locator("fieldset").first
     species_fields.locator("select").nth(1).select_option(str(taxonomy[0]["id"]))
-    species_fields.locator("select").nth(2).select_option(
-        str(taxonomy[0]["families"][0]["id"])
-    )
+    species_fields.locator("select").nth(2).select_option(str(taxonomy[0]["families"][0]["id"]))
     species_fields.locator("select").nth(3).select_option(
         str(taxonomy[0]["families"][0]["genera"][0]["id"])
     )
@@ -279,7 +281,8 @@ def test_batch_new_species_is_created_once_and_failed_photo_can_retry(browser_ap
     records = httpx.get(f"{base_url}/api/observations").json()
     assert len(records) == 3
     new_species = [
-        item for item in httpx.get(f"{base_url}/api/species").json()
+        item
+        for item in httpx.get(f"{base_url}/api/species").json()
         if item["scientific_name"] == "Lonchura batchtest"
     ]
     assert len(new_species) == 1
@@ -288,7 +291,9 @@ def test_batch_new_species_is_created_once_and_failed_photo_can_retry(browser_ap
     assert b'"new_species":null' in requests[-1]
 
 
-def test_batch_unknown_save_result_stops_queue_and_cannot_resubmit(browser_app, tmp_path):
+def test_batch_unknown_save_result_stops_queue_and_cannot_resubmit(
+    browser_app, tmp_path, post_location, post_observation
+):
     page, base_url, _ = browser_app
     original = post_observation(base_url)
     location = post_location(base_url)
@@ -319,15 +324,18 @@ def test_batch_unknown_save_result_stops_queue_and_cannot_resubmit(browser_app, 
 
 
 def test_batch_trip_retry_preserves_existing_members_without_resaving_photos(
-    browser_app, tmp_path
+    browser_app, tmp_path, post_location, post_observation
 ):
     page, base_url, _ = browser_app
     original = post_observation(base_url)
     location = post_location(base_url)
     trip_payload = {
-        "name": "Batch Trip", "location_id": location["id"],
-        "location_ids": [location["id"]], "started_at": "2026-08-15T00:00",
-        "ended_at": "2026-08-16T23:00", "notes": None,
+        "name": "Batch Trip",
+        "location_id": location["id"],
+        "location_ids": [location["id"]],
+        "started_at": "2026-08-15T00:00",
+        "ended_at": "2026-08-16T23:00",
+        "notes": None,
     }
     response = httpx.post(f"{base_url}/api/trips", json=trip_payload)
     assert response.status_code == 201, response.text
@@ -364,7 +372,9 @@ def test_batch_trip_retry_preserves_existing_members_without_resaving_photos(
     page.screenshot(path=str(tmp_path / "batch-mobile.png"), full_page=True)
 
 
-def test_batch_pause_finishes_current_photo_and_resumes_remaining_queue(browser_app, tmp_path):
+def test_batch_pause_finishes_current_photo_and_resumes_remaining_queue(
+    browser_app, tmp_path, post_location, post_observation
+):
     page, base_url, _ = browser_app
     original = post_observation(base_url)
     location = post_location(base_url)

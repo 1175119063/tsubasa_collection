@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { api, errorMessage, jsonRequest } from "@/api/client";
 import type { ObservationRecord, SpeciesSummary } from "@/api/types";
+import BehaviorPicker from "./BehaviorPicker.vue";
 import ObservationPhotoManager from "./ObservationPhotoManager.vue";
 
 interface Subspecies { id: number; chinese_name: string | null; scientific_name: string }
@@ -22,6 +23,8 @@ const sex = ref<string | null>(null);
 const lifeStage = ref<string | null>(null);
 const subspeciesId = ref<number | null>(null);
 const entryNotes = ref("");
+const behaviorLabels = ref<string[]>([]);
+const behaviorDrafts = new Map<number, string[]>();
 const observationNotes = ref(current.value.notes || "");
 
 async function syncEntry(): Promise<void> {
@@ -31,14 +34,19 @@ async function syncEntry(): Promise<void> {
   lifeStage.value = value.life_stage;
   subspeciesId.value = value.subspecies?.id || null;
   entryNotes.value = value.notes || "";
+  behaviorLabels.value = [...(behaviorDrafts.get(value.species_id) || value.behavior_labels || [])];
   if (value.photo_type === "individual") {
     try {
-      subspecies.value = (await api<{ subspecies: Subspecies[] }>(`/api/species/${value.species_id}`)).subspecies;
+      subspecies.value = [];
+      const detail = await api<{ subspecies: Subspecies[] }>(`/api/species/${value.species_id}`);
+      if (entry.value?.species_id === value.species_id) subspecies.value = detail.subspecies;
     } catch (caught) { status.value = errorMessage(caught); }
   } else subspecies.value = [];
 }
-watch(index, syncEntry);
-onMounted(syncEntry);
+watch(() => entry.value?.species_id, (_value, previous) => {
+  if (previous) behaviorDrafts.set(previous, [...behaviorLabels.value]);
+  void syncEntry();
+}, { immediate: true });
 
 async function addSpecies(): Promise<void> {
   const speciesId = Number(newSpeciesId.value);
@@ -80,7 +88,16 @@ async function save(): Promise<void> {
       life_stage: value.photo_type === "individual" ? lifeStage.value : null,
       subspecies_id: value.photo_type === "individual" ? subspeciesId.value : null,
       notes: entryNotes.value || null,
+      behavior_labels: behaviorLabels.value,
     }));
+    behaviorDrafts.set(value.species_id, [...behaviorLabels.value]);
+    for (const other of speciesUpdated.species_entries) {
+      if (other.id === value.id || !behaviorDrafts.has(other.species_id)) continue;
+      await api(`/api/observations/${current.value.id}/species/${other.id}`, jsonRequest("PATCH", {
+        sex: other.sex, life_stage: other.life_stage, subspecies_id: other.subspecies?.id || null,
+        notes: other.notes, behavior_labels: behaviorDrafts.get(other.species_id),
+      }));
+    }
     const primary = speciesUpdated.species_entries.find((item) => item.is_primary) || speciesUpdated.species_entries[0];
     current.value = await api<ObservationRecord>(`/api/observations/${current.value.id}`, jsonRequest("PATCH", {
       sex: primary.photo_type === "individual" ? primary.sex : null,
@@ -108,7 +125,8 @@ function photosUpdated(updated: ObservationRecord): void {
         <div class="observation-add-species"><label>加入其他物种<select v-model="newSpeciesId"><option value="">选择尚未记录的物种</option><option v-for="item in availableSpecies" :key="item.id" :value="String(item.id)">{{ item.chinese_name }} · {{ item.scientific_name }}</option></select></label><label>照片类型<select v-model="newPhotoType"><option value="individual">个体照片</option><option value="group">群体照片</option></select></label><button type="button" class="secondary-button" :disabled="!newSpeciesId" @click="addSpecies">加入这笔观察</button></div>
       </section>
       <div v-if="entry?.photo_type === 'individual'" class="observation-edit-grid"><label>性别<select v-model="sex"><option value="unknown">未知</option><option value="male">雄性</option><option value="female">雌性</option></select></label><label>生命阶段<select v-model="lifeStage"><option value="unknown">未知</option><option value="egg">卵</option><option value="chick">雏鸟</option><option value="subadult">亚成</option><option value="adult">成鸟</option></select></label><label class="full-field">亚种<select v-model="subspeciesId"><option :value="null">未知 / 无亚种</option><option v-for="item in subspecies" :key="item.id" :value="item.id">{{ item.chinese_name ? `${item.chinese_name} · ` : "" }}{{ item.scientific_name }}</option></select></label></div>
-      <p v-else class="field-hint">这是群体照片，只能修改备注。</p>
+      <p v-else class="field-hint">这是群体照片，可以修改行为标签和备注。</p>
+      <BehaviorPicker v-if="entry" :key="entry.species_id" v-model="behaviorLabels" :species-id="entry.species_id" />
       <label>物种备注<textarea v-model="entryNotes" rows="3"></textarea></label>
       <label>整笔观察备注<textarea v-model="observationNotes" rows="4"></textarea></label>
     </div>

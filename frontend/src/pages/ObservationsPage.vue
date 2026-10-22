@@ -95,7 +95,7 @@ async function loadObservations(): Promise<void> {
   finally { loading.value = false; }
 }
 
-async function openObservation(item: ObservationRecord, index = 0): Promise<void> {
+async function openObservation(item: ObservationRecord, index = item.species_entries?.findIndex((entry) => entry.species_id === speciesId.value) ?? 0): Promise<void> {
   selected.value = item;
   const count = item.species_entries?.length || 1;
   speciesIndex.value = Math.max(0, Math.min(index, count - 1));

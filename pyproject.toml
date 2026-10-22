@@ -1,7 +1,7 @@
 [project]
 name = "tsubasa"
 version = "0.3.0"
-description = "羽迹：本地鸟类观察记录与个人图鉴"
+description = "翼·时光记：本地鸟类观察记录与个人图鉴"
 requires-python = ">=3.11"
 dependencies = [
     "alembic",
@@ -24,6 +24,10 @@ dev = ["httpx", "playwright", "pytest", "ruff"]
 [tool.pytest.ini_options]
 pythonpath = ["backend"]
 testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "browser: browser integration tests (automatically applied to browser_app fixture users)",
+]
 
 [tool.ruff]
 line-length = 100

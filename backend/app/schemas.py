@@ -1,6 +1,6 @@
 import unicodedata
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -59,7 +59,22 @@ class NewSpeciesInput(BaseModel):
         return self
 
 
-class ObservationSpeciesInput(BaseModel):
+BehaviorLabel = Annotated[str, Field(min_length=1, max_length=80)]
+
+
+class ObservationBehaviorsInput(BaseModel):
+    behavior_labels: list[BehaviorLabel] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def validate_behavior_labels(self):
+        keys = [" ".join(unicodedata.normalize("NFKC", v).split()).casefold()
+                for v in self.behavior_labels]
+        if any(not key for key in keys) or len(keys) != len(set(keys)):
+            raise ValueError("行为标签不能为空或重复")
+        return self
+
+
+class ObservationSpeciesInput(ObservationBehaviorsInput):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     species_id: int = Field(ge=1)
@@ -122,7 +137,7 @@ class ObservationPhotoUpdateInput(ObservationPhotoAddInput):
     pass
 
 
-class ObservationInput(BaseModel):
+class ObservationInput(ObservationBehaviorsInput):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     species_id: int | None = Field(default=None, ge=1)
@@ -204,7 +219,7 @@ class ObservationSelectionInput(BaseModel):
     observation_id: int | None = Field(default=None, ge=1)
 
 
-class ObservationUpdateInput(BaseModel):
+class ObservationUpdateInput(ObservationBehaviorsInput):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     sex: Sex | None = None
@@ -224,8 +239,24 @@ class ArchiveEvidenceInput(BaseModel):
 class BehaviorTagInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
+    id: int | None = Field(default=None, ge=1)
     label: str = Field(min_length=1, max_length=80)
+    observation_ids: list[Annotated[int, Field(ge=1)]] | None = None
     observation_id: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_links(self):
+        if self.observation_ids is not None:
+            if "observation_id" in self.model_fields_set:
+                raise ValueError("请仅提交 observation_ids，不要同时提交旧版单笔凭证")
+            if len(self.observation_ids) != len(set(self.observation_ids)):
+                raise ValueError("关联观察不能重复")
+        return self
+
+    def selected_observation_ids(self) -> list[int]:
+        if self.observation_ids is not None:
+            return self.observation_ids
+        return [self.observation_id] if self.observation_id is not None else []
 
 
 class IndividualTagInput(BaseModel):

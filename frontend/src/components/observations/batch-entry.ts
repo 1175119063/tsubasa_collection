@@ -13,6 +13,7 @@ export interface BatchFields { species: boolean; location: boolean; season: bool
 
 export function copyBatchFields(source: ObservationDraft, target: ObservationDraft, fields: BatchFields): void {
   if (fields.species) {
+    if (target.speciesId !== source.speciesId) target.form.behavior_labels = [];
     target.speciesId = source.speciesId;
     target.orderId = source.orderId;
     target.familyId = source.familyId;

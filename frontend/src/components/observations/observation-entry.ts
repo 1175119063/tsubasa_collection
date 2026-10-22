@@ -10,6 +10,7 @@ export interface AdditionalSpecies {
   subspecies_id: number | null;
   subspecies: Subspecies[];
   notes: string;
+  behavior_labels: string[];
 }
 export type EntryLocation = LocationSummary & { country_code?: string; country_name?: string; admin1_code?: string };
 export interface CreationResult { observation_id: number; species_id: number; catalog_number: string }
@@ -40,7 +41,7 @@ export function createObservationDraft(speciesId = "", batch = false) {
       observed_at: batch ? "" : new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
       season: "", latitude: null as number | null, longitude: null as number | null,
       country_code: "CN", country_name: "中国", admin1_code: "", admin1_name: "", locality: "",
-      notes: "", location_id: "",
+      notes: "", location_id: "", behavior_labels: [] as string[],
     },
     photo: null as File | null,
     additionalPhotos: [] as AdditionalPhotoDraft[],
@@ -95,12 +96,14 @@ export function buildObservationPayload(draft: ObservationDraft, taxonomy: Taxon
     locality: form.locality, season: form.season, season_note: null,
     sex: individual ? form.sex : null, life_stage: individual ? form.life_stage : null,
     notes: form.notes || null,
+    behavior_labels: form.behavior_labels,
     additional_species: draft.additional.map((item) => ({
       species_id: item.species.id, photo_type: item.photo_type,
       sex: item.photo_type === "individual" ? item.sex : null,
       life_stage: item.photo_type === "individual" ? item.life_stage : null,
       subspecies_id: item.photo_type === "individual" ? item.subspecies_id : null,
       notes: item.notes || null,
+      behavior_labels: item.behavior_labels,
     })),
     photos: [
       {

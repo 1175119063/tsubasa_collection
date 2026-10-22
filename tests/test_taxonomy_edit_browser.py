@@ -1,12 +1,12 @@
 import httpx
 import pytest
 from playwright.sync_api import expect
-from test_browser_flows import browser_app as browser_app
-from test_browser_flows import observation_payload, post_observation
 
 
 @pytest.mark.parametrize("missing_step", ["preview", "save"])
-def test_old_backend_reports_restart_and_keeps_taxonomy_draft(browser_app, missing_step):
+def test_old_backend_reports_restart_and_keeps_taxonomy_draft(
+    browser_app, missing_step, post_observation
+):
     page, base_url, _ = browser_app
     post_observation(base_url)
     genus_id = httpx.get(f"{base_url}/api/species").json()[0]["genus_id"]
@@ -33,18 +33,23 @@ def test_old_backend_reports_restart_and_keeps_taxonomy_draft(browser_app, missi
     expect(page.locator("[data-taxonomy-current]")).to_contain_text("文鸟属更正")
 
 
-def test_tree_rename_and_move_branch_with_impact_preview(browser_app, tmp_path):
+def test_tree_rename_and_move_branch_with_impact_preview(
+    browser_app, tmp_path, observation_payload, post_observation
+):
     page, base_url, _ = browser_app
     first = post_observation(base_url)
     second = observation_payload()
     second["new_species"]["scientific_name"] = "Lonchura punctulata"
     post_observation(base_url, second)
     target = observation_payload()
-    target["new_species"].update({
-        "chinese_name": "喜鹊", "scientific_name": "Pica serica",
-        "family": {"chinese_name": "鸦科", "scientific_name": "Corvidae"},
-        "genus": {"chinese_name": "鹊属", "scientific_name": "Pica"},
-    })
+    target["new_species"].update(
+        {
+            "chinese_name": "喜鹊",
+            "scientific_name": "Pica serica",
+            "family": {"chinese_name": "鸦科", "scientific_name": "Corvidae"},
+            "genus": {"chinese_name": "鹊属", "scientific_name": "Pica"},
+        }
+    )
     post_observation(base_url, target)
     species = httpx.get(f"{base_url}/api/species").json()
     genus_id = next(item["genus_id"] for item in species if item["id"] == first["species_id"])
@@ -74,7 +79,9 @@ def test_tree_rename_and_move_branch_with_impact_preview(browser_app, tmp_path):
     assert len(httpx.get(f"{base_url}/api/observations").json()) == 3
 
 
-def test_species_move_from_tree_and_profile_save(browser_app, tmp_path):
+def test_species_move_from_tree_and_profile_save(
+    browser_app, tmp_path, observation_payload, post_observation
+):
     page, base_url, _ = browser_app
     first = post_observation(base_url)
     second = observation_payload()

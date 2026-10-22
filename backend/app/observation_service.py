@@ -136,7 +136,7 @@ class ObservationServiceMixin:
                 value is not None
                 for value in (payload.sex, payload.life_stage, payload.subspecies_id)
             ):
-                raise DomainError("群体照片只能修改备注", 422)
+                raise DomainError("群体照片不能填写性别、生命阶段或亚种", 422)
         else:
             if payload.sex is None or payload.life_stage is None:
                 raise DomainError("个体照片必须保留性别和生命阶段", 422)
@@ -156,6 +156,8 @@ class ObservationServiceMixin:
                 entry.life_stage = payload.life_stage
                 entry.subspecies = selected_subspecies
 
+        if entry is not None and "behavior_labels" in payload.model_fields_set:
+            self._set_entry_behaviors(entry, payload.behavior_labels)
         observation.notes = payload.notes or None
         self.session.commit()
         return self._observation_dict(observation)
@@ -179,7 +181,7 @@ class ObservationServiceMixin:
                 value is not None
                 for value in (payload.sex, payload.life_stage, payload.subspecies_id)
             ):
-                raise DomainError("群体照片只能修改物种备注", 422)
+                raise DomainError("群体照片不能填写性别、生命阶段或亚种", 422)
         else:
             if payload.sex is None or payload.life_stage is None:
                 raise DomainError("个体照片必须保留性别和生命阶段", 422)
@@ -194,6 +196,8 @@ class ObservationServiceMixin:
             entry.sex = payload.sex
             entry.life_stage = payload.life_stage
             entry.subspecies = selected_subspecies
+        if "behavior_labels" in payload.model_fields_set:
+            self._set_entry_behaviors(entry, payload.behavior_labels)
         entry.notes = payload.notes or None
         if entry.is_primary:
             entry.observation.sex = entry.sex
@@ -366,6 +370,7 @@ class ObservationServiceMixin:
         )
         observation.species_entries.append(entry)
         self.session.flush()
+        self._set_entry_behaviors(entry, payload.behavior_labels)
         cover = next((photo for photo in observation.photos if photo.is_cover), None)
         if cover is not None:
             cover.species_links.append(ObservationPhotoSpecies(species_entry=entry))
@@ -507,6 +512,7 @@ class ObservationServiceMixin:
                 else None
             ),
             "notes": item.notes,
+            "behavior_labels": self._entry_behavior_labels(focused_entry),
             "species_count": len(entries),
             "species_entries": [
                 {
@@ -528,6 +534,7 @@ class ObservationServiceMixin:
                         else None
                     ),
                     "notes": entry.notes,
+                    "behavior_labels": self._entry_behavior_labels(entry),
                     "is_primary": entry.is_primary,
                 }
                 for entry in entries

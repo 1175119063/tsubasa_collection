@@ -286,6 +286,9 @@ class ObservationSpecies(TimestampMixin, Base):
     observation: Mapped[Observation] = relationship(back_populates="species_entries")
     species: Mapped[Species] = relationship(back_populates="observation_entries")
     subspecies: Mapped[Subspecies | None] = relationship()
+    behavior_links: Mapped[list[ObservationBehavior]] = relationship(
+        back_populates="entry", cascade="all, delete-orphan", lazy="selectin"
+    )
     photo_links: Mapped[list[ObservationPhotoSpecies]] = relationship(
         back_populates="species_entry", cascade="all, delete-orphan"
     )
@@ -611,6 +614,9 @@ class SpeciesBehaviorTag(TimestampMixin, Base):
         ForeignKey("observations.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    entry_links: Mapped[list[ObservationBehavior]] = relationship(
+        back_populates="tag", cascade="all, delete-orphan", lazy="selectin"
+    )
     species: Mapped[Species] = relationship(back_populates="behavior_tags")
     observation: Mapped[Observation | None] = relationship()
 
@@ -763,3 +769,18 @@ class CollectionPlanSlot(TimestampMixin, Base):
     membership: Mapped[CollectionPlanSpecies] = relationship(back_populates="slots")
     subitem: Mapped[CollectionPlanSubitem] = relationship(back_populates="slots")
     observation_species: Mapped[ObservationSpecies | None] = relationship()
+
+
+class ObservationBehavior(Base):
+    """A behavior belongs to a species entry, never to every bird in a photograph."""
+
+    __tablename__ = "observation_behaviors"
+
+    tag_id: Mapped[int] = mapped_column(
+        ForeignKey("species_behavior_tags.id", ondelete="CASCADE"), primary_key=True
+    )
+    observation_species_id: Mapped[int] = mapped_column(
+        ForeignKey("observation_species.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    tag: Mapped[SpeciesBehaviorTag] = relationship(back_populates="entry_links", lazy="joined")
+    entry: Mapped[ObservationSpecies] = relationship(back_populates="behavior_links")

@@ -46,6 +46,11 @@ def apply_taxonomy_edit(
     return service.apply_taxonomy_edit(rank, node_id, payload)
 
 
+@router.get("/species/{species_id}/behaviors")
+def species_behaviors(species_id: int, service: BirdServiceDependency) -> list[dict]:
+    return service.species_detail(species_id)["behaviors"]
+
+
 @router.get("/species/{species_id}")
 def species_detail(species_id: int, service: BirdServiceDependency) -> dict:
     return service.species_detail(species_id)

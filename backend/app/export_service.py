@@ -14,7 +14,7 @@ def observations_csv(observations: list[dict]) -> bytes:
         "life_stage", "subspecies_chinese_name", "subspecies_scientific_name",
         "country_code", "country_name", "admin1_code", "admin1_name", "locality",
         "latitude", "longitude", "season", "location_catalog_number", "location_name",
-        "trip_catalog_number", "trip_name", "observation_notes", "species_notes",
+        "trip_catalog_number", "trip_name", "observation_notes", "species_notes", "behavior_labels",
     ]
     writer = csv.DictWriter(output, fieldnames=fields, lineterminator="\r\n")
     writer.writeheader()
@@ -26,6 +26,7 @@ def observations_csv(observations: list[dict]) -> bytes:
             "photo_type": observation.get("photo_type"), "sex": observation.get("sex"),
             "life_stage": observation.get("life_stage"),
             "subspecies": observation.get("subspecies"), "notes": None,
+            "behavior_labels": observation.get("behavior_labels", []),
         }]
         for entry in entries:
             subspecies = entry.get("subspecies") or {}
@@ -62,5 +63,6 @@ def observations_csv(observations: list[dict]) -> bytes:
                 "trip_name": trip.get("name"),
                 "observation_notes": observation.get("notes"),
                 "species_notes": entry.get("notes"),
+                "behavior_labels": " | ".join(entry.get("behavior_labels", [])),
             })
     return b"\xef\xbb\xbf" + output.getvalue().encode("utf-8")

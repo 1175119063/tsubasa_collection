@@ -1,21 +1,29 @@
 import httpx
 from playwright.sync_api import expect
-from test_browser_flows import browser_app as browser_app
-from test_browser_flows import post_observation
 
 
-def test_discovery_stamp_uses_full_history_and_seven_digit_numbers(browser_app, tmp_path):
+def test_discovery_stamp_uses_full_history_and_seven_digit_numbers(
+    browser_app, tmp_path, post_observation
+):
     page, base_url, _ = browser_app
     post_observation(base_url)
     template = httpx.get(f"{base_url}/api/observations").json()[0]
     original = template["species_entries"][0]
     second = {**original, "species_id": 999, "species_name": "喜鹊", "is_primary": False}
     records = [
-        {**template, "id": record_id, "observed_at": f"2026-08-{day:02d}T08:00",
-         "species_entries": entries, "species_count": len(entries)}
+        {
+            **template,
+            "id": record_id,
+            "observed_at": f"2026-08-{day:02d}T08:00",
+            "species_entries": entries,
+            "species_count": len(entries),
+        }
         for record_id, day, entries in [
-            (30, 1, [original]), (10, 2, [original]), (20, 1, [original]),
-            (40, 3, [original, second]), (10000, 4, [second]),
+            (30, 1, [original]),
+            (10, 2, [original]),
+            (20, 1, [original]),
+            (40, 3, [original, second]),
+            (10000, 4, [second]),
         ]
     ]
     page.route("**/api/observations", lambda route: route.fulfill(json=records))
@@ -51,8 +59,15 @@ def test_discovery_stamp_uses_full_history_and_seven_digit_numbers(browser_app, 
     page.screenshot(path=str(tmp_path / "discovery-stamps.png"), full_page=True)
 
     # A later import of an older encounter becomes the first for both species.
-    records.append({**template, "id": 60, "observed_at": "2026-07-01T08:00",
-                    "species_entries": [original, second], "species_count": 2})
+    records.append(
+        {
+            **template,
+            "id": 60,
+            "observed_at": "2026-07-01T08:00",
+            "species_entries": [original, second],
+            "species_count": 2,
+        }
+    )
     page.reload()
     expect(stamps).to_have_count(1)
     expect(cards.filter(has_text="#0000060").get_by_alt_text("新发现")).to_have_count(1)

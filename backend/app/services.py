@@ -4,6 +4,7 @@ from fastapi import UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from .behavior_service import BehaviorServiceMixin
 from .collection_service import CollectionServiceMixin
 from .enums import (
     MediaKind,
@@ -38,6 +39,7 @@ from .taxonomy_service import TaxonomyServiceMixin
 
 
 class BirdService(
+    BehaviorServiceMixin,
     TaxonomyServiceMixin,
     CollectionServiceMixin,
     LocationTripServiceMixin,
@@ -135,6 +137,11 @@ class BirdService(
             primary_entry = next(
                 entry for entry in observation.species_entries if entry.is_primary
             )
+            self._set_entry_behaviors(primary_entry, payload.behavior_labels)
+            for entry_payload in payload.additional_species:
+                self._set_entry_behaviors(
+                    entries_by_species[entry_payload.species_id], entry_payload.behavior_labels
+                )
             photo_metadata = payload.photos
             if photo_metadata and len(photo_metadata) != len(photo_imports):
                 raise DomainError("照片资料数量与上传照片数量不一致", 422)

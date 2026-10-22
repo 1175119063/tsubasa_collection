@@ -45,7 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         database.engine.dispose()
 
     app = FastAPI(
-        title="羽迹 API",
+        title="翼·时光记 API",
         version=app_settings.app_version,
         lifespan=lifespan,
     )

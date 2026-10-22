@@ -22,6 +22,7 @@ function entries(item: ObservationRecord): ObservationSpeciesEntry[] {
     subspecies: item.subspecies,
     notes: null,
     is_primary: true,
+    behavior_labels: item.behavior_labels || [],
   }];
 }
 

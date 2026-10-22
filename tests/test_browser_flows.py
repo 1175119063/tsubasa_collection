@@ -1,99 +1,6 @@
-import io
 import json
-import socket
-import threading
-import time
-from pathlib import Path
 
 import httpx
-import pytest
-import uvicorn
-from app.config import Settings
-from app.main import create_app
-from PIL import Image
-from playwright.sync_api import sync_playwright
-
-EDGE_PATH = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-
-
-def jpeg_bytes(color=(73, 105, 82)) -> bytes:
-    buffer = io.BytesIO()
-    Image.new("RGB", (800, 600), color).save(buffer, format="JPEG")
-    return buffer.getvalue()
-
-
-def observation_payload() -> dict:
-    return {
-        "species_id": None,
-        "new_species": {
-            "order": {"chinese_name": "雀形目", "scientific_name": "Passeriformes"},
-            "family": {"chinese_name": "梅花雀科", "scientific_name": "Estrildidae"},
-            "genus": {"chinese_name": "文鸟属", "scientific_name": "Lonchura"},
-            "chinese_name": "白腰文鸟",
-            "scientific_name": "Lonchura striata",
-            "iucn_status": "LC",
-            "china_protection_status": "three_protected",
-            "has_subspecies": False,
-            "subspecies": [],
-            "notes": None,
-        },
-        "subspecies_id": None,
-        "subspecies_scientific_name": None,
-        "photo_type": "individual",
-        "observed_at": "2026-08-15T08:30",
-        "latitude": 30.2741,
-        "longitude": 120.1551,
-        "country_code": "CN",
-        "country_name": "中国",
-        "admin1_code": "CN-ZJ",
-        "admin1_name": "浙江省",
-        "locality": "杭州西湖",
-        "season": "summer",
-        "season_note": None,
-        "sex": "male",
-        "life_stage": "adult",
-        "notes": "浏览器流程测试",
-    }
-
-
-def post_observation(
-    base_url: str,
-    payload: dict | None = None,
-    color=(73, 105, 82),
-) -> dict:
-    response = httpx.post(
-        f"{base_url}/api/observations",
-        data={"payload": json.dumps(payload or observation_payload(), ensure_ascii=False)},
-        files={"photo": ("bird.jpg", jpeg_bytes(color), "image/jpeg")},
-        timeout=20,
-    )
-    response.raise_for_status()
-    return response.json()
-
-
-def post_location(base_url: str, name: str = "Test Wetland") -> dict:
-    response = httpx.post(
-        f"{base_url}/api/locations",
-        json={
-            "name": name,
-            "location_type": "wetland_park",
-            "country_code": "CN",
-            "country_name": "China",
-            "admin1_code": "CN-ZJ",
-            "admin1_name": "Zhejiang",
-            "city": "Hangzhou",
-            "district": None,
-            "center_latitude": 30.2741,
-            "center_longitude": 120.1551,
-            "coordinate_system": "wgs84",
-            "radius_meters": 3000,
-            "notes": None,
-            "link_matching_records": False,
-        },
-        timeout=20,
-    )
-    response.raise_for_status()
-    return response.json()
 
 
 def wait_for_taxonomy_idle(page) -> None:
@@ -132,15 +39,16 @@ def test_home_sections_fill_the_viewport(browser_app):
         assert abs(box["width"] - viewport_width) <= 1
 
 
-def test_tianditu_is_used_as_primary_map_with_browser_key(browser_app):
+def test_tianditu_is_used_as_primary_map_with_browser_key(browser_app, jpeg_bytes):
     page, base_url, _data_dir = browser_app
     page.goto(f"{base_url}/")
     page.locator(".v2-api-manage").click()
     dialog = page.locator("dialog.v2-api-dialog[open]")
     dialog.get_by_label("浏览器端 Key（tk）").fill("browser-map-key")
     with page.expect_response(
-        lambda response: response.url.endswith("/api/integrations/tianditu")
-        and response.request.method == "PUT"
+        lambda response: (
+            response.url.endswith("/api/integrations/tianditu") and response.request.method == "PUT"
+        )
     ) as save_response:
         dialog.get_by_role("button", name="保存底图配置").click()
     assert save_response.value.status == 200
@@ -162,7 +70,7 @@ def test_tianditu_is_used_as_primary_map_with_browser_key(browser_app):
     assert page.locator(".leaflet-control-layers").count() == 1
 
 
-def test_tianditu_tile_failure_falls_back_to_openstreetmap(browser_app):
+def test_tianditu_tile_failure_falls_back_to_openstreetmap(browser_app, jpeg_bytes):
     page, base_url, _data_dir = browser_app
     response = httpx.put(
         f"{base_url}/api/integrations/tianditu",
@@ -183,7 +91,7 @@ def test_tianditu_tile_failure_falls_back_to_openstreetmap(browser_app):
     assert osm_urls
 
 
-def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
+def test_personal_taxonomy_navigation_url_and_species_actions(browser_app, post_observation):
     page, base_url, _data_dir = browser_app
     created = post_observation(base_url)
     page.set_viewport_size({"width": 1600, "height": 1000})
@@ -197,18 +105,18 @@ def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
     assert "view=taxonomy" in page.url
     assert "rank=class" in page.url
     assert page.locator('[data-taxonomy-current][data-rank="class"]').count() == 1
-    assert "脊索动物门" in page.locator('[data-taxonomy-phylum]').inner_text()
-    assert page.locator('[data-taxonomy-phylum] button').count() == 0
-    assert page.locator('.is-taxonomy-view .v2-dex-header').count() == 0
+    assert "脊索动物门" in page.locator("[data-taxonomy-phylum]").inner_text()
+    assert page.locator("[data-taxonomy-phylum] button").count() == 0
+    assert page.locator(".is-taxonomy-view .v2-dex-header").count() == 0
     for width, height in [(1920, 1080), (1440, 900), (1366, 768)]:
-        page.set_viewport_size({'width': width, 'height': height})
-        summary = page.locator('.v2-taxonomy-summary').bounding_box()
-        tree = page.locator('[data-taxonomy-child-track]').bounding_box()
+        page.set_viewport_size({"width": width, "height": height})
+        summary = page.locator(".v2-taxonomy-summary").bounding_box()
+        tree = page.locator("[data-taxonomy-child-track]").bounding_box()
         assert summary and tree
-        assert tree['y'] >= 92
-        assert tree['y'] + tree['height'] <= summary['y'] + 1
-        assert summary['y'] + summary['height'] <= height
-    page.set_viewport_size({'width': 1600, 'height': 1000})
+        assert tree["y"] >= 92
+        assert tree["y"] + tree["height"] <= summary["y"] + 1
+        assert summary["y"] + summary["height"] <= height
+    page.set_viewport_size({"width": 1600, "height": 1000})
 
     current_box = page.locator("[data-taxonomy-current]").bounding_box()
     child_box = page.locator("[data-taxonomy-child]").first.bounding_box()
@@ -232,8 +140,7 @@ def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
     page.locator('[data-taxonomy-current][data-rank="order"]').wait_for()
     page.wait_for_url("**rank=order**")
     page.evaluate(
-        "() => new Promise(resolve => "
-        "requestAnimationFrame(() => requestAnimationFrame(resolve)))"
+        "() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
     )
     assert abs(page.evaluate("window.scrollY") - scroll_before) <= 2
 
@@ -242,9 +149,7 @@ def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
         page.locator(f'[data-taxonomy-current][data-rank="{rank}"]').wait_for()
         assert f"rank={rank}" in page.url
 
-    catalog_marker = page.locator(
-        "[data-taxonomy-current] .v2-taxonomy-node-copy small"
-    )
+    catalog_marker = page.locator("[data-taxonomy-current] .v2-taxonomy-node-copy small")
     assert catalog_marker.inner_text() == created["catalog_number"]
 
     assert page.locator("[data-taxonomy-breadcrumb]").count() == 0
@@ -257,19 +162,15 @@ def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
     current_avatar_box = page.locator(
         "[data-taxonomy-current] [data-taxonomy-avatar]"
     ).bounding_box()
-    current_copy_box = page.locator(
-        "[data-taxonomy-current] .v2-taxonomy-node-copy"
-    ).bounding_box()
+    current_copy_box = page.locator("[data-taxonomy-current] .v2-taxonomy-node-copy").bounding_box()
     assert current_avatar_box and current_copy_box
-    parent_avatar_box = page.locator(
-        "[data-taxonomy-parent] [data-taxonomy-avatar]"
-    ).bounding_box()
+    parent_avatar_box = page.locator("[data-taxonomy-parent] [data-taxonomy-avatar]").bounding_box()
     assert parent_avatar_box
     avatar_center_x = current_avatar_box["x"] + current_avatar_box["width"] / 2
     avatar_center_y = current_avatar_box["y"] + current_avatar_box["height"] / 2
     parent_center_x = parent_avatar_box["x"] + parent_avatar_box["width"] / 2
     assert abs(avatar_center_x - (stage_box["x"] + stage_box["width"] / 2)) <= 1
-    assert abs(avatar_center_y - (stage_box["y"] + stage_box["height"] * .568)) <= 1
+    assert abs(avatar_center_y - (stage_box["y"] + stage_box["height"] * 0.568)) <= 1
     assert abs(parent_center_x - avatar_center_x) <= 1
     assert parent_avatar_box["y"] > current_avatar_box["y"] + current_avatar_box["height"]
     assert current_copy_box["x"] >= current_avatar_box["x"] + current_avatar_box["width"] + 12
@@ -301,16 +202,16 @@ def test_personal_taxonomy_navigation_url_and_species_actions(browser_app):
     page.locator(".v2-field-card").wait_for()
     assert page.locator(".v2-field-card").count() == 1
 
-    page.goto(
-        f"{base_url}/dex?view=taxonomy&rank=species&node={created['species_id']}"
-    )
+    page.goto(f"{base_url}/dex?view=taxonomy&rank=species&node={created['species_id']}")
     page.locator('[data-taxonomy-current][data-rank="species"]').wait_for()
     page.locator("[data-taxonomy-switch]").click()
     page.locator(".v2-species-grid").wait_for()
     assert "view=taxonomy" not in page.url
 
 
-def test_personal_taxonomy_carousel_and_first_portrait(browser_app):
+def test_personal_taxonomy_carousel_and_first_portrait(
+    browser_app, observation_payload, post_observation
+):
     page, base_url, _data_dir = browser_app
     for index, suffix in enumerate("甲乙丙丁戊己"):
         payload = observation_payload()
@@ -363,10 +264,12 @@ def test_personal_taxonomy_carousel_and_first_portrait(browser_app):
     # Portraits must occupy the five sockets in the supplied illustration.
     sockets = [(18.15, 40.95), (31.05, 24.4), (50, 16.1), (68.95, 24.4), (81.85, 40.95)]
     for index, (x, y) in enumerate(sockets):
-        avatar = children.nth(index).locator('[data-taxonomy-avatar]').bounding_box()
+        avatar = children.nth(index).locator("[data-taxonomy-avatar]").bounding_box()
         assert avatar
-        assert abs(avatar['x'] + avatar['width'] / 2 - (stage_box['x'] + stage_box['width'] * x / 100)) < 1
-        assert abs(avatar['y'] + avatar['height'] / 2 - (stage_box['y'] + stage_box['height'] * y / 100)) < 1
+        expected_x = stage_box["x"] + stage_box["width"] * x / 100
+        assert abs(avatar["x"] + avatar["width"] / 2 - expected_x) < 1
+        expected_y = stage_box["y"] + stage_box["height"] * y / 100
+        assert abs(avatar["y"] + avatar["height"] / 2 - expected_y) < 1
     child_boxes = [children.nth(index).bounding_box() for index in range(5)]
     assert all(child_boxes)
     for child_box in child_boxes:
@@ -374,7 +277,7 @@ def test_personal_taxonomy_carousel_and_first_portrait(browser_app):
         assert child_box["x"] >= stage_box["x"]
         assert child_box["x"] + child_box["width"] <= stage_box["x"] + stage_box["width"]
     for index, first_box in enumerate(child_boxes):
-        for second_box in child_boxes[index + 1:]:
+        for second_box in child_boxes[index + 1 :]:
             assert first_box and second_box
             assert not rectangles_overlap(first_box, second_box)
     first_window = children.evaluate_all(
@@ -382,9 +285,7 @@ def test_personal_taxonomy_carousel_and_first_portrait(browser_app):
     )
     assert "01—05 / 06" in page.locator(".v2-taxonomy-context").inner_text()
 
-    current_portraits = page.locator(
-        "[data-taxonomy-current] [data-taxonomy-avatar] img"
-    )
+    current_portraits = page.locator("[data-taxonomy-current] [data-taxonomy-avatar] img")
     assert current_portraits.count() == 1
     species_response = httpx.get(f"{base_url}/api/species")
     species_response.raise_for_status()
@@ -410,9 +311,10 @@ def test_personal_taxonomy_carousel_and_first_portrait(browser_app):
     track.press("ArrowLeft")
     assert track.get_attribute("data-taxonomy-motion") == "backward"
     wait_for_taxonomy_idle(page)
-    assert children.evaluate_all(
-        "nodes => nodes.map(node => node.getAttribute('data-node-id'))"
-    ) == first_window
+    assert (
+        children.evaluate_all("nodes => nodes.map(node => node.getAttribute('data-node-id'))")
+        == first_window
+    )
     bounds = track.bounding_box()
     assert bounds
     track.evaluate(
@@ -432,52 +334,17 @@ def test_personal_taxonomy_carousel_and_first_portrait(browser_app):
     assert track.get_attribute("data-taxonomy-motion") == "forward"
     assert track.get_attribute("data-taxonomy-window-start") == "1"
     wait_for_taxonomy_idle(page)
-    assert children.evaluate_all(
-        "nodes => nodes.map(node => node.getAttribute('data-node-id'))"
-    ) != first_window
-
-
-@pytest.fixture
-def browser_app(tmp_path):
-    if not EDGE_PATH.is_file():
-        pytest.skip("浏览器流程测试需要 Microsoft Edge")
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        port = listener.getsockname()[1]
-    data_dir = tmp_path / "library"
-    app = create_app(Settings(_env_file=None, data_dir=data_dir))
-    server = uvicorn.Server(
-        uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
+    assert (
+        children.evaluate_all("nodes => nodes.map(node => node.getAttribute('data-node-id'))")
+        != first_window
     )
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    deadline = time.monotonic() + 10
-    while not server.started and time.monotonic() < deadline:
-        time.sleep(0.05)
-    if not server.started:
-        pytest.fail("测试服务器未能启动")
-
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            executable_path=str(EDGE_PATH),
-            headless=True,
-        )
-        page = browser.new_page()
-        yield page, f"http://127.0.0.1:{port}", data_dir
-        browser.close()
-    server.should_exit = True
-    thread.join(timeout=10)
 
 
-
-
-def test_assistant_previews_then_fills_new_species_taxonomy(browser_app, tmp_path):
+def test_assistant_previews_then_fills_new_species_taxonomy(browser_app, tmp_path, jpeg_bytes):
     page, base_url, _data_dir = browser_app
     page.route(
         "**/api/assistant/status",
-        lambda route: route.fulfill(
-            json={"enabled": True, "available": True, "message": "ready"}
-        ),
+        lambda route: route.fulfill(json={"enabled": True, "available": True, "message": "ready"}),
     )
     page.route(
         "**/api/assistant/taxonomy-research",
@@ -537,7 +404,9 @@ def test_assistant_previews_then_fills_new_species_taxonomy(browser_app, tmp_pat
     assert species_scientific.input_value() == "Cyanoptila cyanomelana"
 
 
-def test_browser_can_create_observation_with_existing_species(browser_app, tmp_path):
+def test_browser_can_create_observation_with_existing_species(
+    browser_app, tmp_path, jpeg_bytes, post_observation
+):
     page, base_url, _data_dir = browser_app
     original = post_observation(base_url)
     photo_path = tmp_path / "vue-observation.jpg"
@@ -547,9 +416,7 @@ def test_browser_can_create_observation_with_existing_species(browser_app, tmp_p
     dialog = page.locator("dialog.batch-dialog[open]")
     dialog.wait_for(state="visible")
     form = dialog.locator("form")
-    dialog.get_by_label("批量选择照片", exact=True).set_input_files(
-        str(photo_path)
-    )
+    dialog.get_by_label("批量选择照片", exact=True).set_input_files(str(photo_path))
     form.locator("fieldset").first.locator("select").first.select_option(
         str(original["species_id"])
     )
@@ -569,8 +436,9 @@ def test_browser_can_create_observation_with_existing_species(browser_app, tmp_p
     season.select_option("summer")
 
     with page.expect_response(
-        lambda response: response.url.endswith("/api/observations")
-        and response.request.method == "POST"
+        lambda response: (
+            response.url.endswith("/api/observations") and response.request.method == "POST"
+        )
     ) as response_info:
         dialog.get_by_role("button", name="保存就绪照片（1）").click()
     assert response_info.value.status == 201
@@ -580,7 +448,9 @@ def test_browser_can_create_observation_with_existing_species(browser_app, tmp_p
     assert len(httpx.get(f"{base_url}/api/observations").json()) == 2
 
 
-def test_browser_can_view_and_extend_multi_photo_observation(browser_app, tmp_path):
+def test_browser_can_view_and_extend_multi_photo_observation(
+    browser_app, tmp_path, jpeg_bytes, observation_payload
+):
     page, base_url, _data_dir = browser_app
     third_photo = tmp_path / "encounter-third.jpg"
     third_photo.write_bytes(jpeg_bytes((70, 95, 125)))
@@ -609,12 +479,9 @@ def test_browser_can_view_and_extend_multi_photo_observation(browser_app, tmp_pa
     editor = page.locator("dialog.observation-entry-dialog[open]")
     editor.locator(".observation-photo-manager-list article").nth(1).wait_for()
     editor.get_by_label("选择 JPEG/JPG").set_input_files(str(third_photo))
-    editor.locator(".observation-photo-add").get_by_label("拍摄时间").fill(
-        "2026-08-26T07:20"
-    )
+    editor.locator(".observation-photo-add").get_by_label("拍摄时间").fill("2026-08-26T07:20")
     with page.expect_response(
-        lambda response: "/photos" in response.url
-        and response.request.method == "POST"
+        lambda response: "/photos" in response.url and response.request.method == "POST"
     ) as add_response:
         editor.get_by_role("button", name="保存这张补充照片").click()
     assert add_response.value.status == 201
@@ -631,60 +498,30 @@ def test_browser_can_view_and_extend_multi_photo_observation(browser_app, tmp_pa
     ]
 
 
-def test_species_dossier_completeness_and_compact_layout(browser_app):
+def test_species_dossier_identity_and_ecology_layout(browser_app, post_observation):
     page, base_url, _data_dir = browser_app
     created = post_observation(base_url)
-    species_id = created["species_id"]
-    detail = httpx.get(f"{base_url}/api/species/{species_id}").json()
-    detail["introduction"] = "  "
-    detail["ecology"] = {"group": "unknown", "body_size": "unknown", "habitats": []}
-    detail["species_audio"] = []
-    for item in detail["observations"]:
-        item["audio"] = []
-    page.route(f"**/api/species/{species_id}", lambda route: route.fulfill(json=detail))
-    page.set_viewport_size({"width": 1366, "height": 768})
-    page.goto(f"{base_url}/dex?species={species_id}")
+    page.goto(f"{base_url}/dex?species={created['species_id']}")
     dossier = page.locator("dialog.v2-dossier[open]")
-    meter = dossier.locator(".dossier-completeness")
-    meter.wait_for()
-    assert "3 / 8" in meter.get_attribute("aria-label")
-    assert dossier.get_by_text("调查情报", exact=False).count() == 0
-    segments = meter.locator(".dossier-completeness-segments > span")
-    assert segments.count() == 8
-    assert meter.locator(".is-complete").count() == 6  # Three segments and three status labels.
-    widths = segments.evaluate_all("nodes => nodes.map(n => n.getBoundingClientRect().width)")
-    assert max(widths) - min(widths) < 1
-    meter.hover()
-    tooltip = meter.locator(".dossier-completeness-tooltip")
-    assert tooltip.is_visible()
-    assert "待补充" in tooltip.inner_text()
-    page.mouse.move(0, 0)
-    meter.focus()
-    assert tooltip.is_visible()
+    dossier.wait_for(state="visible")
+    assert dossier.get_by_text("档案完整度", exact=False).count() == 0
     for width, height in [(1366, 768), (1440, 900), (1920, 1080)]:
         page.set_viewport_size({"width": width, "height": height})
-        intro = dossier.locator(".v2-dossier-main > article").first.bounding_box()
-        bounds = dossier.bounding_box()
-        assert intro and bounds
-        assert intro["y"] + 120 < bounds["y"] + bounds["height"]
-    detail["observations"][0]["audio"] = [{"url": "/test-observation.mp3"}]
-    page.reload()
-    meter.wait_for()
-    assert "4 / 8" in meter.get_attribute("aria-label")
-    detail["observations"][0]["audio"] = []
-    detail["species_audio"] = [{"id": 1, "url": "/test-species.mp3"}]
-    detail["introduction"] = "已填写简介"
-    detail["ecology"] = {"group": "songbird", "body_size": "small", "habitats": ["forest"]}
-    page.reload()
-    meter.wait_for()
-    assert "8 / 8" in meter.get_attribute("aria-label")
-    assert dossier.locator(".dossier-first-encounter").count() == 1
+        name = dossier.locator(".dossier-species-name").bounding_box()
+        encounter = dossier.locator(".dossier-first-encounter").bounding_box()
+        ecology = dossier.locator(".v2-dossier-title .v2-ecology-panel").bounding_box()
+        assert name and encounter and ecology
+        assert encounter["x"] >= name["x"] + name["width"]
+        assert ecology["y"] >= encounter["y"] + encounter["height"]
     dossier.locator(".dossier-first-encounter").click()
     page.wait_for_url("**/observations?observation=*")
     assert f"observation={created['observation_id']}" in page.url
 
 
-def test_browser_can_edit_species_profile_and_open_audio_form(browser_app, tmp_path):
+
+def test_browser_can_edit_species_profile_and_open_audio_form(
+    browser_app, tmp_path, post_observation
+):
     page, base_url, _data_dir = browser_app
     created = post_observation(base_url)
     species_id = created["species_id"]
@@ -697,8 +534,10 @@ def test_browser_can_edit_species_profile_and_open_audio_form(browser_app, tmp_p
     profile.wait_for(state="visible")
     profile.get_by_label("物种简介").fill("Vue 图鉴编辑流程测试。")
     with page.expect_response(
-        lambda response: response.url.endswith(f"/api/species/{species_id}/profile")
-        and response.request.method == "PUT"
+        lambda response: (
+            response.url.endswith(f"/api/species/{species_id}/profile")
+            and response.request.method == "PUT"
+        )
     ) as profile_response:
         profile.get_by_role("button", name="保存图鉴资料").click()
     assert profile_response.value.status == 200
@@ -716,8 +555,10 @@ def test_browser_can_edit_species_profile_and_open_audio_form(browser_app, tmp_p
     audio_form.wait_for(state="visible")
     audio_form.get_by_label("MP3 录音").set_input_files(str(audio_path))
     with page.expect_response(
-        lambda response: response.url.endswith(f"/api/species/{species_id}/audio")
-        and response.request.method == "POST"
+        lambda response: (
+            response.url.endswith(f"/api/species/{species_id}/audio")
+            and response.request.method == "POST"
+        )
     ) as audio_response:
         audio_form.get_by_role("button", name="保存录音").click()
     assert audio_response.value.status == 201
@@ -739,8 +580,9 @@ def test_browser_can_create_location_and_open_saved_detail(browser_app):
     coordinates.nth(2).fill("120.162")
 
     with page.expect_response(
-        lambda response: response.url.endswith("/api/locations")
-        and response.request.method == "POST"
+        lambda response: (
+            response.url.endswith("/api/locations") and response.request.method == "POST"
+        )
     ) as response_info:
         form.locator('button[type="submit"]').click()
     assert response_info.value.status == 201
@@ -750,7 +592,7 @@ def test_browser_can_create_location_and_open_saved_detail(browser_app):
     assert len(httpx.get(f"{base_url}/api/locations").json()) == 1
 
 
-def test_browser_can_create_trip_and_open_saved_detail(browser_app):
+def test_browser_can_create_trip_and_open_saved_detail(browser_app, post_location):
     page, base_url, _data_dir = browser_app
     post_location(base_url)
     page.goto(f"{base_url}/trips?new=1")
@@ -763,8 +605,7 @@ def test_browser_can_create_trip_and_open_saved_detail(browser_app):
     date_fields.nth(1).fill("2026-08-26T10:00")
 
     with page.expect_response(
-        lambda response: response.url.endswith("/api/trips")
-        and response.request.method == "POST"
+        lambda response: response.url.endswith("/api/trips") and response.request.method == "POST"
     ) as response_info:
         form.locator('button[type="submit"]').click()
     assert response_info.value.status == 201
@@ -774,7 +615,7 @@ def test_browser_can_create_trip_and_open_saved_detail(browser_app):
     assert len(httpx.get(f"{base_url}/api/trips").json()) == 1
 
 
-def test_browser_can_permanently_delete_observation(browser_app):
+def test_browser_can_permanently_delete_observation(browser_app, post_observation):
     page, base_url, _data_dir = browser_app
     post_observation(base_url)
     page.goto(f"{base_url}/observations")
@@ -783,8 +624,9 @@ def test_browser_can_permanently_delete_observation(browser_app):
     detail.wait_for(state="visible")
     page.once("dialog", lambda dialog: dialog.accept())
     with page.expect_response(
-        lambda response: "/api/observations/" in response.url
-        and response.request.method == "DELETE"
+        lambda response: (
+            "/api/observations/" in response.url and response.request.method == "DELETE"
+        )
     ) as response_info:
         detail.get_by_role("button", name="永久删除").click()
     assert response_info.value.status == 200
@@ -794,7 +636,7 @@ def test_browser_can_permanently_delete_observation(browser_app):
     assert httpx.get(f"{base_url}/api/observations").json() == []
 
 
-def test_browser_can_restore_complete_backup(browser_app):
+def test_browser_can_restore_complete_backup(browser_app, post_observation):
     page, base_url, data_dir = browser_app
     created = post_observation(base_url)
     page.goto(base_url)
@@ -802,8 +644,7 @@ def test_browser_can_restore_complete_backup(browser_app):
     backup_dialog = page.get_by_role("dialog")
     backup_dialog.wait_for(state="visible")
     with page.expect_response(
-        lambda response: response.url.endswith("/api/backups")
-        and response.request.method == "POST"
+        lambda response: response.url.endswith("/api/backups") and response.request.method == "POST"
     ) as backup_response:
         backup_dialog.get_by_role("button", name="立即创建完整备份").click()
     backup = backup_response.value.json()
@@ -825,7 +666,7 @@ def test_browser_can_restore_complete_backup(browser_app):
     assert restored[0]["species_name"] == "白腰文鸟"
 
 
-def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app):
+def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app, post_observation):
     page, base_url, _data_dir = browser_app
     post_observation(base_url)
     page.goto(f"{base_url}/collections?new=1")
@@ -835,8 +676,9 @@ def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app
     plan_form.get_by_label("观察记录简介").fill("比较不同个体形态。")
     plan_form.get_by_text("性别与年龄", exact=True).click()
     with page.expect_response(
-        lambda response: response.url.endswith("/api/collections")
-        and response.request.method == "POST"
+        lambda response: (
+            response.url.endswith("/api/collections") and response.request.method == "POST"
+        )
     ) as create_info:
         plan_form.get_by_role("button", name="保存计划").click()
     assert create_info.value.status == 201
@@ -851,9 +693,11 @@ def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app
     member_dialog.wait_for(state="visible")
     member_dialog.get_by_role("checkbox").check()
     with page.expect_response(
-        lambda response: response.url.endswith("/species")
-        and "/api/collections/" in response.url
-        and response.request.method == "PUT"
+        lambda response: (
+            response.url.endswith("/species")
+            and "/api/collections/" in response.url
+            and response.request.method == "PUT"
+        )
     ) as members_info:
         member_dialog.get_by_role("button", name="保存鸟种").click()
     assert members_info.value.status == 200
@@ -873,9 +717,11 @@ def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app
     evidence.locator(".collection-evidence-list button").first.click()
     evidence.locator('input[type="range"]').fill("2")
     with page.expect_response(
-        lambda response: "/api/collections/" in response.url
-        and "/slots/" in response.url
-        and response.request.method == "PUT"
+        lambda response: (
+            "/api/collections/" in response.url
+            and "/slots/" in response.url
+            and response.request.method == "PUT"
+        )
     ) as response_info:
         evidence.get_by_role("button", name="保存头像").click()
     assert response_info.value.status == 200
@@ -892,9 +738,11 @@ def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app
     logo_dialog.wait_for(state="visible")
     logo_dialog.locator(".collection-logo-candidates button").first.click()
     with page.expect_response(
-        lambda response: response.url.endswith("/logo")
-        and "/api/collections/" in response.url
-        and response.request.method == "PUT"
+        lambda response: (
+            response.url.endswith("/logo")
+            and "/api/collections/" in response.url
+            and response.request.method == "PUT"
+        )
     ) as logo_info:
         logo_dialog.get_by_role("button", name="保存 Logo").click()
     assert logo_info.value.status == 200
@@ -905,18 +753,18 @@ def test_browser_collection_plan_selects_crops_and_previews_evidence(browser_app
 
     detail.get_by_role("button", name="查看 白腰文鸟 ♂ 的计划档案").click()
     preview = detail.locator(".collection-preview-panel")
-    preview.get_by_role("heading", name="白腰文鸟", exact=True).wait_for(
-        state="visible"
-    )
+    preview.get_by_role("heading", name="白腰文鸟", exact=True).wait_for(state="visible")
     assert preview.get_by_text("梅花雀科", exact=True).is_visible()
     assert preview.get_by_text("IUCN LC · 无危", exact=True).is_visible()
     assert preview.get_by_text("收集子项 · ♂", exact=True).is_visible()
     assert preview.get_by_role("link", name="查看这笔照片凭证").is_visible()
     preview.get_by_role("textbox").fill("记录它在文鸟专题中的辨识要点。")
     with page.expect_response(
-        lambda response: response.url.endswith("/introduction")
-        and "/api/collections/" in response.url
-        and response.request.method == "PUT"
+        lambda response: (
+            response.url.endswith("/introduction")
+            and "/api/collections/" in response.url
+            and response.request.method == "PUT"
+        )
     ) as introduction_info:
         preview.get_by_role("button", name="保存简介").click()
     assert introduction_info.value.status == 200

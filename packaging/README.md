@@ -3,7 +3,7 @@
 `build-release.ps1` 生成不含个人资料的目录版和 ZIP。`build-installer.ps1` 只接受 `packaging/release` 内已经审阅的空白目录版，并调用 Inno Setup 6 生成当前用户安装器。
 
 macOS 发布资产采用 Docker 部署包。Mac 用户安装 Docker Desktop 后解压对应压缩包，在包目录运行
-`docker compose up -d --build` 即可；数据保存在包目录的 `data` 卷中。
+`docker compose up -d --build` 即可；数据库与媒体保存在包目录的 `data/` 绑定目录中；默认 Compose 未持久化 `backups/` 和 `updates/`，详见 [macOS 部署限制](macos/README-zh-CN.md#当前部署限制)。
 
 安装器使用固定 AppId，升级时覆盖程序文件但不覆盖既有 `data`；卸载时同样保留 `data`、`backups` 和 `updates`。不要把真实个人资料复制进公开发行目录。
 
@@ -17,4 +17,4 @@ macOS 发布资产采用 Docker 部署包。Mac 用户安装 Docker Desktop 后�
 
 更新流程只负责检查版本、下载和校验安装包，不会替换正在运行的程序。用户应先在首页创建完整备份，关闭翼·时光记，再运行已校验的安装包。
 
-本地脚本只负责生成构建产物；推送 `v*` 标签后，GitHub Actions 会自动构建 Windows 便携包和 macOS Docker 部署包并创建 GitHub Release。
+本地脚本只负责生成构建产物；推送 `v*` 标签或手动触发发布工作流后，GitHub Actions 会构建 Windows 便携包和 macOS Docker 部署包并创建 GitHub Release。该工作流不生成 Inno Setup 安装器，也不自动发布可用的客户端更新清单。源码中的工作流不能证明某个版本已成功发布，应以实际 Release 和运行结果为准。

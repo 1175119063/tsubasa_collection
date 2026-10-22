@@ -4,6 +4,7 @@ import { api, errorMessage, jsonRequest } from "@/api/client";
 import type { DossierObservation, SpeciesDetail } from "@/components/dex/SpeciesDossier.vue";
 
 interface TagDraft { label: string; observation_id: number | null }
+interface BehaviorDraft { id?: number; label: string; observation_ids: number[] }
 interface EvidenceDraft { dimension: "sex" | "life_stage" | "subspecies"; value_key: string; label: string; observation_id: number; options: DossierObservation[] }
 
 const props = defineProps<{ detail: SpeciesDetail }>();
@@ -23,7 +24,7 @@ const form = reactive({
   ecological_group: props.detail.ecology.group || "unknown", body_size: props.detail.ecology.body_size || "unknown",
   preferred_habitats: [...(props.detail.ecology.habitats || [])],
 });
-const behaviors = reactive<TagDraft[]>(props.detail.behaviors.map((item) => ({ label: item.label || "", observation_id: item.observation_id || null })));
+const behaviors = reactive<BehaviorDraft[]>(props.detail.behaviors.map((item) => ({ id: typeof item.id === "number" ? item.id : undefined, label: item.label || "", observation_ids: [...(item.observation_ids || [])] })));
 const individuals = reactive<TagDraft[]>(props.detail.individuals.filter((item) => !String(item.id).startsWith("observed-")).map((item) => ({ label: item.label || "", observation_id: item.observation_id || null })));
 const status = ref(""); const busy = ref(false);
 
@@ -53,7 +54,7 @@ async function submit(): Promise<void> {
       introduction: form.introduction || null,
       ecological_group: form.ecological_group, body_size: form.body_size, preferred_habitats: form.preferred_habitats,
       evidence_selections: evidence.map((item) => ({ dimension: item.dimension, value_key: item.value_key, observation_id: item.observation_id })),
-      behaviors: behaviors.map((item) => ({ label: item.label, observation_id: item.observation_id })),
+      behaviors: behaviors.map((item) => ({ id: item.id, label: item.label, observation_ids: item.observation_ids })),
       individuals: individuals.map((item) => ({ label: item.label, observation_id: item.observation_id })),
     }));
     emit("saved", saved);
@@ -66,12 +67,26 @@ async function submit(): Promise<void> {
   <form @submit.prevent="submit"><header class="dialog-header"><div><p class="eyebrow">SPECIES PROFILE</p><h2>修改图鉴资料</h2></div><button type="button" class="icon-button" aria-label="关闭" @click="emit('close')">×</button></header><div class="form-scroll">
     <fieldset><legend><span>01</span> 调查者手记</legend><label>物种简介<textarea v-model="form.introduction" rows="7" maxlength="10000" placeholder="记录识别经验、习性、鸣声或个人观察印象。"></textarea></label></fieldset>
     <fieldset><legend><span>02</span> 生态画像</legend><div class="profile-ecology-editor"><section><h3>生态类群</h3><div class="ecology-choice-grid"><label v-for="([value,label]) in ecologyGroups" :key="value" class="ecology-choice"><input v-model="form.ecological_group" type="radio" :value="value" /><span class="ecology-icon"><b v-if="value === 'unknown'">?</b><img v-else :src="`/static/assets/${ecologyAssets[value]}`" alt="" /></span><strong>{{ label }}</strong></label></div></section><section><h3>体型大小</h3><div class="body-size-choice-grid"><label v-for="([value,label],index) in bodySizes" :key="value" class="body-size-choice" :style="{ '--bird-width': `${32 + Math.max(0,index - 1) * 8}px` }"><input v-model="form.body_size" type="radio" :value="value" /><span v-if="value !== 'unknown'"><img class="body-size-raster-icon" :src="'/static/assets/body-size-silhouette.png'" alt="" /></span><span v-else>?</span><strong>{{ label }}</strong></label></div></section><section><div class="profile-choice-heading"><h3>偏好生境</h3><span>{{ habitatStatus }}</span></div><div class="habitat-choice-grid"><label v-for="([value,label]) in habitats" :key="value" class="habitat-choice"><input type="checkbox" :checked="form.preferred_habitats.includes(value)" @change="toggleHabitat(value, ($event.target as HTMLInputElement).checked)" /><span>{{ label }}</span></label></div></section></div></fieldset>
-    <fieldset><legend><span>03</span> 个体档案</legend><p class="field-hint">建立“成年雄性繁殖羽”等自定义个体标签，并可选择一笔观察作为照片凭证。</p><div class="profile-behavior-list"><div v-for="(item,index) in individuals" :key="index" class="profile-behavior-row"><label>个体标签<input v-model="item.label" maxlength="120" required /></label><label>照片凭证<select v-model="item.observation_id"><option :value="null">暂不关联</option><option v-for="observation in detail.observations" :key="observation.id" :value="observation.id">{{ observationLabel(observation) }}</option></select></label><button type="button" class="danger-button" @click="individuals.splice(index,1)">删除标签</button></div></div><button type="button" class="secondary-button" @click="addTag(individuals)">＋ 添加个体标签</button></fieldset>
-    <fieldset><legend><span>04</span> 档案照片凭证</legend><div class="profile-evidence-list"><label v-for="item in evidence" :key="`${item.dimension}-${item.value_key}`" class="profile-evidence-row"><span>{{ item.label }}</span><select v-model="item.observation_id"><option v-for="observation in item.options" :key="observation.id" :value="observation.id">{{ observationLabel(observation) }}</option></select></label><p v-if="!evidence.length" class="field-hint">目前没有可设置照片凭证的个体或亚种档案。</p></div></fieldset>
-    <fieldset><legend><span>05</span> 行为档案</legend><div class="profile-behavior-list"><div v-for="(item,index) in behaviors" :key="index" class="profile-behavior-row"><label>行为标签<input v-model="item.label" maxlength="80" required /></label><label>照片凭证<select v-model="item.observation_id"><option :value="null">暂不关联</option><option v-for="observation in detail.observations" :key="observation.id" :value="observation.id">{{ observationLabel(observation) }}</option></select></label><button type="button" class="danger-button" @click="behaviors.splice(index,1)">删除标签</button></div></div><button type="button" class="secondary-button" @click="addTag(behaviors)">＋ 添加行为标签</button></fieldset>
+    <fieldset><legend><span>03</span> 自定义个体标签</legend><p class="field-hint">建立“成年雄性繁殖羽”等自定义个体标签，并可选择一笔观察作为照片凭证。</p><div class="profile-behavior-list"><div v-for="(item,index) in individuals" :key="index" class="profile-behavior-row"><label>个体标签<input v-model="item.label" maxlength="120" required /></label><label>照片凭证<select v-model="item.observation_id"><option :value="null">暂不关联</option><option v-for="observation in detail.observations" :key="observation.id" :value="observation.id">{{ observationLabel(observation) }}</option></select></label><button type="button" class="danger-button" @click="individuals.splice(index,1)">删除标签</button></div></div><button type="button" class="secondary-button" @click="addTag(individuals)">＋ 添加个体标签</button></fieldset>
+    <fieldset><legend><span>04</span> 自动档案照片凭证</legend><p class="field-hint">对应外部“观察自动汇总”与亚种档案的凭证；自定义个体标签在上方单独关联。</p><div class="profile-evidence-list"><label v-for="item in evidence" :key="`${item.dimension}-${item.value_key}`" class="profile-evidence-row"><span>{{ item.label }}</span><select v-model="item.observation_id"><option v-for="observation in item.options" :key="observation.id" :value="observation.id">{{ observationLabel(observation) }}</option></select></label><p v-if="!evidence.length" class="field-hint">目前没有可设置照片凭证的个体或亚种档案。</p></div></fieldset>
+    <fieldset><legend><span>05</span> 行为档案</legend>
+      <p class="field-hint">一个行为可关联多笔观察；这里的关联与田野记录的行为字段同步。删除标签会从该物种的所有观察中移除该行为，不删除观察。</p>
+      <div class="profile-behavior-list"><section v-for="(item,index) in behaviors" :key="item.id || `new-${index}`" class="profile-behavior-entry">
+        <label>行为标签<input v-model="item.label" maxlength="80" required /></label>
+        <fieldset class="behavior-observations"><legend>关联观察（可多选）</legend>
+          <label v-for="observation in detail.observations" :key="observation.id"><input v-model="item.observation_ids" type="checkbox" :value="observation.id" />{{ observationLabel(observation) }}</label>
+        </fieldset>
+        <button type="button" class="danger-button" @click="behaviors.splice(index,1)">删除行为标签</button>
+      </section></div>
+      <button type="button" class="secondary-button" @click="behaviors.push({ label: '', observation_ids: [] })">＋ 添加行为标签</button>
+    </fieldset>
   </div><footer class="dialog-footer"><span role="status">{{ status }}</span><button type="submit" class="primary-button" :disabled="busy">{{ busy ? "正在保存…" : "保存图鉴资料" }}</button></footer></form>
 </template>
 
 <style scoped>
 .ecology-icon{display:grid;place-items:center}.ecology-icon img{display:block;width:88%;height:88%;object-fit:contain}.ecology-icon b{font:24px Georgia,serif}.body-size-choice>span{min-height:24px}.profile-behavior-row .danger-button{min-width:82px}
+.profile-behavior-entry { padding: 14px; border: 1px solid var(--line); margin-bottom: 12px; }
+.behavior-observations { max-height: 240px; overflow: auto; margin: 12px 0; }
+.behavior-observations label { display: flex; align-items: center; gap: 8px; }
+.behavior-observations input { width: 16px; height: 16px; flex-shrink: 0; }
 </style>

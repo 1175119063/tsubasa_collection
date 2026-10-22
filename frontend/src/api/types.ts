@@ -1,5 +1,6 @@
 export interface Stats {
   species_count: number;
+  behavior_labels: string[];
   observation_count: number;
   photo_count: number;
   audio_count: number;
@@ -63,6 +64,7 @@ export interface ObservationSpeciesEntry {
   } | null;
   notes: string | null;
   is_primary: boolean;
+  behavior_labels: string[];
 }
 
 export interface ObservationRecord {
@@ -96,6 +98,7 @@ export interface ObservationRecord {
   subspecies: ObservationSpeciesEntry["subspecies"];
   notes: string | null;
   species_count: number;
+  behavior_labels: string[];
   species_entries: ObservationSpeciesEntry[];
   photo_asset_id: number;
   photo_url: string;
@@ -180,6 +183,7 @@ export interface LocationSummary {
   center_latitude: number;
   center_longitude: number;
   species_count: number;
+  behavior_labels: string[];
   observation_count: number;
   visit_day_count: number;
   cover_url: string | null;
@@ -240,6 +244,7 @@ export interface TripSummary {
   notes: string | null;
   observation_count: number;
   species_count: number;
+  behavior_labels: string[];
   genus_count: number;
   family_count: number;
   cover_observation_id: number | null;
@@ -261,6 +266,7 @@ export interface CollectionPlanSummary {
   template_kind: CollectionTemplateKind;
   subitems: string[];
   species_count: number;
+  behavior_labels: string[];
   slot_count: number;
   completed_count: number;
   cover_url: string | null;

@@ -475,7 +475,7 @@ def test_existing_database_is_registered_at_migration_baseline(tmp_path):
         }
         assert "coordinate_system" in location_columns
         assert connection.execute("SELECT version_num FROM alembic_version").fetchone()[0] == (
-            "20260905_08"
+            "20261022_09"
         )
     finally:
         connection.close()

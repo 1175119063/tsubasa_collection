@@ -18,6 +18,7 @@ const entries = computed(() => props.observation.species_entries?.length
       subspecies: props.observation.subspecies,
       notes: null,
       is_primary: true,
+      behavior_labels: props.observation.behavior_labels || [],
     }]);
 const entry = computed(() => entries.value[Math.min(props.speciesIndex, entries.value.length - 1)]);
 const activePhotoIndex = ref(0);
@@ -62,6 +63,7 @@ const seasonLabels: Record<string, string> = { spring: "春", summer: "夏", aut
       <div class="observation-detail-tags"><span>{{ seasonLabels[observation.season] || observation.season || '未记录季节' }}</span><span>{{ entry.photo_type === 'group' ? '群体观察' : '个体观察' }}</span><span>{{ photos.length }} 张照片</span></div>
       <dl>
         <div><dt>个体信息</dt><dd>{{ individualInfo }}</dd></div>
+        <div><dt>行为标签</dt><dd>{{ entry.behavior_labels?.length ? entry.behavior_labels.join('、') : '未记录' }}</dd></div>
         <div><dt>亚种</dt><dd>{{ subspecies }}</dd></div>
         <div><dt>拍摄时间</dt><dd>{{ observation.observed_at.replace("T", " ") }}</dd></div>
         <div v-if="photos.length > 1"><dt>当前照片</dt><dd>{{ activePhoto.observed_at.replace("T", " ") }} · 共 {{ photos.length }} 张</dd></div>

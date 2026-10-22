@@ -4,6 +4,7 @@ import { api, errorMessage } from "@/api/client";
 import type { SpeciesSummary, TaxonomyGenus, TaxonomyOrder } from "@/api/types";
 import { applyObservationLocation, readAdditionalPhoto, readObservationPhoto, type AdditionalPhotoDraft, type ObservationDraft, type EntryLocation, type Subspecies } from "./observation-entry";
 import ObservationSpeciesAssistant, { type AssistantTaxon, type SpeciesExtraction } from "./ObservationSpeciesAssistant.vue";
+import BehaviorPicker from "./BehaviorPicker.vue";
 import ObservationSpeciesPicker from "./ObservationSpeciesPicker.vue";
 
 const props = defineProps<{ draft: ObservationDraft; species: SpeciesSummary[]; locations: EntryLocation[]; taxonomy: TaxonomyOrder[]; fixedPhoto?: boolean }>();
@@ -42,7 +43,7 @@ const availableAdditional = computed(() => {
 });
 watch(orderId, () => { familyId.value = "new"; genusId.value = "new"; });
 watch(familyId, () => { genusId.value = "new"; });
-watch(speciesId, () => { form.subspecies_id = null; void loadSubspecies(); });
+watch(speciesId, () => { form.behavior_labels = []; form.subspecies_id = null; void loadSubspecies(); });
 watch(() => additional.value.map((item) => item.species.id).join(","), () => {
   const valid = new Set(additional.value.map((item) => item.species.id));
   props.draft.primaryPhotoSpeciesIds = props.draft.primaryPhotoSpeciesIds.filter((id) => valid.has(id));
@@ -75,14 +76,14 @@ function taxonMatch<T extends TaxonomyGenus>(items: T[], suggestion: AssistantTa
 async function applyAssistant(extraction: SpeciesExtraction): Promise<void> { const order = taxonMatch(taxonomy.value, extraction.order); orderId.value = order ? String(order.id) : "new"; if (!order) { newSpecies.order_chinese = extraction.order.chinese_name || ""; newSpecies.order_scientific = extraction.order.scientific_name || ""; } await nextTick(); const family = taxonMatch(families.value, extraction.family); familyId.value = family ? String(family.id) : "new"; if (!family) { newSpecies.family_chinese = extraction.family.chinese_name || ""; newSpecies.family_scientific = extraction.family.scientific_name || ""; } await nextTick(); const genus = taxonMatch(genera.value, extraction.genus); genusId.value = genus ? String(genus.id) : "new"; if (!genus) { newSpecies.genus_chinese = extraction.genus.chinese_name || ""; newSpecies.genus_scientific = extraction.genus.scientific_name || ""; } newSpecies.chinese_name = extraction.species.chinese_name || ""; newSpecies.scientific_name = extraction.species.scientific_name || ""; newSpecies.has_subspecies = extraction.subspecies.length > 0; newSpecies.subspecies_list = extraction.subspecies.map((item) => [item.scientific_name, item.chinese_name].filter(Boolean).join(" | ")).filter(Boolean).join("\n"); }
 function audioChanged(event: Event): void { audio.value = [...((event.target as HTMLInputElement).files || [])]; }
 function useLocation(): void { navigator.geolocation.getCurrentPosition(({ coords }) => { form.latitude = coords.latitude; form.longitude = coords.longitude; }, () => { status.value = "无法读取设备位置，请手动填写经纬度"; }); }
-async function addAdditional(): Promise<void> { const item = props.species.find((value) => String(value.id) === additionalId.value); if (!item || additional.value.length >= 9) return; try { const detail = await api<{ subspecies: Subspecies[] }>(`/api/species/${item.id}`); additional.value.push({ species: item, photo_type: "individual", sex: "unknown", life_stage: "unknown", subspecies_id: null, subspecies: detail.subspecies, notes: "" }); additionalId.value = ""; } catch (caught) { status.value = errorMessage(caught); } }
+async function addAdditional(): Promise<void> { const item = props.species.find((value) => String(value.id) === additionalId.value); if (!item || additional.value.length >= 9) return; try { const detail = await api<{ subspecies: Subspecies[] }>(`/api/species/${item.id}`); additional.value.push({ species: item, photo_type: "individual", sex: "unknown", life_stage: "unknown", subspecies_id: null, subspecies: detail.subspecies, notes: "", behavior_labels: [] }); additionalId.value = ""; } catch (caught) { status.value = errorMessage(caught); } }
 onMounted(loadSubspecies);
 </script>
 
 <template>
 
     <ObservationSpeciesAssistant v-if="speciesId === 'new'" @apply="applyAssistant" />
-    <fieldset>
+    <fieldset tabindex="-1">
 <legend>
 <span>01</span> 目标物种</legend>
 <div class="form-grid">
@@ -140,12 +141,11 @@ onMounted(loadSubspecies);
 </template>
 </div>
 </fieldset>
-    <fieldset>
+    <fieldset tabindex="-1">
 <legend>
-<span>02</span> 照片与个体</legend>
+<span>02</span> 个体与行为</legend>
 <div class="form-grid">
-<label class="full-field file-field observation-photo-input">JPEG/JPG 照片（每张不超过 10 MB）<img v-if="photoPreview && !draft.photoError" class="observation-photo-preview" :src="photoPreview" alt="当前选择的观察照片" /><input v-if="!fixedPhoto" type="file" accept="image/jpeg,.jpg,.jpeg" multiple :required="!photo" @change="photoChanged" />
-<strong v-else>{{ photo?.name }}</strong>
+<label class="full-field file-field observation-photo-input"><span v-if="!fixedPhoto">JPEG/JPG 照片（每张不超过 10 MB）</span><img v-if="photoPreview && !draft.photoError" class="observation-photo-preview" :src="photoPreview" alt="当前选择的观察照片" /><input v-if="!fixedPhoto" type="file" accept="image/jpeg,.jpg,.jpeg" multiple :required="!photo" @change="photoChanged" />
 <span class="field-hint" role="status">{{ photoStatus }}</span>
 <button v-if="fixedPhoto && photo" type="button" :disabled="draft.readingPhoto" @click="readObservationPhoto(draft, photo)">重新读取照片时间</button>
 </label>
@@ -182,12 +182,13 @@ onMounted(loadSubspecies);
 </select>
 </label>
 </template>
+<BehaviorPicker v-if="speciesId" v-model="form.behavior_labels" :species-id="Number(speciesId) || null" />
 <label class="full-field file-field">MP3 录音（可多选）<input type="file" accept="audio/mpeg,.mp3" multiple @change="audioChanged" />
 <span v-if="audio.length" class="field-hint">已选择：{{ audio.map(file => file.name).join('、') }}</span>
 </label>
 </div>
 </fieldset>
-    <fieldset>
+    <fieldset tabindex="-1">
 <legend>
 <span>03</span> 照片中的其他物种</legend>
 <div class="form-grid">
@@ -228,6 +229,7 @@ onMounted(loadSubspecies);
 </select>
 </label>
 </template>
+<BehaviorPicker v-model="item.behavior_labels" :species-id="item.species.id" />
 <label class="full-field">该物种备注<textarea v-model="item.notes" rows="2">
 </textarea>
 </label>
@@ -235,7 +237,7 @@ onMounted(loadSubspecies);
 </article>
 </div>
 </fieldset>
-    <fieldset>
+    <fieldset tabindex="-1">
 <legend>
 <span>04</span> 时间、地点与环境</legend>
 <div class="form-grid">
