@@ -4,6 +4,7 @@ import { api, errorMessage } from "@/api/client";
 import type { SpeciesSummary, TaxonomyGenus, TaxonomyOrder } from "@/api/types";
 import { applyObservationLocation, readAdditionalPhoto, readObservationPhoto, type AdditionalPhotoDraft, type ObservationDraft, type EntryLocation, type Subspecies } from "./observation-entry";
 import ObservationSpeciesAssistant, { type AssistantTaxon, type SpeciesExtraction } from "./ObservationSpeciesAssistant.vue";
+import type { OnlineTaxonName, OnlineTaxonomyDraft } from "@/api/online-species";
 import BehaviorPicker from "./BehaviorPicker.vue";
 import ObservationSpeciesPicker from "./ObservationSpeciesPicker.vue";
 
@@ -15,6 +16,7 @@ const taxonomy = toRef(props, "taxonomy");
 const primarySubspecies = ref<Subspecies[]>([]);
 const additionalId = ref("");
 const status = ref("");
+const onlineApplyStatus = ref("");
 const photoPreview = ref("");
 const additionalPreviews = new Map<string, string>();
 watch(photo, (file) => {
@@ -74,6 +76,44 @@ async function photoChanged(event: Event): Promise<void> {
 function normalized(value: string | null | undefined): string { return String(value || "").normalize("NFKC").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ""); }
 function taxonMatch<T extends TaxonomyGenus>(items: T[], suggestion: AssistantTaxon): T | undefined { const keys = [suggestion.chinese_name, suggestion.scientific_name].map(normalized).filter(Boolean); return items.find((item) => keys.some((key) => [item.chinese_name, item.scientific_name].map(normalized).some((value) => value.includes(key) || key.includes(value)))); }
 async function applyAssistant(extraction: SpeciesExtraction): Promise<void> { const order = taxonMatch(taxonomy.value, extraction.order); orderId.value = order ? String(order.id) : "new"; if (!order) { newSpecies.order_chinese = extraction.order.chinese_name || ""; newSpecies.order_scientific = extraction.order.scientific_name || ""; } await nextTick(); const family = taxonMatch(families.value, extraction.family); familyId.value = family ? String(family.id) : "new"; if (!family) { newSpecies.family_chinese = extraction.family.chinese_name || ""; newSpecies.family_scientific = extraction.family.scientific_name || ""; } await nextTick(); const genus = taxonMatch(genera.value, extraction.genus); genusId.value = genus ? String(genus.id) : "new"; if (!genus) { newSpecies.genus_chinese = extraction.genus.chinese_name || ""; newSpecies.genus_scientific = extraction.genus.scientific_name || ""; } newSpecies.chinese_name = extraction.species.chinese_name || ""; newSpecies.scientific_name = extraction.species.scientific_name || ""; newSpecies.has_subspecies = extraction.subspecies.length > 0; newSpecies.subspecies_list = extraction.subspecies.map((item) => [item.scientific_name, item.chinese_name].filter(Boolean).join(" | ")).filter(Boolean).join("\n"); }
+function sameTaxon(current: OnlineTaxonName, suggestion: OnlineTaxonName): boolean {
+  if (current.scientific_name?.trim()) return normalized(current.scientific_name) === normalized(suggestion.scientific_name);
+  if (current.chinese_name?.trim()) return normalized(current.chinese_name) === normalized(suggestion.chinese_name);
+  return true;
+}
+async function applyOnline(draft: OnlineTaxonomyDraft): Promise<void> {
+  const ranks = ["order", "family", "genus"] as const;
+  const ids = { order: orderId, family: familyId, genus: genusId };
+  const catalogs = { order: taxonomy, family: families, genus: genera };
+  // Check the entire existing path before changing IDs (whose watchers reset descendants).
+  for (const rank of ranks) {
+    const selected = catalogs[rank].value.find((item) => String(item.id) === ids[rank].value);
+    const current = selected || { chinese_name: newSpecies[`${rank}_chinese`], scientific_name: newSpecies[`${rank}_scientific`] };
+    if (!draft[rank].scientific_name || !sameTaxon(current, draft[rank])) {
+      onlineApplyStatus.value = "已有分类与在线资料不一致，或来源缺少完整分类；尚未填入，请手动核对。";
+      return;
+    }
+  }
+  if (!sameTaxon(newSpecies, draft.species)) {
+    onlineApplyStatus.value = "已有物种名称与候选不一致，尚未填入，请先核对物种。";
+    return;
+  }
+  for (const rank of ranks) {
+    const suggestion = draft[rank];
+    const matches = catalogs[rank].value.filter((item) => normalized(item.scientific_name) === normalized(suggestion.scientific_name));
+    // Reuse a uniquely identified local taxon only when that rank has no typed values.
+    if (!newSpecies[`${rank}_chinese`].trim() && !newSpecies[`${rank}_scientific`].trim() && matches.length === 1) {
+      ids[rank].value = String(matches[0]!.id);
+    } else if (ids[rank].value === "new") {
+      if (!newSpecies[`${rank}_chinese`].trim()) newSpecies[`${rank}_chinese`] = suggestion.chinese_name || "";
+      if (!newSpecies[`${rank}_scientific`].trim()) newSpecies[`${rank}_scientific`] = suggestion.scientific_name || "";
+    }
+    await nextTick();
+  }
+  if (!newSpecies.chinese_name.trim()) newSpecies.chinese_name = draft.species.chinese_name || "";
+  if (!newSpecies.scientific_name.trim()) newSpecies.scientific_name = draft.species.scientific_name || "";
+  onlineApplyStatus.value = "已补充空白分类字段。中文名缺失时请手动补充；已有内容和亚种保持原样。";
+}
 function audioChanged(event: Event): void { audio.value = [...((event.target as HTMLInputElement).files || [])]; }
 function useLocation(): void { navigator.geolocation.getCurrentPosition(({ coords }) => { form.latitude = coords.latitude; form.longitude = coords.longitude; }, () => { status.value = "无法读取设备位置，请手动填写经纬度"; }); }
 async function addAdditional(): Promise<void> { const item = props.species.find((value) => String(value.id) === additionalId.value); if (!item || additional.value.length >= 9) return; try { const detail = await api<{ subspecies: Subspecies[] }>(`/api/species/${item.id}`); additional.value.push({ species: item, photo_type: "individual", sex: "unknown", life_stage: "unknown", subspecies_id: null, subspecies: detail.subspecies, notes: "", behavior_labels: [] }); additionalId.value = ""; } catch (caught) { status.value = errorMessage(caught); } }
@@ -82,7 +122,7 @@ onMounted(loadSubspecies);
 
 <template>
 
-    <ObservationSpeciesAssistant v-if="speciesId === 'new'" @apply="applyAssistant" />
+    <ObservationSpeciesAssistant v-if="speciesId === 'new'" :online-apply-message="onlineApplyStatus" @apply="applyAssistant" @apply-online="applyOnline" />
     <fieldset tabindex="-1">
 <legend>
 <span>01</span> 目标物种</legend>

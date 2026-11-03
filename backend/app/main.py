@@ -15,6 +15,7 @@ from .feather_assistant import FeatherAssistant
 from .integration_store import IntegrationStore
 from .knowledge_service import KnowledgeLibrary
 from .media_store import MediaStore
+from .online_species_service import OnlineSpeciesService
 from .service_common import DomainError
 from .update_service import UpdateService
 
@@ -39,6 +40,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.feather_assistant = FeatherAssistant(
             app_settings,
             app.state.integration_store,
+        )
+        app.state.online_species = OnlineSpeciesService(
+            app_settings.data_dir, app_settings.online_species_enabled
         )
         app.state.write_lock = asyncio.Lock()
         yield

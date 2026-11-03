@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, errorMessage, jsonRequest } from "@/api/client";
 
+import OnlineSpeciesLookup from "./OnlineSpeciesLookup.vue";
+
 type PageName = "home" | "observations" | "dex" | "locations" | "trips" | "map";
 type Role = "assistant" | "user";
 
@@ -53,7 +55,7 @@ const examples: Record<PageName, string[]> = {
 const panelOpen = ref(false);
 const available = ref(false);
 const status = ref("正在确认本地模型状态…");
-const mode = ref<"chat" | "search">("chat");
+const mode = ref<"chat" | "search" | "online">("chat");
 const input = ref("");
 const messages = ref<Message[]>([]);
 const suggestions = ref<string[]>([]);
@@ -115,7 +117,7 @@ async function loadStatus(): Promise<void> {
   }
 }
 
-function switchMode(nextMode: "chat" | "search"): void {
+function switchMode(nextMode: "chat" | "search" | "online"): void {
   mode.value = nextMode;
   suggestions.value = [];
 }
@@ -197,12 +199,14 @@ onBeforeUnmount(() => {
       </div>
       <button class="feather-panel-close" type="button" aria-label="关闭" @click="setPanel(false)">×</button>
     </header>
-    <div class="feather-status" :class="{ 'is-online': available }">{{ status }}</div>
+    <div class="feather-status" :class="{ 'is-online': available }">{{ mode === "online" ? "在线资料查询 · 无需大模型" : status }}</div>
     <nav class="feather-chat-modes" aria-label="飞羽精灵对话模式">
       <button :class="{ 'is-active': mode === 'chat' }" type="button" @click="switchMode('chat')">精灵对话</button>
       <button v-if="page === 'observations'" :class="{ 'is-active': mode === 'search' }" type="button" @click="switchMode('search')">检索田野记录</button>
+      <button :class="{ 'is-active': mode === 'online' }" type="button" @click="switchMode('online')">联网查物种</button>
     </nav>
-    <section class="feather-chat-stage">
+    <OnlineSpeciesLookup v-if="mode === 'online'" />
+    <section v-else class="feather-chat-stage">
       <div ref="chatLog" class="feather-chat-log" aria-live="polite">
         <article
           v-for="message in messages"
@@ -219,7 +223,7 @@ onBeforeUnmount(() => {
         <button v-for="item in quickReplies" :key="item" type="button" @click="send(item)">{{ item }}</button>
       </div>
     </section>
-    <form class="feather-composer" @submit.prevent="send()">
+    <form v-if="mode !== 'online'" class="feather-composer" @submit.prevent="send()">
       <textarea
         v-model="input"
         maxlength="500"

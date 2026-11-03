@@ -2,11 +2,15 @@
 import { computed, onMounted, ref } from "vue";
 import { api, errorMessage, jsonRequest } from "@/api/client";
 
+import OnlineSpeciesLookup from "../OnlineSpeciesLookup.vue";
+import type { OnlineTaxonomyDraft } from "@/api/online-species";
+
 export interface AssistantTaxon { chinese_name: string | null; scientific_name: string | null; evidence?: string | null }
 export interface SpeciesExtraction { order: AssistantTaxon; family: AssistantTaxon; genus: AssistantTaxon; species: AssistantTaxon; subspecies: AssistantTaxon[]; missing_fields: string[]; warnings: string[] }
 interface Citation { source_id: string; title: string; locator: string; excerpt: string }
-const emit = defineEmits<{ apply: [extraction: SpeciesExtraction] }>();
-const available = ref(false); const availability = ref("正在唤醒飞羽精灵…"); const mode = ref<"research" | "extract">("research"); const query = ref(""); const source = ref(""); const busy = ref(false); const result = ref<SpeciesExtraction | null>(null); const citations = ref<Citation[]>([]); const message = ref("输入鸟名或粘贴资料后，精灵会先给出建议，不会直接修改表单。"); const applied = ref(false);
+defineProps<{ onlineApplyMessage?: string }>();
+const emit = defineEmits<{ apply: [extraction: SpeciesExtraction]; applyOnline: [draft: OnlineTaxonomyDraft] }>();
+const available = ref(false); const availability = ref("正在唤醒飞羽精灵…"); const mode = ref<"research" | "extract" | "online">("research"); const query = ref(""); const source = ref(""); const busy = ref(false); const result = ref<SpeciesExtraction | null>(null); const citations = ref<Citation[]>([]); const message = ref("输入鸟名或粘贴资料后，精灵会先给出建议，不会直接修改表单。"); const applied = ref(false);
 const rows = computed(() => result.value ? [
   ["目", result.value.order], ["科", result.value.family], ["属", result.value.genus], ["种", result.value.species],
   ["亚种", { chinese_name: result.value.subspecies.map((item) => item.chinese_name).filter(Boolean).join("、") || null, scientific_name: result.value.subspecies.map((item) => item.scientific_name).filter(Boolean).join("、") || null }],
@@ -19,9 +23,10 @@ onMounted(loadStatus);
 
 <template>
   <section class="feather-entry-assistant full-field">
-    <header><span class="feather-entry-avatar"><img :src="'/static/assets/feather-spirit-avatar.png?v=20260825-1'" alt="" /></span><div><p>FEATHER ASSISTED ENTRY</p><h3>请飞羽精灵整理分类资料</h3><small>{{ availability }}</small></div><i :class="{ 'is-ready': available }"></i></header>
-    <nav aria-label="分类助手工作方式"><button :class="{ 'is-active': mode === 'research' }" type="button" @click="mode = 'research'">查阅本地资料</button><button :class="{ 'is-active': mode === 'extract' }" type="button" @click="mode = 'extract'">识别粘贴内容</button></nav>
-    <div class="feather-entry-workspace">
+    <header><span class="feather-entry-avatar"><img :src="'/static/assets/feather-spirit-avatar.png?v=20260825-1'" alt="" /></span><div><p>FEATHER ASSISTED ENTRY</p><h3>请飞羽精灵整理分类资料</h3><small>{{ mode === "online" ? "联网物种查询无需大模型" : availability }}</small></div><i :class="{ 'is-ready': available }"></i></header>
+    <nav aria-label="分类助手工作方式"><button :class="{ 'is-active': mode === 'research' }" type="button" @click="mode = 'research'">查阅本地资料</button><button :class="{ 'is-active': mode === 'extract' }" type="button" @click="mode = 'extract'">识别粘贴内容</button><button :class="{ 'is-active': mode === 'online' }" type="button" @click="mode = 'online'">联网查物种</button></nav>
+    <OnlineSpeciesLookup v-if="mode === 'online'" allow-apply :apply-message="onlineApplyMessage" @apply="emit('applyOnline', $event)" />
+    <div v-else class="feather-entry-workspace">
       <div class="feather-entry-input"><template v-if="mode === 'research'"><label>想查询的鸟名<input v-model="query" data-vue-feather-query maxlength="300" placeholder="例如：蓝歌鸲" autocomplete="off" @keydown.enter.prevent="run" /></label><p>从本地论文、书籍和资料库寻找可以支持分类字段的证据。</p></template><template v-else><label>分类资料原文<textarea v-model="source" data-vue-feather-source maxlength="6000" rows="6" placeholder="粘贴包含目、科、属、种、拉丁学名或亚种信息的资料…"></textarea></label><p>精灵只提取原文明确提供的信息，不会直接保存。</p></template><button class="feather-entry-run" data-vue-feather-run type="button" :disabled="!available || busy || !(mode === 'research' ? query.trim() : source.trim())" @click="run">{{ busy ? "精灵正在整理…" : mode === "research" ? "开始查阅" : "开始识别" }}</button></div>
       <div class="feather-entry-output" data-vue-feather-output :class="{ 'has-result': result }"><p v-if="!result" class="feather-entry-message">{{ message }}</p><template v-else><strong>分类填写建议</strong><div class="feather-extraction-grid"><span v-for="([label, item]) in rows" :key="label"><small>{{ label }}</small><b>{{ [item.chinese_name, item.scientific_name].filter(Boolean).join(" · ") || "资料不足" }}</b></span></div><ul v-if="result.warnings.length"><li v-for="item in result.warnings" :key="item">{{ item }}</li></ul><details v-if="citations.length" class="feather-citations"><summary>查看 {{ citations.length }} 条本地资料证据</summary><article v-for="item in citations" :key="`${item.source_id}-${item.locator}`"><b>{{ item.title }}</b><small>{{ item.locator }} · {{ item.source_id }}</small><p>{{ item.excerpt }}</p></article></details><button class="feather-entry-apply" data-vue-feather-apply type="button" @click="apply">{{ applied ? "已抄写，可继续核对" : "抄写到新物种表单" }}</button></template></div>
     </div>

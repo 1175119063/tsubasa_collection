@@ -39,6 +39,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    if sys.argv[1:] == ["--inat-mcp"]:
+        from app.inat_mcp.mcp_server import main as run_mcp
+
+        raise SystemExit(run_mcp())
+
     import uvicorn
     from app.main import app
 

@@ -135,6 +135,25 @@ def get_update_file(filename: str, request: Request) -> FileResponse:
     return FileResponse(path, media_type="application/vnd.microsoft.portable-executable")
 
 
+@router.get("/assistant/online-species/status")
+def online_species_status(request: Request) -> dict:
+    return request.app.state.online_species.status()
+
+
+@router.post("/assistant/online-species/search")
+async def online_species_search(
+    payload: AssistantTaxonomyResearchInput, request: Request,
+) -> dict:
+    return await asyncio.to_thread(request.app.state.online_species.search, payload.query)
+
+
+@router.get("/assistant/online-species/{taxon_id}")
+async def online_species_detail(taxon_id: int, request: Request) -> dict:
+    if not 1 <= taxon_id <= 2**53 - 1:
+        raise HTTPException(status_code=422, detail="物种编号必须是正整数")
+    return await asyncio.to_thread(request.app.state.online_species.detail, taxon_id)
+
+
 @router.get("/assistant/status")
 async def feather_assistant_status(request: Request) -> dict:
     return await asyncio.to_thread(request.app.state.feather_assistant.status)

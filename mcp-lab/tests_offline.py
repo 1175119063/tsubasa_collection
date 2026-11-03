@@ -46,7 +46,7 @@ class ProtocolTests(unittest.TestCase):
     def test_real_server_handshake_and_tool_list(self) -> None:
         with McpStdioClient() as client:
             self.assertEqual(client.protocol_version, "2025-06-18")
-            self.assertEqual(client.server_info.get("name"), "tsubasa-inat-lab")
+            self.assertEqual(client.server_info.get("name"), "tsubasa-inat")
             tools = client.list_tools()
             names = [tool["name"] for tool in tools]
             self.assertEqual(names, ["search_taxa", "get_taxon", "resolve_name"])
