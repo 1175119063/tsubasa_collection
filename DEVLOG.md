@@ -2,6 +2,14 @@
 
 > 本文是历史变更记录。旧功能描述、测试数量和当时的发布状态仅代表对应阶段；当前规则见 `DESIGN.md`，实际行为以当前代码为准。
 
+## 2026-11-03 · 在线物种查询接入亚种、维基资料与只读 AI 建议
+
+- iNaturalist 查询从分类扩展到 children 亚种（编号、学名、中文名、观察数）、完整保护状态（IUCN/地区条目）、Wikipedia 摘录和附近亚种记录；附近统计用拍摄地点坐标查询亚种级观察，全局不可用时回退到物种级资料。
+- 新增 `backend/app/skills/` 只读 skill 层与 `wikipedia_api.py` 来源：`OnlineSpeciesSkill` 负责解析名称、获取资料、整合附近计数与维基摘录；`FeatherAssistant.advise_online_species` 只做候选排序与理由。MCP stdio 保留为实验、兼容与独立测试入口。
+- AI 约束：只使用给定资料，只能从 iNaturalist children 中选择，未知编号丢弃；无坐标、无候选或模型不可用时返回 `available=false`，不推断。AI 不生成物种简介、不推断中国保护等级、不写业务数据库，也不自动选择亚种。证据中的坐标粗化为两位小数。
+- 前端展示亚种候选、AI 高/中/低置信建议、附近亚种计数与维基摘录；新物种表单仅在“完整亚种名单”为空时填入 children，已有内容不覆盖。已有物种增加只读参考面板。查询无坐标时请求体仍只有 `{"query": ...}`。
+- 回归：非浏览器 116 项通过；浏览器 3 项通过（使用项目 Playwright；当前环境 bsk 插件 CLI 不可用）。真实接口验证“黑水鸡”返回 5 个亚种与上海 50 km 内 16 条记录，AI 建议指名亚种并附证据。真实资料库未参与 UI 写入测试，测试使用 `.browser-data` 副本；安装包尚未重新生成。
+
 ## 2026-10-23 · MCP 接入飞羽精灵
 
 - 将实验的 iNaturalist API、MCP stdio server/client 整理为 `backend/app/inat_mcp/` 共用实现，实验目录保留兼容入口；桌面启动器增加专用 `--inat-mcp` 模式。

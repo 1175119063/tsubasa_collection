@@ -4,6 +4,7 @@ import { api, errorMessage } from "@/api/client";
 import type { SpeciesSummary, TaxonomyGenus, TaxonomyOrder } from "@/api/types";
 import { applyObservationLocation, readAdditionalPhoto, readObservationPhoto, type AdditionalPhotoDraft, type ObservationDraft, type EntryLocation, type Subspecies } from "./observation-entry";
 import ObservationSpeciesAssistant, { type AssistantTaxon, type SpeciesExtraction } from "./ObservationSpeciesAssistant.vue";
+import OnlineSpeciesLookup from "../OnlineSpeciesLookup.vue";
 import type { OnlineTaxonName, OnlineTaxonomyDraft } from "@/api/online-species";
 import BehaviorPicker from "./BehaviorPicker.vue";
 import ObservationSpeciesPicker from "./ObservationSpeciesPicker.vue";
@@ -14,6 +15,8 @@ const form = props.draft.form;
 const newSpecies = props.draft.newSpecies;
 const taxonomy = toRef(props, "taxonomy");
 const primarySubspecies = ref<Subspecies[]>([]);
+const onlineReferenceOpen = ref(false);
+const selectedSpecies = computed(() => props.species.find((item) => String(item.id) === speciesId.value));
 const additionalId = ref("");
 const status = ref("");
 const onlineApplyStatus = ref("");
@@ -112,9 +115,22 @@ async function applyOnline(draft: OnlineTaxonomyDraft): Promise<void> {
   }
   if (!newSpecies.chinese_name.trim()) newSpecies.chinese_name = draft.species.chinese_name || "";
   if (!newSpecies.scientific_name.trim()) newSpecies.scientific_name = draft.species.scientific_name || "";
-  onlineApplyStatus.value = "已补充空白分类字段。中文名缺失时请手动补充；已有内容和亚种保持原样。";
+  const onlineSubspecies = draft.subspecies ?? [];
+  if (onlineSubspecies.length && !newSpecies.subspecies_list.trim()) {
+    newSpecies.has_subspecies = true;
+    newSpecies.subspecies_list = onlineSubspecies
+      .map((item) => [item.name, item.common_name].filter(Boolean).join(" | "))
+      .filter(Boolean)
+      .join("\n");
+    onlineApplyStatus.value = `已补充空白分类字段，并填入 ${onlineSubspecies.length} 个亚种候选；请核对后再保存。`;
+  } else if (onlineSubspecies.length) {
+    onlineApplyStatus.value = "已补充空白分类字段；亚种名单已有内容，未覆盖。请对照在线列表核对。";
+  } else {
+    onlineApplyStatus.value = "已补充空白分类字段。中文名缺失时请手动补充；iNaturalist 未列出亚种。";
+  }
 }
 function audioChanged(event: Event): void { audio.value = [...((event.target as HTMLInputElement).files || [])]; }
+function onlineToggled(event: Event): void { onlineReferenceOpen.value = (event.target as HTMLDetailsElement).open; }
 function useLocation(): void { navigator.geolocation.getCurrentPosition(({ coords }) => { form.latitude = coords.latitude; form.longitude = coords.longitude; }, () => { status.value = "无法读取设备位置，请手动填写经纬度"; }); }
 async function addAdditional(): Promise<void> { const item = props.species.find((value) => String(value.id) === additionalId.value); if (!item || additional.value.length >= 9) return; try { const detail = await api<{ subspecies: Subspecies[] }>(`/api/species/${item.id}`); additional.value.push({ species: item, photo_type: "individual", sex: "unknown", life_stage: "unknown", subspecies_id: null, subspecies: detail.subspecies, notes: "", behavior_labels: [] }); additionalId.value = ""; } catch (caught) { status.value = errorMessage(caught); } }
 onMounted(loadSubspecies);
@@ -122,7 +138,7 @@ onMounted(loadSubspecies);
 
 <template>
 
-    <ObservationSpeciesAssistant v-if="speciesId === 'new'" :online-apply-message="onlineApplyStatus" @apply="applyAssistant" @apply-online="applyOnline" />
+    <ObservationSpeciesAssistant v-if="speciesId === 'new'" :online-apply-message="onlineApplyStatus" :latitude="form.latitude" :longitude="form.longitude" :locality="form.locality" @apply="applyAssistant" @apply-online="applyOnline" />
     <fieldset tabindex="-1">
 <legend>
 <span>01</span> 目标物种</legend>
@@ -223,6 +239,18 @@ onMounted(loadSubspecies);
 </label>
 </template>
 <BehaviorPicker v-if="speciesId" v-model="form.behavior_labels" :species-id="Number(speciesId) || null" />
+<details v-if="speciesId !== 'new'" class="full-field online-species-reference" @toggle="onlineToggled">
+<summary>联网核对亚种与保护状态（只读参考）</summary>
+<OnlineSpeciesLookup
+  v-if="onlineReferenceOpen"
+  :key="speciesId"
+  :initial-query="selectedSpecies?.scientific_name || selectedSpecies?.chinese_name || ''"
+  :latitude="form.latitude"
+  :longitude="form.longitude"
+  :locality="form.locality"
+  apply-hint="只读参考；请在下方亚种下拉框中选择，确认后保存。AI 建议不会自动选中。"
+/>
+</details>
 <label class="full-field file-field">MP3 录音（可多选）<input type="file" accept="audio/mpeg,.mp3" multiple @change="audioChanged" />
 <span v-if="audio.length" class="field-hint">已选择：{{ audio.map(file => file.name).join('、') }}</span>
 </label>

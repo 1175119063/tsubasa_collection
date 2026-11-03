@@ -199,7 +199,7 @@ onBeforeUnmount(() => {
       </div>
       <button class="feather-panel-close" type="button" aria-label="关闭" @click="setPanel(false)">×</button>
     </header>
-    <div class="feather-status" :class="{ 'is-online': available }">{{ mode === "online" ? "在线资料查询 · 无需大模型" : status }}</div>
+    <div class="feather-status" :class="{ 'is-online': available }">{{ mode === "online" ? "在线资料查询 · AI 只给建议" : status }}</div>
     <nav class="feather-chat-modes" aria-label="飞羽精灵对话模式">
       <button :class="{ 'is-active': mode === 'chat' }" type="button" @click="switchMode('chat')">精灵对话</button>
       <button v-if="page === 'observations'" :class="{ 'is-active': mode === 'search' }" type="button" @click="switchMode('search')">检索田野记录</button>

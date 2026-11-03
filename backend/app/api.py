@@ -15,6 +15,7 @@ from .assistant_schemas import (
     AssistantTaxonomyResearchResponse,
     AssistantTextInput,
     LlmIntegrationInput,
+    OnlineSpeciesSearchInput,
     TiandituIntegrationInput,
 )
 from .database import Database
@@ -142,9 +143,15 @@ def online_species_status(request: Request) -> dict:
 
 @router.post("/assistant/online-species/search")
 async def online_species_search(
-    payload: AssistantTaxonomyResearchInput, request: Request,
+    payload: OnlineSpeciesSearchInput, request: Request,
 ) -> dict:
-    return await asyncio.to_thread(request.app.state.online_species.search, payload.query)
+    return await asyncio.to_thread(
+        request.app.state.online_species.search,
+        payload.query,
+        payload.latitude,
+        payload.longitude,
+        payload.locality,
+    )
 
 
 @router.get("/assistant/online-species/{taxon_id}")

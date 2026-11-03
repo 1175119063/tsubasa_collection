@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import httpx
 from app.inat_mcp import inat_api
 from app.online_species_service import OnlineSpeciesService
 from playwright.sync_api import expect
@@ -20,6 +21,74 @@ def online_result():
         "candidates": [],
         "warnings": [],
     }
+
+
+def rich_result():
+    result = online_result()
+    taxon = result["taxon"]
+    taxon["children"] = [
+        {
+            "id": 204640,
+            "name": "Chlidonias hybrida hybrida",
+            "common_name": "须浮鸥（指名亚种）",
+            "english_common_name": "Whiskered Tern",
+            "rank": "subspecies",
+            "is_active": True,
+            "observations_count": 3500,
+            "url": "https://www.inaturalist.org/taxa/204640",
+            "photo": None,
+        },
+        {
+            "id": 516848,
+            "name": "Chlidonias hybrida delalandii",
+            "common_name": "须浮鸥（非洲亚种）",
+            "rank": "subspecies",
+            "is_active": True,
+            "observations_count": 3694,
+            "url": "https://www.inaturalist.org/taxa/516848",
+            "photo": None,
+        },
+    ]
+    taxon["children_count"] = 2
+    first = taxon["children"][0]
+    result["ai"] = {
+        "available": True,
+        "message": "AI 仅按给定资料排序候选，不会自动选中或写入数据库。",
+        "subspecies": [
+            {
+                **first,
+                "confidence": "high",
+                "reason": "上海附近 16 条亚种级记录全部为指名亚种。",
+            }
+        ],
+        "warnings": [],
+        "sources": ["iNaturalist", "Wikipedia"],
+    }
+    result["nearby"] = {
+        "radius_km": 50,
+        "total_results": 16,
+        "returned": 16,
+        "truncated": False,
+        "counts": [
+            {
+                "taxon_id": 204640,
+                "name": "Chlidonias hybrida hybrida",
+                "common_name": "须浮鸥（指名亚种）",
+                "rank": "subspecies",
+                "count": 16,
+            }
+        ],
+    }
+    result["wikipedia"] = {
+        "available": True,
+        "title": "须浮鸥",
+        "url": "https://zh.wikipedia.org/wiki/%E9%A1%BB%E6%B5%AE%E9%B8%A5",
+        "lang": "zh",
+        "excerpt": "须浮鸥繁殖于欧洲至中亚，冬季迁往非洲和南亚。",
+        "fetched_at": "2026-11-03T08:00:00+08:00",
+        "cached": False,
+    }
+    return result
 
 
 def mock_model_offline(page):
@@ -68,6 +137,96 @@ def test_online_entry_preview_preserves_existing_fields(browser_app, tmp_path, j
     expect(dialog.get_by_label("科拉丁学名", exact=True)).to_have_value("Corvidae")
     dialog.locator("[data-online-detail]").scroll_into_view_if_needed()
     page.screenshot(path=str(tmp_path / "online-entry.png"))
+
+
+def test_online_species_shows_subspecies_ai_and_prefills_only_after_apply(
+    browser_app, tmp_path, jpeg_bytes
+):
+    page, base_url, _ = browser_app
+    mock_model_offline(page)
+    page.route(
+        "**/api/assistant/online-species/search",
+        lambda route: route.fulfill(json=rich_result()),
+    )
+    page.goto(f"{base_url}/observations?new=1")
+    dialog = page.locator("dialog.batch-dialog[open]")
+    photo = tmp_path / "online-rich.jpg"
+    photo.write_bytes(jpeg_bytes())
+    dialog.get_by_label("批量选择照片", exact=True).set_input_files(str(photo))
+    dialog.locator("fieldset").first.locator("select").first.select_option("new")
+    dialog.get_by_role("button", name="联网查物种", exact=True).click()
+    subspecies = dialog.get_by_label("该物种存在亚种", exact=True)
+    expect(subspecies).not_to_be_checked()
+    dialog.locator("[data-online-query]").fill("须浮鸥")
+    dialog.locator("[data-online-search]").click()
+    expect(dialog.locator("[data-online-subspecies]")).to_be_visible()
+    expect(dialog.get_by_text("AI 建议 · 高置信", exact=False)).to_be_visible()
+    expect(
+        dialog.get_by_text("上海附近 16 条亚种级记录全部为指名亚种。", exact=False)
+    ).to_be_visible()
+    expect(
+        dialog.locator(".online-nearby").get_by_text("16 条亚种级记录", exact=False)
+    ).to_be_visible()
+    expect(dialog.locator(".online-nearby").get_by_text("16 条", exact=True)).to_be_visible()
+    expect(subspecies).not_to_be_checked()
+    dialog.locator("[data-online-apply]").click()
+    expect(subspecies).to_be_checked()
+    expect(dialog.get_by_label("完整亚种名单", exact=True)).to_have_value(
+        "Chlidonias hybrida hybrida | 须浮鸥（指名亚种）\n"
+        "Chlidonias hybrida delalandii | 须浮鸥（非洲亚种）"
+    )
+    # Applying only fills the form; it must not save or close the observation dialog.
+    expect(dialog).to_be_visible()
+    page.screenshot(path=str(tmp_path / "online-subspecies-ai.png"))
+
+
+def test_online_prefill_creates_new_species_with_subspecies(browser_app, tmp_path, jpeg_bytes):
+    page, base_url, _ = browser_app
+    mock_model_offline(page)
+    page.route(
+        "**/api/assistant/online-species/search",
+        lambda route: route.fulfill(json=rich_result()),
+    )
+    page.goto(f"{base_url}/observations?new=1")
+    dialog = page.locator("dialog.batch-dialog[open]")
+    photo = tmp_path / "online-save.jpg"
+    photo.write_bytes(jpeg_bytes())
+    dialog.get_by_label("批量选择照片", exact=True).set_input_files(str(photo))
+    dialog.locator("fieldset").first.locator("select").first.select_option("new")
+    dialog.get_by_role("button", name="联网查物种", exact=True).click()
+    dialog.locator("[data-online-query]").fill("须浮鸥")
+    dialog.locator("[data-online-search]").click()
+    expect(dialog.locator("[data-online-subspecies]")).to_be_visible()
+    dialog.locator("[data-online-apply]").click()
+    expect(dialog.get_by_label("该物种存在亚种", exact=True)).to_be_checked()
+
+    form = dialog.locator("form")
+    location_fields = form.locator("fieldset").nth(3).locator("input")
+    location_fields.nth(0).fill("2026-08-26T07:15")
+    location_fields.nth(1).fill("31.230")
+    location_fields.nth(2).fill("121.470")
+    location_fields.nth(5).fill("CN-SH")
+    location_fields.nth(6).fill("Shanghai")
+    location_fields.nth(7).fill("Century Park")
+    form.locator("fieldset").nth(3).locator("select").nth(1).select_option("summer")
+
+    with page.expect_response(
+        lambda response: (
+            response.url.endswith("/api/observations") and response.request.method == "POST"
+        )
+    ) as saved:
+        dialog.get_by_role("button", name="保存就绪照片（1）", exact=True).click()
+
+    assert saved.value.status == 201
+    created = saved.value.json()
+    assert created["species_id"] > 0
+    species = httpx.get(f"{base_url}/api/species/{created['species_id']}").json()
+    assert species["scientific_name"] == "Chlidonias hybrida"
+    assert species["has_subspecies"] is True
+    assert {item["scientific_name"] for item in species["subspecies"]} == {
+        "Chlidonias hybrida hybrida",
+        "Chlidonias hybrida delalandii",
+    }
 
 
 def test_online_sidebar_candidates_retry_and_mobile(browser_app, tmp_path):

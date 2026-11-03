@@ -42,7 +42,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.integration_store,
         )
         app.state.online_species = OnlineSpeciesService(
-            app_settings.data_dir, app_settings.online_species_enabled
+            app_settings.data_dir,
+            app_settings.online_species_enabled,
+            app.state.feather_assistant,
         )
         app.state.write_lock = asyncio.Lock()
         yield

@@ -7,9 +7,10 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from app.assistant_schemas import AssistantOnlineSpeciesAdvice, OnlineSubspeciesSuggestion
 from app.config import Settings
 from app.inat_mcp import inat_api
-from app.inat_mcp.mcp_client import McpError, McpRpcError, McpStdioClient, McpTimeout
+from app.inat_mcp.mcp_client import McpError, McpRpcError, McpStdioClient
 from app.main import create_app
 from app.online_species_service import OnlineSpeciesService
 from app.service_common import DomainError
@@ -140,7 +141,7 @@ def test_cache_failure_does_not_lose_network_result(monkeypatch, tmp_path):
     assert inat_api.search_taxa("nothing")["results"] == []
 
 
-def test_service_uses_mcp_and_cache_with_no_llm(tmp_path):
+def test_service_reads_cached_taxon_without_network(tmp_path):
     service = OnlineSpeciesService(tmp_path)
     service.cache_dir.mkdir(parents=True)
     taxon = fixture_taxon()
@@ -151,11 +152,159 @@ def test_service_uses_mcp_and_cache_with_no_llm(tmp_path):
     assert detail["cached"]
 
 
+class _FakeAssistant:
+    enabled = True
+
+    def __init__(self, advice):
+        self.advice = advice
+        self.calls = 0
+
+    def advise_online_species(self, evidence):
+        self.calls += 1
+        self.evidence = evidence
+        return self.advice
+
+
+def _skill_taxon():
+    taxon = fixture_taxon()
+    taxon["children"] = [
+        {
+            "id": 204640,
+            "name": "Gallinula chloropus chloropus",
+            "common_name": "黑水鸡（指名亚种）",
+            "rank": "subspecies",
+            "is_active": True,
+            "observations_count": 3500,
+            "url": "https://www.inaturalist.org/taxa/204640",
+        }
+    ]
+    taxon["children_count"] = 1
+    return taxon
+
+
+def test_skill_returns_children_and_filters_unknown_ai_ids(monkeypatch, tmp_path):
+    taxon = _skill_taxon()
+    monkeypatch.setattr(
+        inat_api,
+        "resolve_name",
+        lambda *a, **kw: {
+            "resolved": True,
+            "taxon": taxon,
+            "candidates": [],
+            "via": "test",
+            "wikidata": None,
+            "warnings": [],
+        },
+    )
+    monkeypatch.setattr(
+        inat_api,
+        "nearby_subspecies",
+        lambda *a, **kw: {
+            "radius_km": 50,
+            "total_results": 2,
+            "returned": 2,
+            "truncated": False,
+            "counts": taxon["children"],
+            "source": "test",
+            "fetched_at": "2026-11-03T00:00:00+08:00",
+            "cached": False,
+        },
+    )
+    assistant = _FakeAssistant(
+        AssistantOnlineSpeciesAdvice(
+            subspecies=[
+                OnlineSubspeciesSuggestion(
+                    taxon_id=204640,
+                    reason="附近记录全部为该亚种。",
+                    confidence="high",
+                ),
+                OnlineSubspeciesSuggestion(
+                    taxon_id=999999,
+                    reason="不在候选中的编号。",
+                    confidence="low",
+                ),
+            ]
+        )
+    )
+    service = OnlineSpeciesService(tmp_path, assistant=assistant)
+    service.skill._wiki_fetcher = lambda **kw: {
+        "available": False,
+        "message": "no wiki",
+    }
+    result = service.search("黑水鸡", 31.23, 121.47, "上海")
+    assert result["resolved"] is True
+    assert result["taxon"]["children"][0]["id"] == 204640
+    assert result["ai"]["available"] is True
+    assert [item["id"] for item in result["ai"]["subspecies"]] == [204640]
+    assert any("不在候选" in item for item in result["ai"]["warnings"])
+    assert assistant.evidence["location"]["latitude"] == 31.23
+    assert assistant.evidence["location"]["longitude"] == 121.47
+
+
+def test_no_coordinates_skips_ai_and_nearby(monkeypatch, tmp_path):
+    taxon = _skill_taxon()
+    monkeypatch.setattr(
+        inat_api,
+        "resolve_name",
+        lambda *a, **kw: {
+            "resolved": True,
+            "taxon": taxon,
+            "candidates": [],
+            "via": "test",
+            "wikidata": None,
+            "warnings": [],
+        },
+    )
+    nearby = Mock()
+    monkeypatch.setattr(inat_api, "nearby_subspecies", nearby)
+    assistant = Mock(enabled=True)
+    service = OnlineSpeciesService(tmp_path, assistant=assistant)
+    service.skill._wiki_fetcher = lambda **kw: {
+        "available": False,
+        "message": "no wiki",
+    }
+    result = service.search("黑水鸡")
+    assert result["ai"]["available"] is False
+    assistant.advise_online_species.assert_not_called()
+    nearby.assert_not_called()
+
+
+def test_search_is_read_only_for_database(tmp_path, monkeypatch):
+    app = create_app(
+        Settings(_env_file=None, data_dir=tmp_path, online_species_enabled=True)
+    )
+    with TestClient(app) as client:
+        database = tmp_path / "database.sqlite"
+        before = database.read_bytes()
+        taxon = _skill_taxon()
+        monkeypatch.setattr(
+            inat_api,
+            "resolve_name",
+            lambda *a, **kw: {
+                "resolved": True,
+                "taxon": taxon,
+                "candidates": [],
+                "via": "test",
+                "wikidata": None,
+                "warnings": [],
+            },
+        )
+        app.state.online_species.skill._wiki_fetcher = lambda **kw: {
+            "available": False,
+            "message": "no wiki",
+        }
+        response = client.post(
+            "/api/assistant/online-species/search", json={"query": "须浮鸥"}
+        )
+        assert response.status_code == 200
+        assert database.read_bytes() == before
+
+
 def test_service_rejects_non_birds_and_does_not_invent_chinese_names(monkeypatch, tmp_path):
     service = OnlineSpeciesService(tmp_path)
     taxon = fixture_taxon()
     taxon["common_name"] = "Whiskered Tern"
-    monkeypatch.setattr(service, "_call", lambda *a: taxon)
+    monkeypatch.setattr(inat_api, "get_taxon", lambda *a, **kw: taxon)
     assert service.detail(62148)["draft"]["species"]["chinese_name"] is None
     taxon["is_bird"] = False
     with pytest.raises(DomainError) as exc:
@@ -165,7 +314,9 @@ def test_service_rejects_non_birds_and_does_not_invent_chinese_names(monkeypatch
 
 def test_service_timeout_releases_lock(monkeypatch, tmp_path):
     service = OnlineSpeciesService(tmp_path)
-    monkeypatch.setattr(McpStdioClient, "call_tool_json", Mock(side_effect=McpTimeout("late")))
+    monkeypatch.setattr(
+        service.skill, "search", Mock(side_effect=inat_api.InatError("查询超时"))
+    )
     with pytest.raises(DomainError) as exc:
         service.search("Pica serica")
     assert exc.value.status_code == 504

@@ -35,6 +35,7 @@ ALIASES_DIR = pathlib.Path(os.environ.get("TSUBASA_INAT_ALIASES_DIR", LAB_DIR))
 ALIASES_LOCAL = ALIASES_DIR / "aliases.local.json"
 ALIASES_EXAMPLE = ALIASES_DIR / "aliases.example.json"
 DEFAULT_TTL = 7 * 24 * 60 * 60.0
+NEARBY_TTL = 6 * 60 * 60.0
 CJK = re.compile(r"[\u3400-\u9fff]")
 HTML_TAG = re.compile(r"<[^>]+>")
 
@@ -45,6 +46,19 @@ class InatError(RuntimeError):
     def __init__(self, message: str, status: int | None = None) -> None:
         super().__init__(message)
         self.status = status
+
+
+def configure(
+    cache_dir: pathlib.Path | str,
+    aliases_dir: pathlib.Path | str | None = None,
+) -> None:
+    """Point the shared source layer at the application's data directory."""
+    global CACHE_DIR, ALIASES_DIR, ALIASES_LOCAL, ALIASES_EXAMPLE
+    CACHE_DIR = pathlib.Path(cache_dir)
+    if aliases_dir is not None:
+        ALIASES_DIR = pathlib.Path(aliases_dir)
+        ALIASES_LOCAL = ALIASES_DIR / "aliases.local.json"
+        ALIASES_EXAMPLE = ALIASES_DIR / "aliases.example.json"
 
 
 def _now() -> str:
@@ -104,7 +118,7 @@ def _get_json(url: str, timeout: float = 8.0) -> dict:
 
 def _cache_key(kind: str, params: dict) -> str:
     raw = json.dumps(params, sort_keys=True, ensure_ascii=False)
-    return f"v2-{kind}-{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]}"
+    return f"v3-{kind}-{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]}"
 
 
 def _read_cache(kind: str, params: dict, ttl: float) -> dict | None:
@@ -180,6 +194,27 @@ def _compact_ancestor(item: dict) -> dict:
     }
 
 
+def _compact_child(item: dict) -> dict:
+    photo = item.get("default_photo") or {}
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "common_name": item.get("preferred_common_name") or item.get("common_name"),
+        "english_common_name": item.get("english_common_name"),
+        "rank": item.get("rank"),
+        "is_active": item.get("is_active"),
+        "observations_count": item.get("observations_count"),
+        "url": _taxon_url(item.get("id")),
+        "photo": {
+            "attribution": photo.get("attribution"),
+            "license": photo.get("license_code"),
+            "url": photo.get("medium_url") or photo.get("url"),
+        }
+        if photo
+        else None,
+    }
+
+
 def normalize_taxon(item: dict, *, fetched_at: str, cached: bool) -> dict:
     ancestors = [_compact_ancestor(entry) for entry in (item.get("ancestors") or [])]
     by_rank = {entry["rank"]: entry for entry in ancestors if entry.get("rank")}
@@ -194,13 +229,27 @@ def normalize_taxon(item: dict, *, fetched_at: str, cached: bool) -> dict:
     conservation = []
     for entry in item.get("conservation_statuses") or []:
         if entry.get("status"):
+            place = entry.get("place") or {}
             conservation.append(
                 {
                     "status": entry.get("status"),
                     "authority": entry.get("authority"),
-                    "place": (entry.get("place") or {}).get("name"),
+                    "place": place.get("name"),
+                    "place_id": place.get("id"),
+                    "place_display_name": place.get("display_name"),
+                    "admin_level": place.get("admin_level"),
+                    "iucn": entry.get("iucn"),
+                    "url": entry.get("url"),
+                    "description": _strip_html(entry.get("description")),
+                    "geoprivacy": entry.get("geoprivacy"),
+                    "updated_at": entry.get("updated_at"),
                 }
             )
+    children = [
+        _compact_child(entry)
+        for entry in (item.get("children") or [])
+        if entry.get("id") and entry.get("is_active") is not False
+    ]
     photo = item.get("default_photo") or {}
     taxon_id = item.get("id")
     return {
@@ -213,6 +262,11 @@ def normalize_taxon(item: dict, *, fetched_at: str, cached: bool) -> dict:
         or any(entry.get("name") == "Aves" for entry in ancestors),
         "is_active": item.get("is_active"),
         "extinct": item.get("extinct"),
+        "complete_rank": item.get("complete_rank"),
+        "children_count": item.get("children_count", len(children)),
+        "children": children,
+        "listed_taxa_count": item.get("listed_taxa_count"),
+        "vision": item.get("vision"),
         "ancestors": ancestors,
         "classification": classification,
         "summary": _strip_html(item.get("wikipedia_summary")),
@@ -301,6 +355,138 @@ def get_taxon(
     payload["source_url"] = url
     if use_cache:
         _write_cache("taxon", cache_key, payload)
+    return payload
+
+
+def get_taxon_children(
+    taxon_id: int,
+    locale: str = "zh-CN",
+    *,
+    use_cache: bool = True,
+    ttl: float = DEFAULT_TTL,
+) -> dict:
+    """Return the active subspecies under a species in one bounded request."""
+    if type(taxon_id) is not int or taxon_id <= 0:
+        raise InatError("taxon_id must be a positive integer")
+    params = {
+        "parent_id": taxon_id,
+        "rank": "subspecies",
+        "per_page": 30,
+        "locale": locale,
+    }
+    cache_key = {"kind": "children", "id": taxon_id, "locale": locale}
+    if use_cache:
+        cached = _read_cache("children", cache_key, ttl)
+        if cached is not None:
+            cached["cached"] = True
+            return cached
+    url = f"{BASE_URL}/taxa?{urllib.parse.urlencode(params)}"
+    data = _get_json(url)
+    results = [
+        _compact_child(item)
+        for item in (data.get("results") or [])[:30]
+        if item.get("id") and item.get("is_active") is not False
+    ]
+    payload = {
+        "taxon_id": taxon_id,
+        "locale": locale,
+        "total_results": data.get("total_results", len(results)),
+        "results": results,
+        "source": url,
+        "fetched_at": _now(),
+        "cached": False,
+    }
+    if use_cache:
+        _write_cache("children", cache_key, payload)
+    return payload
+
+
+def nearby_subspecies(
+    taxon_id: int,
+    latitude: float,
+    longitude: float,
+    radius_km: int = 50,
+    *,
+    use_cache: bool = True,
+    ttl: float = NEARBY_TTL,
+) -> dict:
+    """Count research-grade nearby records that are identified to subspecies.
+
+    iNaturalist cannot group `species_counts` by subspecies, so this reads one
+    bounded page of observations and counts locally. It is evidence about what
+    local identifiers have recorded, not proof that other subspecies are absent.
+    """
+    if type(taxon_id) is not int or taxon_id <= 0:
+        raise InatError("taxon_id must be a positive integer")
+    if isinstance(latitude, bool) or not isinstance(latitude, (int, float)):
+        raise InatError("latitude must be a number")
+    if isinstance(longitude, bool) or not isinstance(longitude, (int, float)):
+        raise InatError("longitude must be a number")
+    if not -90 <= latitude <= 90:
+        raise InatError("latitude must be between -90 and 90")
+    if not -180 <= longitude <= 180:
+        raise InatError("longitude must be between -180 and 180")
+    if isinstance(radius_km, bool) or not isinstance(radius_km, int):
+        raise InatError("radius_km must be an integer")
+    radius_km = max(1, min(radius_km, 500))
+    params = {
+        "taxon_id": taxon_id,
+        "hrank": "subspecies",
+        "lrank": "subspecies",
+        "lat": round(float(latitude), 5),
+        "lng": round(float(longitude), 5),
+        "radius": radius_km,
+        "per_page": 200,
+        "order_by": "observed_on",
+        "locale": "zh-CN",
+    }
+    cache_key = {
+        "kind": "nearby",
+        "id": taxon_id,
+        "lat": round(float(latitude), 4),
+        "lng": round(float(longitude), 4),
+        "radius": radius_km,
+    }
+    if use_cache:
+        cached = _read_cache("nearby", cache_key, ttl)
+        if cached is not None:
+            cached["cached"] = True
+            return cached
+    url = f"{BASE_URL}/observations?{urllib.parse.urlencode(params)}"
+    data = _get_json(url)
+    results = data.get("results") or []
+    counts: dict[int, dict] = {}
+    for observation in results:
+        taxon = observation.get("taxon") or {}
+        entry_id = taxon.get("id")
+        if not isinstance(entry_id, int):
+            continue
+        entry = counts.setdefault(
+            entry_id,
+            {
+                "taxon_id": entry_id,
+                "name": taxon.get("name"),
+                "common_name": taxon.get("preferred_common_name"),
+                "rank": taxon.get("rank"),
+                "count": 0,
+            },
+        )
+        entry["count"] += 1
+    payload = {
+        "taxon_id": taxon_id,
+        "latitude": round(float(latitude), 5),
+        "longitude": round(float(longitude), 5),
+        "radius_km": radius_km,
+        "total_results": data.get("total_results", len(results)),
+        "returned": len(results),
+        "truncated": data.get("total_results", len(results)) > len(results),
+        "counts": sorted(counts.values(), key=lambda item: item["count"], reverse=True),
+        "source": url,
+        "fetched_at": _now(),
+        "cached": False,
+    }
+    if use_cache:
+        _write_cache("nearby", cache_key, payload)
     return payload
 
 

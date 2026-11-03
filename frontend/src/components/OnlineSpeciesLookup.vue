@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { api, errorMessage, jsonRequest } from "@/api/client";
-import type { OnlineSpeciesResult, OnlineTaxon, OnlineTaxonomyDraft } from "@/api/online-species";
+import type { OnlineSpeciesResult, OnlineSubspecies, OnlineTaxon, OnlineTaxonomyDraft } from "@/api/online-species";
 
-const props = defineProps<{ allowApply?: boolean; applyMessage?: string }>();
+const props = defineProps<{
+  allowApply?: boolean;
+  applyMessage?: string;
+  initialQuery?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  locality?: string | null;
+  applyHint?: string;
+}>();
 const emit = defineEmits<{ apply: [draft: OnlineTaxonomyDraft] }>();
-const query = ref("");
+const query = ref(props.initialQuery?.trim() || "");
 const enabled = ref(false);
 const status = ref("正在检查联网查询设置…");
 const busy = ref(false);
@@ -20,11 +28,22 @@ const rows = computed(() => selected.value
   ? (Object.keys(labels) as Array<keyof typeof labels>).map((key) => ({
     label: labels[key], ...selected.value!.draft[key],
   })) : []);
+const children = computed<OnlineSubspecies[]>(() => selected.value?.children ?? []);
+const ai = computed(() => result.value?.ai ?? null);
+const suggestions = computed(() => new Map((ai.value?.subspecies ?? []).map((item) => [item.id, item])));
+const nearby = computed(() => result.value?.nearby ?? null);
 
+function suggestionFor(id: number) {
+  return suggestions.value.get(id);
+}
+function confidenceLabel(value: string | undefined): string {
+  return value === "high" ? "高置信" : value === "low" ? "低置信" : "中置信";
+}
 function sourceLink(value: string | null | undefined): string | undefined {
   try {
     const url = new URL(value || "");
-    if (url.protocol === "https:" && ["www.inaturalist.org", "api.inaturalist.org", "www.wikidata.org"].includes(url.hostname)) return url.href;
+    const wikipedia = url.hostname === "wikipedia.org" || url.hostname.endsWith(".wikipedia.org");
+    if (url.protocol === "https:" && (["www.inaturalist.org", "api.inaturalist.org", "www.wikidata.org"].includes(url.hostname) || wikipedia)) return url.href;
   } catch { /* Missing provenance is rendered as text. */ }
   return undefined;
 }
@@ -38,11 +57,19 @@ async function search(): Promise<void> {
   result.value = null;
   selected.value = null;
   applied.value = false;
-  message.value = "正在查阅在线物种资料…";
+  message.value = "正在查阅在线物种与亚种资料…";
   try {
-    result.value = await api<OnlineSpeciesResult>("/api/assistant/online-species/search", jsonRequest("POST", { query: query.value.trim() }));
+    const body: Record<string, unknown> = { query: query.value.trim() };
+    if (typeof props.latitude === "number" && typeof props.longitude === "number"
+      && Number.isFinite(props.latitude) && Number.isFinite(props.longitude)) {
+      body.latitude = props.latitude;
+      body.longitude = props.longitude;
+    }
+    if (props.locality?.trim()) body.locality = props.locality.trim();
+    result.value = await api<OnlineSpeciesResult>("/api/assistant/online-species/search", jsonRequest("POST", body));
     selected.value = result.value.taxon;
-    message.value = selected.value ? "找到名称匹配，请核对学名与分类。"
+    message.value = selected.value
+      ? (children.value.length ? "找到名称匹配。亚种候选来自 iNaturalist，AI 建议仅供核对。" : "找到名称匹配，但 iNaturalist 未列出亚种。")
       : result.value.candidates.length ? "名称尚未确定，请选择候选查看资料。" : "没有找到可用的鸟类物种。可以尝试完整学名。";
   } catch (error) { message.value = errorMessage(error); }
   finally { busy.value = false; }
@@ -61,7 +88,7 @@ async function choose(id: number): Promise<void> {
 }
 function apply(): void {
   if (!selected.value || busy.value) return;
-  emit("apply", selected.value.draft);
+  emit("apply", { ...selected.value.draft, subspecies: selected.value.children ?? [] });
   applied.value = true;
 }
 onMounted(async () => {
@@ -81,18 +108,37 @@ onMounted(async () => {
       <button type="button" data-online-search :disabled="!enabled || busy || query.trim().length < 2" @click="search">{{ busy ? "查询中…" : "查物种" }}</button>
     </div>
     <p v-if="message" class="online-message" role="status">{{ message }}</p>
-    <ul v-if="result?.warnings.length" class="online-warnings"><li v-for="warning in result.warnings" :key="warning">{{ warning }}</li></ul>
-    <div v-if="result?.candidates.length" class="online-candidates" aria-label="物种候选">
-      <button v-for="candidate in result.candidates" :key="candidate.id" type="button" :disabled="busy" :class="{ selected: selected?.id === candidate.id }" @click="choose(candidate.id)"><strong>{{ candidate.common_name || candidate.name }}</strong><em>{{ candidate.name }}</em><span>查看资料 ↗</span></button>
+    <ul v-if="result?.warnings?.length" class="online-warnings"><li v-for="warning in result?.warnings" :key="warning">{{ warning }}</li></ul>
+    <div v-if="result?.candidates?.length" class="online-candidates" aria-label="物种候选">
+      <button v-for="candidate in result?.candidates" :key="candidate.id" type="button" :disabled="busy" :class="{ selected: selected?.id === candidate.id }" @click="choose(candidate.id)"><strong>{{ candidate.common_name || candidate.name }}</strong><em>{{ candidate.name }}</em><span>查看资料 ↗</span></button>
     </div>
     <article v-if="selected" class="online-detail" data-online-detail>
       <header><small>iNaturalist · #{{ selected.id }}</small><h4>{{ selected.common_name || selected.name }}</h4><em>{{ selected.name }}</em></header>
       <dl><div v-for="row in rows" :key="row.label"><dt>{{ row.label }}</dt><dd>{{ row.chinese_name || "中文名待补充" }}<em>{{ row.scientific_name || "学名待补充" }}</em></dd></div></dl>
       <p class="online-source"><a :href="sourceLink(selected.url)" target="_blank" rel="noopener noreferrer">查看 iNaturalist 原始条目 ↗</a><a :href="sourceLink(selected.source_url)" target="_blank" rel="noopener noreferrer">数据来源 ↗</a><span>{{ selected.cached ? "缓存资料 · 获取于" : "资料获取于" }} {{ timestamp(selected.fetched_at) }}</span></p>
       <p v-if="nameSource" class="online-source"><a :href="sourceLink(nameSource.source_url)" target="_blank" rel="noopener noreferrer">Wikidata 名称依据 ↗</a><span>{{ timestamp(nameSource.fetched_at) }}{{ nameSource.cached ? " · 缓存" : "" }}</span></p>
-      <details v-if="selected.summary || selected.conservation.length || selected.photo"><summary>简介与补充资料</summary><p v-if="selected.summary">{{ selected.summary }}</p><ul v-if="selected.conservation.length"><li v-for="(item, index) in selected.conservation" :key="index">{{ [item.authority, item.status, item.place].filter(Boolean).join(" · ") }}</li></ul><p v-if="selected.photo" class="online-muted">来源图片署名：{{ selected.photo.attribution || "未提供" }}；许可：{{ selected.photo.license || "未提供" }}。</p></details>
-      <template v-if="props.allowApply"><p class="online-muted">只补充空白分类字段；已有内容、亚种、保护等级和备注由你核对填写。分类冲突或资料不完整时停止填入。</p><button class="online-apply" type="button" data-online-apply :disabled="busy" @click="apply">{{ applied ? "重新检查并填入空白字段" : "核对后填入空白分类字段" }}</button><p v-if="applied && props.applyMessage" class="online-message" role="status">{{ props.applyMessage }}</p></template>
-      <p v-else class="online-muted">可在「登记新发现 → 新物种」中查阅并填入分类资料。</p>
+
+      <section v-if="children.length" class="online-subspecies" data-online-subspecies>
+        <h5>亚种候选 <small>{{ children.length }} 个 · 来自 iNaturalist</small></h5>
+        <ul>
+          <li v-for="child in children" :key="child.id">
+            <div class="online-subspecies-name"><strong>{{ child.common_name || child.name }}</strong><em>{{ child.name }}</em></div>
+            <div class="online-subspecies-meta"><span>{{ child.observations_count ?? 0 }} 条观察</span><span v-if="suggestionFor(child.id)" class="online-badge" :class="`confidence-${suggestionFor(child.id)?.confidence}`">AI 建议 · {{ confidenceLabel(suggestionFor(child.id)?.confidence) }}</span></div>
+            <p v-if="suggestionFor(child.id)" class="online-reason">{{ suggestionFor(child.id)?.reason }}</p>
+          </li>
+        </ul>
+      </section>
+      <p v-if="ai" class="online-ai-message" :class="{ muted: !ai.available }" role="status">{{ ai.message }}</p>
+      <ul v-if="ai?.warnings?.length" class="online-warnings"><li v-for="warning in (ai?.warnings ?? [])" :key="warning">{{ warning }}</li></ul>
+      <section v-if="nearby?.counts?.length" class="online-nearby">
+        <h5>附近 {{ nearby?.radius_km }} km 的亚种记录</h5>
+        <p>{{ nearby?.total_results }} 条亚种级记录，本次统计 {{ nearby?.returned }} 条<span v-if="nearby?.truncated">（已截断）</span>。</p>
+        <ul><li v-for="item in (nearby?.counts ?? []).slice(0, 12)" :key="item.taxon_id"><span>{{ item.common_name || item.name }}</span><em>{{ item.name }}</em><strong>{{ item.count }} 条</strong></li></ul>
+      </section>
+
+      <details v-if="selected.summary || selected.conservation.length || selected.photo || result?.wikipedia?.available"><summary>简介、保护状态与维基资料</summary><p v-if="selected.summary">{{ selected.summary }}</p><ul v-if="selected.conservation.length"><li v-for="(item, index) in selected.conservation" :key="index">{{ [item.authority, item.status, item.place].filter(Boolean).join(" · ") }}</li></ul><div v-if="result?.wikipedia?.available" class="online-wiki"><p>{{ result?.wikipedia?.excerpt }}</p><a :href="sourceLink(result?.wikipedia?.url)" target="_blank" rel="noopener noreferrer">查看维基百科条目 ↗</a></div><p v-if="selected.photo" class="online-muted">来源图片署名：{{ selected.photo.attribution || "未提供" }}；许可：{{ selected.photo.license || "未提供" }}。</p></details>
+      <template v-if="props.allowApply"><p class="online-muted">只补充空白分类字段；亚种名单仅当原为空时填入，已有内容不覆盖。保护等级、亚种选择和保存都由你核对确认。</p><button class="online-apply" type="button" data-online-apply :disabled="busy" @click="apply">{{ applied ? "重新检查并填入空白字段" : "核对后填入分类与亚种" }}</button><p v-if="applied && props.applyMessage" class="online-message" role="status">{{ props.applyMessage }}</p></template>
+      <p v-else class="online-muted">{{ props.applyHint || "可在「登记新发现 → 新物种」中查阅并填入分类资料。" }}</p>
     </article>
   </section>
 </template>
@@ -100,6 +146,7 @@ onMounted(async () => {
 <style scoped>
 .online-species{padding:20px;min-width:0;background:#f7f5ed;color:#263e39;font:13px/1.6 "Microsoft YaHei",sans-serif;overflow-wrap:anywhere}
 .online-intro>span{font-size:9px;letter-spacing:.15em;color:#8d7450}.online-intro h3{font-size:20px;font-weight:500;margin:5px 0 8px}.online-intro p,.online-muted{font-size:12px;color:#70776e;margin:8px 0 12px}
-.online-search{display:flex;align-items:flex-end;gap:8px}.online-search label{display:grid;gap:5px;flex:1;min-width:0;font-size:12px}.online-search input{box-sizing:border-box;width:100%;min-height:40px;padding:9px 10px;border:1px solid #bcc9bd;background:#fffef9;color:#263e39;border-radius:4px}.online-species button{cursor:pointer;font:inherit}.online-search button,.online-apply{border:1px solid #365d51;border-radius:4px;background:#365d51;color:#fffdf4;padding:9px 12px;white-space:normal}.online-search button{flex:0 0 auto;min-height:40px}.online-species button:disabled{opacity:.5;cursor:default}.online-message{padding:10px 0;margin:0;color:#526657}.online-warnings{padding-left:20px;color:#7e694a;font-size:12px}.online-candidates{display:grid;gap:8px;margin:10px 0}.online-candidates button{text-align:left;padding:12px;background:#fffef8;color:#304c40;border:1px solid #d7ddcf;border-radius:5px}.online-candidates button.selected{border-color:#45786a;box-shadow:inset 3px 0 #45786a}.online-candidates strong,.online-candidates em{display:block}.online-candidates span{font-size:11px;color:#697965}.online-detail{margin-top:14px;padding:16px;background:#fffef9;border:1px solid #d7ddcf;border-radius:6px}.online-detail header small{color:#8d7450;font-size:10px}.online-detail h4{margin:4px 0 0;font-size:24px;font-weight:500}.online-detail em{color:#657767;font-family:Georgia,serif;font-weight:normal}.online-detail dl{margin:16px 0}.online-detail dl>div{display:grid;grid-template-columns:26px 1fr;gap:8px;border-top:1px solid #e4e6db;padding:8px 0}.online-detail dt{color:#8a856f}.online-detail dd{margin:0}.online-detail dd em{display:block}.online-source{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:11px}.online-source a{color:#3d7166;text-decoration:underline}.online-source span{flex-basis:100%;color:#7f8275}.online-detail details{margin:14px 0;font-size:12px}.online-detail summary{cursor:pointer;color:#526958}.online-detail details p{max-height:240px;overflow:auto;white-space:pre-line}.online-apply{width:100%;margin-top:4px}
+.online-search{display:flex;align-items:flex-end;gap:8px}.online-search label{display:grid;gap:5px;flex:1;min-width:0;font-size:12px}.online-search input{box-sizing:border-box;width:100%;min-height:40px;padding:9px 10px;border:1px solid #bcc9bd;background:#fffef9;color:#263e39;border-radius:4px}.online-species button{cursor:pointer;font:inherit}.online-search button,.online-apply{border:1px solid #365d51;border-radius:4px;background:#365d51;color:#fffdf4;padding:9px 12px;white-space:normal}.online-search button{flex:0 0 auto;min-height:40px}.online-species button:disabled{opacity:.5;cursor:default}.online-message{padding:10px 0;margin:0;color:#526657}.online-warnings{padding-left:20px;color:#7e694a;font-size:12px}.online-candidates{display:grid;gap:8px;margin:10px 0}.online-candidates button{text-align:left;padding:12px;background:#fffef8;color:#304c40;border:1px solid #d7ddcf;border-radius:5px}.online-candidates button.selected{border-color:#45786a;box-shadow:inset 3px 0 #45786a}.online-candidates strong,.online-candidates em{display:block}.online-candidates span{font-size:11px;color:#697965}.online-detail{margin-top:14px;padding:16px;background:#fffef9;border:1px solid #d7ddcf;border-radius:6px}.online-detail header small{color:#8d7450;font-size:10px}.online-detail h4{margin:4px 0 0;font-size:24px;font-weight:500}.online-detail em{color:#657767;font-family:Georgia,serif;font-weight:normal}.online-detail dl{margin:16px 0}.online-detail dl>div{display:grid;grid-template-columns:26px 1fr;gap:8px;border-top:1px solid #e4e6db;padding:8px 0}.online-detail dt{color:#8a856f}.online-detail dd{margin:0}.online-detail dd em{display:block}.online-source{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:11px}.online-source a{color:#3d7166;text-decoration:underline}.online-source span{flex-basis:100%;color:#7f8275}.online-detail details{margin:14px 0;font-size:12px}.online-detail summary{cursor:pointer;color:#526958}.online-detail details p{max-height:240px;overflow:auto;white-space:pre-wrap}
+.online-subspecies{margin:14px 0;padding:12px;border:1px solid #e1e2d3;background:#fffdf6;border-radius:5px}.online-subspecies h5,.online-nearby h5{margin:0 0 8px;font-size:13px;font-weight:600;color:#365d51}.online-subspecies h5 small{font-weight:400;color:#8a856f}.online-subspecies ul,.online-nearby ul{list-style:none;margin:0;padding:0}.online-subspecies li{padding:8px 0;border-top:1px solid #ececdf}.online-subspecies-name strong,.online-subspecies-name em{display:block}.online-subspecies-name em{color:#657767;font-family:Georgia,serif;font-size:11px}.online-subspecies-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;font-size:11px;color:#7f8275}.online-badge{display:inline-block;padding:1px 6px;border-radius:999px;background:#e2eee7;color:#2f5d4d;font-size:10px}.online-badge.confidence-high{background:#d7ead9}.online-badge.confidence-low{background:#f2e8d5;color:#7a6037}.online-reason{margin:5px 0 0;color:#6f6a55;font-size:11px}.online-ai-message{margin:10px 0;padding:8px 10px;background:#eef2e9;color:#435f50;font-size:12px;border-radius:4px}.online-ai-message.muted{background:#f3f0e7;color:#7c7665}.online-nearby{margin:14px 0;padding:12px;border:1px solid #e1e2d3;background:#fbfaf2;border-radius:5px;font-size:12px}.online-nearby p{margin:0 0 8px;color:#70776e}.online-nearby li{display:grid;grid-template-columns:1fr auto;gap:6px;padding:5px 0;border-top:1px solid #ececdf}.online-nearby li em{grid-column:1/2;color:#7f8275;font-family:Georgia,serif;font-size:11px}.online-nearby li strong{grid-row:1/3;grid-column:2/3;align-self:center;color:#365d51}.online-wiki{margin-top:10px;padding-top:8px;border-top:1px solid #ececdf}.online-wiki p{max-height:180px}.online-wiki a{color:#3d7166;font-size:11px}
 @media(max-width:480px){.online-species{padding:14px}.online-detail{padding:12px}.online-search{flex-wrap:wrap}.online-search label{flex-basis:100%}.online-search button{width:100%}}
 </style>

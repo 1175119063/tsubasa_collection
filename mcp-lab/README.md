@@ -1,24 +1,25 @@
 # iNaturalist MCP 与飞羽精灵
 
-2026-10-23：实验已接入主应用的飞羽精灵侧栏和新物种表单。实现集中在 `../backend/app/inat_mcp/`，本目录三个同名文件保留兼容入口，实验与正式功能不再维护两份逻辑。
+2026-10-23：实验已接入主应用的飞羽精灵侧栏和新物种表单。2026-11-03：主应用“联网查物种”改为只读直接调用 iNaturalist 与 Wikipedia（技能层 `../backend/app/skills/`），本目录的 MCP server/client 保留为实验、兼容和独立测试入口，仍可独立运行。
 
 ## 当前能做什么
 
 1. 在飞羽精灵中选择“联网查物种”，输入中文鸟名或完整学名。
 2. 中文名必要时经 Wikidata 标签/别名及 P225 转为学名，再查询 iNaturalist。多个同名条目展示学名候选，不直接认定第一个结果。
-3. 查看目、科、属、种、简介与保护状态原文，以及来源链接、获取时间、是否使用缓存。
-4. 在登记新物种时确认填入空白分类字段。已有分类冲突或来源缺少完整分类时停止；已有内容、亚种、保护等级与备注不会被覆盖。
+3. 查看目、科、属、种、iNaturalist children 亚种、保护状态、维基摘录与来源链接、获取时间、是否使用缓存。
+4. 在登记新物种时确认填入空白分类字段；亚种名单仅在原为空时填入。已有分类冲突或来源缺少完整分类时停止；已有内容不会被覆盖。已有物种提供只读参考，不修改其亚种。
 
-该入口无需大模型或 API Key。查询只发送名称或编号，不上传观察、坐标或媒体。查询结果不是照片鉴定结果，也不自动保存物种。侧栏提供查阅；填入功能位于新物种录入区。普通精灵对话目前不会自行调用 MCP。
+应用查询不依赖大模型或 API Key；飞羽精灵可用时附加只读 AI 亚种建议，不可用时自动降级。查询发送名称或编号；仅在已填写拍摄地点时附带经纬度供附近亚种统计，不上传照片或观察记录；AI 证据中的坐标粗化到两位小数。查询结果不是照片鉴定结果，也不自动保存；MCP 工具本身仍只接触名称/编号等资源参数，不访问业务数据库。
 
 ## 结构与运行
 
 | 文件 | 作用 |
 | --- | --- |
-| `backend/app/inat_mcp/inat_api.py` | 上游 HTTP、缓存、名称消歧、资料规范化 |
+| `backend/app/inat_mcp/inat_api.py` | 上游 HTTP、缓存、名称消歧、资料规范化（含 children 与保护状态） |
 | `backend/app/inat_mcp/mcp_server.py` | MCP JSON-RPC stdio，三个只读工具 |
 | `backend/app/inat_mcp/mcp_client.py` | 子进程握手、串行请求、超时及退出 |
-| `backend/app/online_species_service.py` | 应用查询边界、鸟类物种校验与草稿映射 |
+| `backend/app/skills/`、`backend/app/wikipedia_api.py` | 应用实际使用的只读技能层与 Wikipedia 来源 |
+| `backend/app/online_species_service.py` | 应用查询边界、并发与错误映射 |
 | 本目录 `inat_api.py` / `mcp_server.py` / `mcp_client.py` | 指向上述模块的兼容入口 |
 | `demo.py`、`probe_zh.py` | 显式联网实验与报告 |
 | `build_aliases.py` | 只读个人数据库并生成实验别名表 |

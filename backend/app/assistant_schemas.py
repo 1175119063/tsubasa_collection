@@ -43,6 +43,40 @@ class AssistantTaxonomyResearchInput(BaseModel):
     query: str = Field(min_length=2, max_length=300)
 
 
+class OnlineSpeciesSearchInput(BaseModel):
+    """Lookup input; coordinates are optional and never persisted here."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    query: str = Field(min_length=2, max_length=300)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    locality: str | None = Field(default=None, max_length=240)
+
+    @model_validator(mode="after")
+    def coordinates_must_be_a_pair(self) -> "OnlineSpeciesSearchInput":
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("经纬度必须同时提供")
+        return self
+
+
+class OnlineSubspeciesSuggestion(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    taxon_id: int = Field(gt=0)
+    reason: str = Field(min_length=1, max_length=400)
+    confidence: Literal["high", "medium", "low"] = "low"
+
+
+class AssistantOnlineSpeciesAdvice(BaseModel):
+    """Model output is advice only; the skill filters ids against iNat children."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    subspecies: list[OnlineSubspeciesSuggestion] = Field(default_factory=list, max_length=12)
+    warnings: list[str] = Field(default_factory=list, max_length=10)
+
+
 class AssistantKnowledgeSearchPlan(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
