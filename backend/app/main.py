@@ -17,6 +17,7 @@ from .knowledge_service import KnowledgeLibrary
 from .media_store import MediaStore
 from .online_species_service import OnlineSpeciesService
 from .service_common import DomainError
+from .skills.species_profile import SpeciesProfileSkill
 from .update_service import UpdateService
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -45,6 +46,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app_settings.data_dir,
             app_settings.online_species_enabled,
             app.state.feather_assistant,
+        )
+        app.state.species_profile = SpeciesProfileSkill(
+            app.state.feather_assistant,
+            online=app.state.online_species.skill,
         )
         app.state.write_lock = asyncio.Lock()
         yield

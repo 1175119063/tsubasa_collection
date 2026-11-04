@@ -5,9 +5,11 @@ from __future__ import annotations
 from ..feather_assistant import FeatherAssistant
 from .base import Skill
 from .online_species import OnlineSpeciesSkill
+from .species_profile import SpeciesProfileSkill
 
 SKILLS: dict[str, type[Skill]] = {
     "online_species": OnlineSpeciesSkill,
+    "species_profile": SpeciesProfileSkill,
 }
 
 

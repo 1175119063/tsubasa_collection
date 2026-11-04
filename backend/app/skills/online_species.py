@@ -135,6 +135,44 @@ class OnlineSpeciesSkill:
             "ai": ai,
         }
 
+    # ------------------------------------------------------------------ collect
+    def collect(self, query: str, fallback_query: str | None = None) -> dict:
+        """Fetch the taxon and Wikipedia material without subspecies advice."""
+
+        candidates = [item for item in (query, fallback_query) if item]
+        warnings: list[str] = []
+        resolved: dict | None = None
+        via: str | None = None
+        wikidata: dict | None = None
+        used: str | None = None
+        for index, candidate in enumerate(candidates):
+            try:
+                resolved = inat_api.resolve_name(candidate, use_aliases=False)
+            except inat_api.InatError as exc:
+                raise _inat_failure(exc) from exc
+            via = resolved.get("via")
+            wikidata = resolved.get("wikidata")
+            warnings.extend(resolved.get("warnings") or [])
+            if resolved.get("resolved") and valid_taxon(resolved.get("taxon")):
+                used = candidate
+                if index:
+                    warnings.append(f"按学名未找到，已改用“{candidate}”查询。")
+                break
+            resolved = None
+        if not resolved or not resolved.get("taxon"):
+            raise SkillError("未找到该物种，请检查中文名或学名。", 404)
+        taxon = enrich_taxon(resolved["taxon"])
+        wiki = self._wikipedia(taxon, warnings)
+        return {
+            "query": used or query,
+            "resolved": True,
+            "via": via,
+            "wikidata": wikidata,
+            "taxon": taxon,
+            "wikipedia": wiki,
+            "warnings": warnings,
+        }
+
     # ------------------------------------------------------------------ detail
     def detail(self, taxon_id: int) -> dict:
         try:

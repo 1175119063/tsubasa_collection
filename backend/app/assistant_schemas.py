@@ -77,6 +77,25 @@ class AssistantOnlineSpeciesAdvice(BaseModel):
     warnings: list[str] = Field(default_factory=list, max_length=10)
 
 
+class SpeciesProfileInput(BaseModel):
+    """The form sends its current, possibly unsaved introduction for integration."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    scientific_name: str = Field(min_length=2, max_length=180)
+    chinese_name: str | None = Field(default=None, max_length=120)
+    introduction: str = Field(default="", max_length=10000)
+
+
+class AssistantSpeciesProfileDraft(BaseModel):
+    """Model output is a draft only; the API never writes it to the database."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    introduction: str = Field(min_length=1, max_length=10000)
+    warnings: list[str] = Field(default_factory=list, max_length=10)
+
+
 class AssistantKnowledgeSearchPlan(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 

@@ -1,6 +1,7 @@
 import json
 
 import httpx
+from playwright.sync_api import expect
 
 
 def wait_for_taxonomy_idle(page) -> None:
@@ -517,6 +518,82 @@ def test_species_dossier_identity_and_ecology_layout(browser_app, post_observati
     page.wait_for_url("**/observations?observation=*")
     assert f"observation={created['observation_id']}" in page.url
 
+
+
+def test_browser_can_complete_species_profile_from_online_sources(
+    browser_app, post_observation
+):
+    page, base_url, _data_dir = browser_app
+    created = post_observation(base_url)
+    species_id = created["species_id"]
+    page.goto(f"{base_url}/dex?species={species_id}")
+    dossier = page.locator("dialog.v2-dossier[open]")
+    dossier.wait_for(state="visible")
+    dossier.get_by_role("button", name="修改图鉴").click()
+
+    profile = page.locator("dialog.profile-dialog[open]")
+    profile.wait_for(state="visible")
+    notes = profile.get_by_label("物种简介")
+    notes.fill("我在校园里见过它。")
+    saved_profile_requests: list[str] = []
+    page.on(
+        "request",
+        lambda request: (
+            saved_profile_requests.append(request.url)
+            if request.method == "PUT" and "/profile" in request.url
+            else None
+        ),
+    )
+    page.route(
+        "**/api/assistant/species-profile",
+        lambda route: route.fulfill(
+            status=200,
+            json={
+                "introduction": "灰喜鹊常成群活动；我在校园里见过它在树上跳跃。",
+                "warnings": [],
+                "sources": [
+                    {"title": "iNaturalist", "url": "https://www.inaturalist.org/taxa/1"}
+                ],
+            },
+        ),
+    )
+    with page.expect_request("**/api/assistant/species-profile") as request_info:
+        profile.get_by_role("button", name="飞羽精灵补全").click()
+    payload = json.loads(request_info.value.post_data or "{}")
+    assert payload["introduction"] == "我在校园里见过它。"
+    assert payload["scientific_name"]
+    expect(notes).to_have_value("灰喜鹊常成群活动；我在校园里见过它在树上跳跃。")
+    assert saved_profile_requests == []
+    assert profile.is_visible()
+
+
+def test_browser_keeps_species_profile_when_completion_fails(
+    browser_app, post_observation
+):
+    page, base_url, _data_dir = browser_app
+    created = post_observation(base_url)
+    species_id = created["species_id"]
+    page.goto(f"{base_url}/dex?species={species_id}")
+    dossier = page.locator("dialog.v2-dossier[open]")
+    dossier.wait_for(state="visible")
+    dossier.get_by_role("button", name="修改图鉴").click()
+
+    profile = page.locator("dialog.profile-dialog[open]")
+    profile.wait_for(state="visible")
+    notes = profile.get_by_label("物种简介")
+    notes.fill("原有观察记录。")
+    page.route(
+        "**/api/assistant/species-profile",
+        lambda route: route.fulfill(
+            status=503,
+            json={"detail": "AI 整理暂时不可用：模型离线。；简介没有修改。"},
+        ),
+    )
+    with page.expect_request("**/api/assistant/species-profile"):
+        profile.get_by_role("button", name="飞羽精灵补全").click()
+    expect(notes).to_have_value("原有观察记录。")
+    expect(profile.locator(".profile-intro-status")).to_contain_text("模型离线")
+    assert profile.is_visible()
 
 
 def test_browser_can_edit_species_profile_and_open_audio_form(

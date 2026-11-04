@@ -75,6 +75,7 @@ Leaflet 脚本和样式随 Vue 前端在本机提供。配置天地图浏览器�
 - `POST /api/integrations/llm/test`：向已保存的外部模型发送最小连接测试；
 - `POST /api/assistant/chat`：执行多轮精灵对话；
 - `POST /api/assistant/taxonomy-research`：检索本地资料并生成待确认的分类建议；
+- `POST /api/assistant/species-profile`：只读获取物种资料并生成图鉴简介草稿，不保存；
 - `POST /api/backups`：创建完整资料库备份；
 - `POST /api/backups/restore`：上传、校验并恢复完整备份；
 - `GET /api/exports/observations.csv`：导出全部田野记录；
@@ -86,3 +87,5 @@ Leaflet 脚本和样式随 Vue 前端在本机提供。配置天地图浏览器�
 ## 联网物种资料
 
 飞羽精灵的“联网查物种”以只读方式直接调用 iNaturalist 与 MediaWiki，不需要在 API 管理配置模型或密钥；这里只提供命名与资料查询，不支持让聊天模型自主调用任意 MCP。开关是 `.env` 中的 `TSUBASA_ONLINE_SPECIES_ENABLED`。请求包含名称或物种编号；仅在已填写拍摄地点时附带经纬度用于附近亚种统计，不上传照片或观察记录。用户确认后仅补充新物种表单的空白分类字段，亚种名单仅在原为空时填入；AI 建议不会自动选中。资料缓存位于 `data/.cache/inat/`，7 天有效，不进入资料库备份。
+
+“飞羽精灵补全”使用 `POST /api/assistant/species-profile`：按学名/中文名只读查询 iNaturalist 与 Wikipedia，再把当前简介和摘录交给模型生成草稿。接口只返回文本，不写业务数据库；是否保存仍由用户在“保存图鉴资料”中决定。已选外部模型时使用外部服务；请求包含物种名称、当前简介和来源摘录，不上传照片或观察记录。

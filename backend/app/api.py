@@ -16,6 +16,7 @@ from .assistant_schemas import (
     AssistantTextInput,
     LlmIntegrationInput,
     OnlineSpeciesSearchInput,
+    SpeciesProfileInput,
     TiandituIntegrationInput,
 )
 from .database import Database
@@ -29,6 +30,7 @@ from .routes.locations import router as location_router
 from .routes.media import router as media_router
 from .routes.observations import router as observation_router
 from .routes.trips import router as trip_router
+from .skills.base import SkillError
 from .update_service import UpdateError
 
 router = APIRouter(prefix="/api")
@@ -159,6 +161,21 @@ async def online_species_detail(taxon_id: int, request: Request) -> dict:
     if not 1 <= taxon_id <= 2**53 - 1:
         raise HTTPException(status_code=422, detail="物种编号必须是正整数")
     return await asyncio.to_thread(request.app.state.online_species.detail, taxon_id)
+
+
+@router.post("/assistant/species-profile")
+async def species_profile_draft(
+    payload: SpeciesProfileInput, request: Request,
+) -> dict:
+    try:
+        return await asyncio.to_thread(
+            request.app.state.species_profile.draft,
+            payload.scientific_name,
+            payload.chinese_name,
+            payload.introduction,
+        )
+    except SkillError as exc:
+        raise HTTPException(exc.status_code, exc.message) from exc
 
 
 @router.get("/assistant/status")

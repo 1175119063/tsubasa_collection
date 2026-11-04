@@ -27,6 +27,7 @@ const form = reactive({
 const behaviors = reactive<BehaviorDraft[]>(props.detail.behaviors.map((item) => ({ id: typeof item.id === "number" ? item.id : undefined, label: item.label || "", observation_ids: [...(item.observation_ids || [])] })));
 const individuals = reactive<TagDraft[]>(props.detail.individuals.filter((item) => !String(item.id).startsWith("observed-")).map((item) => ({ label: item.label || "", observation_id: item.observation_id || null })));
 const status = ref(""); const busy = ref(false);
+const profileBusy = ref(false); const profileStatus = ref("");
 
 function evidenceFor(dimension: EvidenceDraft["dimension"], valueKey: string, label: string, selected: number | null | undefined): EvidenceDraft | null {
   const options = props.detail.observations.filter((item) => dimension === "sex" ? item.sex === valueKey : dimension === "life_stage" ? item.life_stage === valueKey : String(item.subspecies?.id || "") === valueKey);
@@ -47,6 +48,30 @@ function toggleHabitat(value: string, checked: boolean): void {
 }
 function observationLabel(item: DossierObservation): string { return `${item.observed_at.replace("T", " ")} · ${item.locality}`; }
 function addTag(target: TagDraft[]): void { target.push({ label: "", observation_id: null }); }
+async function completeIntroduction(): Promise<void> {
+  if (profileBusy.value || busy.value) return;
+  profileBusy.value = true;
+  profileStatus.value = "飞羽精灵正在查资料并整理简介…";
+  try {
+    const result = await api<{ introduction: string; warnings?: string[] }>(
+      "/api/assistant/species-profile",
+      jsonRequest("POST", {
+        scientific_name: props.detail.scientific_name,
+        chinese_name: props.detail.chinese_name,
+        introduction: form.introduction || "",
+      }),
+    );
+    form.introduction = result.introduction;
+    const warnings = (result.warnings || []).filter(Boolean).slice(0, 2);
+    profileStatus.value = warnings.length
+      ? `已生成草稿；${warnings.join("；")}`
+      : "已生成草稿，保存后才会写入资料库。";
+  } catch (caught) {
+    profileStatus.value = errorMessage(caught);
+  } finally {
+    profileBusy.value = false;
+  }
+}
 async function submit(): Promise<void> {
   busy.value = true; status.value = "正在保存图鉴资料…";
   try {
@@ -65,7 +90,7 @@ async function submit(): Promise<void> {
 
 <template>
   <form @submit.prevent="submit"><header class="dialog-header"><div><p class="eyebrow">SPECIES PROFILE</p><h2>修改图鉴资料</h2></div><button type="button" class="icon-button" aria-label="关闭" @click="emit('close')">×</button></header><div class="form-scroll">
-    <fieldset><legend><span>01</span> 调查者手记</legend><label>物种简介<textarea v-model="form.introduction" rows="7" maxlength="10000" placeholder="记录识别经验、习性、鸣声或个人观察印象。"></textarea></label></fieldset>
+    <fieldset><legend><span>01</span> 调查者手记</legend><div class="profile-intro-field"><label for="species-profile-introduction">物种简介</label><div class="profile-intro-wrap"><textarea id="species-profile-introduction" v-model="form.introduction" rows="7" maxlength="10000" :disabled="profileBusy" placeholder="记录识别经验、习性、鸣声或个人观察印象。"></textarea><button type="button" class="assistant-complete" data-profile-complete :disabled="profileBusy || busy" @click="completeIntroduction">{{ profileBusy ? "整理中…" : "✦ 飞羽精灵补全" }}</button></div><p v-if="profileStatus" class="field-hint profile-intro-status" role="status">{{ profileStatus }}</p></div></fieldset>
     <fieldset><legend><span>02</span> 生态画像</legend><div class="profile-ecology-editor"><section><h3>生态类群</h3><div class="ecology-choice-grid"><label v-for="([value,label]) in ecologyGroups" :key="value" class="ecology-choice"><input v-model="form.ecological_group" type="radio" :value="value" /><span class="ecology-icon"><b v-if="value === 'unknown'">?</b><img v-else :src="`/static/assets/${ecologyAssets[value]}`" alt="" /></span><strong>{{ label }}</strong></label></div></section><section><h3>体型大小</h3><div class="body-size-choice-grid"><label v-for="([value,label],index) in bodySizes" :key="value" class="body-size-choice" :style="{ '--bird-width': `${32 + Math.max(0,index - 1) * 8}px` }"><input v-model="form.body_size" type="radio" :value="value" /><span v-if="value !== 'unknown'"><img class="body-size-raster-icon" :src="'/static/assets/body-size-silhouette.png'" alt="" /></span><span v-else>?</span><strong>{{ label }}</strong></label></div></section><section><div class="profile-choice-heading"><h3>偏好生境</h3><span>{{ habitatStatus }}</span></div><div class="habitat-choice-grid"><label v-for="([value,label]) in habitats" :key="value" class="habitat-choice"><input type="checkbox" :checked="form.preferred_habitats.includes(value)" @change="toggleHabitat(value, ($event.target as HTMLInputElement).checked)" /><span>{{ label }}</span></label></div></section></div></fieldset>
     <fieldset><legend><span>03</span> 自定义个体标签</legend><p class="field-hint">建立“成年雄性繁殖羽”等自定义个体标签，并可选择一笔观察作为照片凭证。</p><div class="profile-behavior-list"><div v-for="(item,index) in individuals" :key="index" class="profile-behavior-row"><label>个体标签<input v-model="item.label" maxlength="120" required /></label><label>照片凭证<select v-model="item.observation_id"><option :value="null">暂不关联</option><option v-for="observation in detail.observations" :key="observation.id" :value="observation.id">{{ observationLabel(observation) }}</option></select></label><button type="button" class="danger-button" @click="individuals.splice(index,1)">删除标签</button></div></div><button type="button" class="secondary-button" @click="addTag(individuals)">＋ 添加个体标签</button></fieldset>
     <fieldset><legend><span>04</span> 自动档案照片凭证</legend><p class="field-hint">对应外部“观察自动汇总”与亚种档案的凭证；自定义个体标签在上方单独关联。</p><div class="profile-evidence-list"><label v-for="item in evidence" :key="`${item.dimension}-${item.value_key}`" class="profile-evidence-row"><span>{{ item.label }}</span><select v-model="item.observation_id"><option v-for="observation in item.options" :key="observation.id" :value="observation.id">{{ observationLabel(observation) }}</option></select></label><p v-if="!evidence.length" class="field-hint">目前没有可设置照片凭证的个体或亚种档案。</p></div></fieldset>
@@ -80,7 +105,7 @@ async function submit(): Promise<void> {
       </section></div>
       <button type="button" class="secondary-button" @click="behaviors.push({ label: '', observation_ids: [] })">＋ 添加行为标签</button>
     </fieldset>
-  </div><footer class="dialog-footer"><span role="status">{{ status }}</span><button type="submit" class="primary-button" :disabled="busy">{{ busy ? "正在保存…" : "保存图鉴资料" }}</button></footer></form>
+  </div><footer class="dialog-footer"><span role="status">{{ status }}</span><button type="submit" class="primary-button" :disabled="busy || profileBusy">{{ busy ? "正在保存…" : "保存图鉴资料" }}</button></footer></form>
 </template>
 
 <style scoped>
@@ -89,4 +114,11 @@ async function submit(): Promise<void> {
 .behavior-observations { max-height: 240px; overflow: auto; margin: 12px 0; }
 .behavior-observations label { display: flex; align-items: center; gap: 8px; }
 .behavior-observations input { width: 16px; height: 16px; flex-shrink: 0; }
+.profile-intro-field { display: block; }
+.profile-intro-wrap { position: relative; display: block; }
+.profile-intro-wrap textarea { padding-bottom: 2.75rem; }
+.assistant-complete { position: absolute; right: 10px; bottom: 10px; border: 1px solid var(--line); border-radius: 999px; background: color-mix(in srgb, var(--paper) 88%, white); color: inherit; padding: 6px 12px; font: inherit; font-size: 12px; line-height: 1.2; cursor: pointer; }
+.assistant-complete:hover:not(:disabled) { border-color: var(--ink); }
+.assistant-complete:disabled { opacity: .65; cursor: progress; }
+.profile-intro-status { margin-top: 8px; }
 </style>
