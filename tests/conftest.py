@@ -2,6 +2,7 @@
 
 import io
 import json
+import os
 import socket
 import threading
 import time
@@ -14,7 +15,12 @@ from app.config import Settings
 from app.main import create_app
 from PIL import Image
 
-EDGE_PATH = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
+EDGE_PATH = Path(
+    os.environ.get(
+        "TSUBASA_BROWSER_EXECUTABLE",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    )
+)
 
 
 def pytest_collection_modifyitems(items):
@@ -128,8 +134,6 @@ def post_location_factory():
 def browser_app(tmp_path):
     from playwright.sync_api import sync_playwright
 
-    if not EDGE_PATH.is_file():
-        pytest.skip("浏览器流程测试需要 Microsoft Edge")
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
@@ -146,10 +150,10 @@ def browser_app(tmp_path):
             pytest.fail("测试服务器未能启动")
 
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
-                executable_path=str(EDGE_PATH),
-                headless=True,
-            )
+            launch_options = {"headless": True}
+            if EDGE_PATH.is_file():
+                launch_options["executable_path"] = str(EDGE_PATH)
+            browser = playwright.chromium.launch(**launch_options)
             page = browser.new_page()
             yield page, f"http://127.0.0.1:{port}", data_dir
             browser.close()

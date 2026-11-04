@@ -3,7 +3,10 @@
 from pathlib import Path
 
 import pytest
-from app.assistant_schemas import AssistantSpeciesProfileDraft
+from app.assistant_schemas import (
+    AssistantSpeciesProfileDraft,
+    SpeciesProfileChunkReview,
+)
 from app.config import Settings
 from app.feather_assistant import FeatherAssistantError
 from app.inat_mcp import inat_api
@@ -18,12 +21,25 @@ class _FakeAssistant:
         self,
         result: AssistantSpeciesProfileDraft | None = None,
         error: Exception | None = None,
+        review_results: list[SpeciesProfileChunkReview] | None = None,
+        review_error: Exception | None = None,
     ) -> None:
         self.result = result or AssistantSpeciesProfileDraft(
             introduction="整合后的物种简介。"
         )
         self.error = error
+        self.review_results = list(review_results or [])
+        self.review_error = review_error
         self.evidence: dict | None = None
+        self.reviews: list[dict] = []
+
+    def review_species_profile_chunk(self, evidence: dict) -> SpeciesProfileChunkReview:
+        self.reviews.append(evidence)
+        if self.review_error is not None:
+            raise self.review_error
+        if not self.review_results:
+            raise AssertionError("unexpected profile review")
+        return self.review_results.pop(0)
 
     def draft_species_profile(self, evidence: dict) -> AssistantSpeciesProfileDraft:
         self.evidence = evidence
@@ -142,6 +158,65 @@ def test_species_profile_skill_integrates_current_introduction_and_wikipedia(
         "iNaturalist",
         "Wikipedia",
     }
+    assert assistant.reviews == []
+
+
+def test_species_profile_loops_over_long_input_until_ai_has_enough(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(inat_api, "resolve_name", lambda *a, **kw: _resolved(_taxon()))
+    existing = "我在校园里见过灰喜鹊。" * 400
+    wiki = _wiki()
+    wiki["excerpt"] = "灰喜鹊分布于东亚，常见于城市公园和校园。" * 200
+    assistant = _FakeAssistant(
+        review_results=[
+            SpeciesProfileChunkReview(
+                notes=["校园观察：灰喜鹊常在树上跳跃。"],
+                enough=False,
+                missing="分布与栖息地",
+            ),
+            SpeciesProfileChunkReview(
+                notes=["分布：东亚的城市公园与校园。"],
+                enough=True,
+            ),
+        ]
+    )
+    skill = SpeciesProfileSkill(assistant=assistant)
+    skill.online._wiki_fetcher = lambda **kw: wiki
+
+    result = skill.draft("Cyanopica cyanus", "灰喜鹊", existing)
+
+    assert len(assistant.reviews) == 2
+    assert assistant.reviews[0]["chunk"]["index"] == 1
+    assert len(assistant.reviews[0]["chunk"]["text"]) <= 3000
+    assert assistant.evidence is not None
+    research = assistant.evidence["research"]
+    assert research["chunks_read"] == 2
+    assert research["chunks_total"] >= 2
+    assert research["stopped"] == "enough"
+    assert research["input_chars"] == len(existing) + len(wiki["excerpt"][:4000])
+    assert assistant.evidence["research_notes"] == [
+        "校园观察：灰喜鹊常在树上跳跃。",
+        "分布：东亚的城市公园与校园。",
+    ]
+    assert assistant.evidence["existing_introduction"] == ""
+    assert result["introduction"] == "整合后的物种简介。"
+    assert any("较长" in warning for warning in result["warnings"])
+
+
+def test_species_profile_review_failure_does_not_overwrite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(inat_api, "resolve_name", lambda *a, **kw: _resolved(_taxon()))
+    assistant = _FakeAssistant(review_error=FeatherAssistantError("模型离线"))
+    skill = SpeciesProfileSkill(assistant=assistant)
+    skill.online._wiki_fetcher = lambda **kw: _wiki()
+
+    with pytest.raises(SkillError) as error:
+        skill.draft("Cyanopica cyanus", "灰喜鹊", "长简介" * 2000)
+
+    assert error.value.status_code == 503
+    assert "模型离线" in error.value.message
 
 
 def test_species_profile_skill_rejects_unresolved_species(

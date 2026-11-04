@@ -43,3 +43,31 @@ jobs:
         run: npx vite build
       - name: Run non-browser tests
         run: python -m pytest -m "not browser" -q
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Python dependencies
+        run: python -m pip install ".[dev]"
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build frontend for browser tests
+        working-directory: frontend
+        run: npx vite build
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Run browser tests
+        run: python -m pytest -m browser -q

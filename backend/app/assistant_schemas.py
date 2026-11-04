@@ -96,6 +96,16 @@ class AssistantSpeciesProfileDraft(BaseModel):
     warnings: list[str] = Field(default_factory=list, max_length=10)
 
 
+class SpeciesProfileChunkReview(BaseModel):
+    """One fixed-size reading pass; the skill decides whether to read further."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    notes: list[str] = Field(default_factory=list, max_length=4)
+    enough: bool = False
+    missing: str | None = Field(default=None, max_length=200)
+
+
 class AssistantKnowledgeSearchPlan(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 

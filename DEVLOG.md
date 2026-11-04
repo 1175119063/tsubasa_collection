@@ -2,6 +2,13 @@
 
 > 本文是历史变更记录。旧功能描述、测试数量和当时的发布状态仅代表对应阶段；当前规则见 `DESIGN.md`，实际行为以当前代码为准。
 
+## 2026-11-04 · 简介补全分块阅读与浏览器 CI
+
+- “飞羽精灵补全”对长输入改为固定 3000 字分块：`SpeciesProfileSkill` 逐段调用 `review_species_profile_chunk`，模型返回本段要点、是否足够和缺失项；AI 认为足够即停止，最多读取 8 段。最终用累积要点与不超过 3000 字的原简介生成草稿。
+- 原简介超过 3000 字、AI 提前停止或资料仍缺项时，在结果中给出 warnings；补全只返回文本，失败不覆盖，仍不写业务数据库。
+- CI 新增独立 browser job：安装 Python/前端依赖、构建前端、安装 Playwright Chromium 后运行 `pytest -m browser`；`tests/conftest.py` 优先使用 Windows Edge，没有 Edge 时回退到 Playwright 自带 Chromium，Linux 上不再跳过。
+- 回归：非浏览器 126 项、浏览器 40 项通过；ruff、vue-tsc、Vite 构建通过。
+
 ## 2026-11-04 · 图鉴物种简介“飞羽精灵补全”
 
 - 鸟类调查册“修改图鉴资料”的物种简介框右下角新增“✦ 飞羽精灵补全”：只读调用 iNaturalist 与 Wikipedia 获取物种资料，再把当前简介、分类、摘要与维基摘录交给模型整合，生成一段可继续编辑的草稿。
