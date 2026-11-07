@@ -79,6 +79,19 @@ def test_create_manage_and_delete_multiple_observation_photos(tmp_path):
         assert covered.json()["photo_asset_id"] == third["asset_id"]
         assert covered.json()["observed_at"] == "2026-08-15T08:30"
 
+        first = record["photos"][0]
+        moved_cover = client.patch(
+            f"/api/observations/{observation_id}/photos/{first['id']}",
+            json={
+                "observed_at": first["observed_at"],
+                "species_entry_ids": [entry_id],
+                "is_cover": True,
+            },
+        )
+        assert moved_cover.status_code == 200, moved_cover.text
+        assert moved_cover.json()["photo_asset_id"] == first["asset_id"]
+        assert sum(photo["is_cover"] for photo in moved_cover.json()["photos"]) == 1
+
         removed = client.delete(
             f"/api/observations/{observation_id}/photos/{third['id']}"
         )

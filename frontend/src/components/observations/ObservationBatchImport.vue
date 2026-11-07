@@ -1,24 +1,28 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
-import { onBeforeRouteLeave } from "vue-router";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { api, errorMessage, jsonRequest } from "@/api/client";
 import type { SpeciesSummary, TaxonomyOrder, TripDetail, TripSummary } from "@/api/types";
 import ObservationFields from "./ObservationFields.vue";
 import { copyBatchFields, newSpeciesIdentity, type BatchItem } from "./batch-entry";
+import { clearBatch, peekBatch, stageBatch } from "./batch-draft-cache";
 import {
-  createObservationDraft, readObservationPhoto, observationIssues, saveObservationDraft,
-  isUncertainSave, type EntryLocation,
+  applyObservationLocation, createObservationDraft, readObservationPhoto, observationIssues,
+  saveObservationDraft, isUncertainSave, type EntryLocation,
 } from "./observation-entry";
 
 const props = defineProps<{ species: SpeciesSummary[]; locations: EntryLocation[] }>();
 const emit = defineEmits<{ close: []; changed: [] }>();
+const route = useRoute();
+const router = useRouter();
 const species = ref([...props.species]);
 const taxonomy = ref<TaxonomyOrder[]>([]);
 const loaded = ref(false);
 const items = ref<BatchItem[]>([]);
+let preservedForLocation = false;
 const activeId = ref("");
 const editorScroll = ref<HTMLElement | null>(null);
-const sections = ["目标物种", "个体与行为", "其他物种", "时间与地点"];
+const sections = ["目标物种", "时间与地点", "个体与行为", "其他物种"];
 const activeNumber = computed(() => items.value.findIndex((item) => item === active.value) + 1);
 const pendingCount = computed(() => items.value.length - saved.value.length - ready.value.length);
 function goToSection(index: number): void {
@@ -53,7 +57,25 @@ const tripId = ref("");
 const linking = ref(false);
 const tripMessage = ref("");
 
+function restoreStagedBatch(): void {
+  const staged = peekBatch();
+  if (!staged) return;
+  items.value = staged.items;
+  activeId.value = staged.activeId;
+  const requested = Number(route.query.location);
+  const target = items.value.find((item) => item.draft.id === staged.targetDraftId);
+  const location = props.locations.find((item) => item.id === requested);
+  if (target && location) applyObservationLocation(target.draft, location);
+  clearBatch();
+}
+function requestLocationCreation(): void {
+  if (!active.value) return;
+  stageBatch(items.value, activeId.value, active.value.draft.id);
+  preservedForLocation = true;
+  void router.push({ path: "/locations", query: { new: "1", return: "/observations", resume: "1" } });
+}
 onMounted(async () => {
+  restoreStagedBatch();
   window.addEventListener("beforeunload", beforeUnload);
   try { taxonomy.value = await api<TaxonomyOrder[]>("/api/taxonomy/tree"); loaded.value = true; }
   catch (caught) { message.value = `无法读取分类资料：${errorMessage(caught)}。请关闭后重新打开。`; }
@@ -177,6 +199,7 @@ async function linkTrip(): Promise<void> {
 }
 
 function canClose(): boolean {
+  if (preservedForLocation) return true;
   if (busy.value) { message.value = "请等待当前操作完成；保存过程中可以先点击暂停。"; return false; }
   if (items.value.some((item) => item.state !== "saved")) {
     return window.confirm("未保存照片的填写内容仅保留在本次窗口中，关闭后需要重新整理。已经保存的记录会保留。确定关闭吗？");
@@ -187,10 +210,10 @@ function requestClose(): void { if (canClose()) emit("close"); }
 function beforeUnload(event: BeforeUnloadEvent): void {
   if (busy.value || items.value.some((item) => item.state !== "saved")) { event.preventDefault(); event.returnValue = ""; }
 }
-onBeforeRouteLeave(() => canClose());
+onBeforeRouteLeave(() => preservedForLocation || canClose());
 onBeforeUnmount(() => {
   disposed = true;
-  items.value.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+  if (!preservedForLocation) items.value.forEach((item) => URL.revokeObjectURL(item.previewUrl));
   window.removeEventListener("beforeunload", beforeUnload);
 });
 defineExpose({ requestClose });
@@ -245,7 +268,7 @@ defineExpose({ requestClose });
               </div>
               <div v-if="issues(active).length" class="batch-issues" role="status"><strong>还需完善 {{ issues(active).length }} 项</strong><ul><li v-for="issue in issues(active)" :key="issue">{{ issue }}</li></ul></div>
               <form :key="active.draft.id" class="batch-entry-form" :inert="saving || linking" @submit.prevent>
-                <ObservationFields :draft="active.draft" :species="species" :locations="locations" :taxonomy="taxonomy" fixed-photo />
+                <ObservationFields :draft="active.draft" :species="species" :locations="locations" :taxonomy="taxonomy" fixed-photo @locate="requestLocationCreation" />
               </form>
             </template>
             <div v-else class="batch-result"><span class="batch-result-mark" aria-hidden="true">{{ active.state === 'saved' ? '✓' : '…' }}</span><h3>{{ active.state === 'saved' ? '这次相遇已存入手册' : statusLabel(active) }}</h3><p>{{ active.state === 'saved' ? '可以继续整理其他照片，或在下方关联本次远征。' : '请等待保存完成；结果待核实时，请先到田野记录确认。' }}</p><a v-if="active.observationId" :href="`/observations?observation=${active.observationId}`" target="_blank" rel="noopener">查看已保存记录 ↗</a><a v-if="active.state === 'uncertain'" href="/observations" target="_blank" rel="noopener">打开田野记录核实 ↗</a></div>

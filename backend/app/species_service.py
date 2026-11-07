@@ -14,6 +14,7 @@ from .models import (
     Observation,
     ObservationAudio,
     ObservationLocationLink,
+    ObservationPhoto,
     ObservationSpecies,
     ObservationTripLink,
     Species,
@@ -86,16 +87,13 @@ class SpeciesServiceMixin:
             select(Species)
             .options(
                 selectinload(Species.genus).selectinload(Genus.family).selectinload(Family.order),
-                selectinload(Species.observations).selectinload(Observation.photo_asset),
                 selectinload(Species.observation_entries)
                 .selectinload(ObservationSpecies.observation)
-                .selectinload(Observation.photo_asset),
+                .selectinload(Observation.photos)
+                .selectinload(ObservationPhoto.asset),
                 selectinload(Species.observation_entries).selectinload(
                     ObservationSpecies.subspecies
                 ),
-                selectinload(Species.observation_entries)
-                .selectinload(ObservationSpecies.observation)
-                .selectinload(Observation.photo_asset),
                 selectinload(Species.display_preference),
             )
             .order_by(Species.id)
@@ -182,15 +180,20 @@ class SpeciesServiceMixin:
             .options(
                 selectinload(Species.genus).selectinload(Genus.family).selectinload(Family.order),
                 selectinload(Species.subspecies),
-                selectinload(Species.observations).selectinload(Observation.photo_asset),
-                selectinload(Species.observations).selectinload(Observation.subspecies),
-                selectinload(Species.observations)
+                selectinload(Species.observation_entries)
+                .selectinload(ObservationSpecies.observation)
+                .selectinload(Observation.photos)
+                .selectinload(ObservationPhoto.asset),
+                selectinload(Species.observation_entries)
+                .selectinload(ObservationSpecies.observation)
                 .selectinload(Observation.audio_links)
                 .selectinload(ObservationAudio.asset),
-                selectinload(Species.observations)
+                selectinload(Species.observation_entries)
+                .selectinload(ObservationSpecies.observation)
                 .selectinload(Observation.location_link)
                 .selectinload(ObservationLocationLink.location),
-                selectinload(Species.observations)
+                selectinload(Species.observation_entries)
+                .selectinload(ObservationSpecies.observation)
                 .selectinload(Observation.trip_link)
                 .selectinload(ObservationTripLink.trip)
                 .selectinload(BirdingTrip.location),
@@ -444,7 +447,6 @@ class SpeciesServiceMixin:
                 selectinload(Species.genus)
                 .selectinload(Genus.family)
                 .selectinload(Family.order),
-                selectinload(Species.observations),
                 selectinload(Species.observation_entries).selectinload(
                     ObservationSpecies.observation
                 ),
@@ -547,7 +549,6 @@ class SpeciesServiceMixin:
             select(Species)
             .where(Species.id == species_id)
             .options(
-                selectinload(Species.observations),
                 selectinload(Species.observation_entries).selectinload(
                     ObservationSpecies.observation
                 ),

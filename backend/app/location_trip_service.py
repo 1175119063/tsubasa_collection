@@ -15,6 +15,8 @@ from .models import (
     Observation,
     ObservationAudio,
     ObservationLocationLink,
+    ObservationPhoto,
+    ObservationSpecies,
     ObservationTripLink,
     Species,
     TripLocation,
@@ -84,10 +86,12 @@ class LocationTripServiceMixin:
             .options(
                 selectinload(BirdingLocation.observation_links)
                 .selectinload(ObservationLocationLink.observation)
-                .selectinload(Observation.species),
+                .selectinload(Observation.species_entries)
+                .selectinload(ObservationSpecies.species),
                 selectinload(BirdingLocation.observation_links)
                 .selectinload(ObservationLocationLink.observation)
-                .selectinload(Observation.photo_asset),
+                .selectinload(Observation.photos)
+                .selectinload(ObservationPhoto.asset),
                 selectinload(BirdingLocation.cover).selectinload(LocationCover.asset),
                 selectinload(BirdingLocation.trips),
                 selectinload(BirdingLocation.trip_links),
@@ -103,13 +107,16 @@ class LocationTripServiceMixin:
             .options(
                 selectinload(BirdingLocation.observation_links)
                 .selectinload(ObservationLocationLink.observation)
-                .selectinload(Observation.species),
+                .selectinload(Observation.species_entries)
+                .selectinload(ObservationSpecies.species),
                 selectinload(BirdingLocation.observation_links)
                 .selectinload(ObservationLocationLink.observation)
-                .selectinload(Observation.subspecies),
+                .selectinload(Observation.species_entries)
+                .selectinload(ObservationSpecies.subspecies),
                 selectinload(BirdingLocation.observation_links)
                 .selectinload(ObservationLocationLink.observation)
-                .selectinload(Observation.photo_asset),
+                .selectinload(Observation.photos)
+                .selectinload(ObservationPhoto.asset),
                 selectinload(BirdingLocation.observation_links)
                 .selectinload(ObservationLocationLink.observation)
                 .selectinload(Observation.audio_links)
@@ -291,12 +298,14 @@ class LocationTripServiceMixin:
                 selectinload(BirdingTrip.location_links).selectinload(TripLocation.location),
                 selectinload(BirdingTrip.observation_links)
                 .selectinload(ObservationTripLink.observation)
-                .selectinload(Observation.species)
+                .selectinload(Observation.species_entries)
+                .selectinload(ObservationSpecies.species)
                 .selectinload(Species.genus)
                 .selectinload(Genus.family),
                 selectinload(BirdingTrip.observation_links)
                 .selectinload(ObservationTripLink.observation)
-                .selectinload(Observation.photo_asset),
+                .selectinload(Observation.photos)
+                .selectinload(ObservationPhoto.asset),
             )
             .order_by(BirdingTrip.started_at, BirdingTrip.id)
         ).all()
@@ -311,15 +320,18 @@ class LocationTripServiceMixin:
                 selectinload(BirdingTrip.location_links).selectinload(TripLocation.location),
                 selectinload(BirdingTrip.observation_links)
                 .selectinload(ObservationTripLink.observation)
-                .selectinload(Observation.species)
+                .selectinload(Observation.species_entries)
+                .selectinload(ObservationSpecies.species)
                 .selectinload(Species.genus)
                 .selectinload(Genus.family),
                 selectinload(BirdingTrip.observation_links)
                 .selectinload(ObservationTripLink.observation)
-                .selectinload(Observation.subspecies),
+                .selectinload(Observation.species_entries)
+                .selectinload(ObservationSpecies.subspecies),
                 selectinload(BirdingTrip.observation_links)
                 .selectinload(ObservationTripLink.observation)
-                .selectinload(Observation.photo_asset),
+                .selectinload(Observation.photos)
+                .selectinload(ObservationPhoto.asset),
                 selectinload(BirdingTrip.observation_links)
                 .selectinload(ObservationTripLink.observation)
                 .selectinload(Observation.audio_links)

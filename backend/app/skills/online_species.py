@@ -244,6 +244,11 @@ class OnlineSpeciesSkill:
                 "locality": context.locality,
                 "country": context.country,
                 "admin1": context.admin1,
+                "observed_at": (
+                    context.observed_at.isoformat()
+                    if context.observed_at is not None
+                    else None
+                ),
             },
             "nearby_subspecies": (
                 {

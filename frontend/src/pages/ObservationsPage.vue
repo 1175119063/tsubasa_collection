@@ -162,7 +162,7 @@ onMounted(async () => {
   const requestedObservation = Number(route.query.observation);
   const target = observations.value.find((item) => item.id === requestedObservation);
   if (target) await openObservation(target);
-  else if (route.query.new === "1") await openNew();
+  else if (route.query.new === "1" || route.query.resume === "1") await openNew();
   document.addEventListener("feather:apply-observation-search", handleAssistantSearch);
 });
 

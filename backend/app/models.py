@@ -9,10 +9,12 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy import (
     Enum as SAEnum,
@@ -124,9 +126,6 @@ class Species(TimestampMixin, Base):
     subspecies: Mapped[list[Subspecies]] = relationship(
         back_populates="species", cascade="all, delete-orphan"
     )
-    observations: Mapped[list[Observation]] = relationship(
-        back_populates="species", cascade="all, delete-orphan"
-    )
     observation_entries: Mapped[list[ObservationSpecies]] = relationship(
         back_populates="species", cascade="all, delete-orphan"
     )
@@ -172,7 +171,6 @@ class Subspecies(TimestampMixin, Base):
     scientific_name_key: Mapped[str] = mapped_column(String(220), unique=True, index=True)
 
     species: Mapped[Species] = relationship(back_populates="subspecies")
-    observations: Mapped[list[Observation]] = relationship(back_populates="subspecies")
 
 
 class MediaAsset(TimestampMixin, Base):
@@ -196,25 +194,9 @@ class Observation(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("latitude >= -90 AND latitude <= 90", name="latitude_range"),
         CheckConstraint("longitude >= -180 AND longitude <= 180", name="longitude_range"),
-        CheckConstraint(
-            "(photo_type = 'group' AND sex IS NULL AND life_stage IS NULL "
-            "AND subspecies_id IS NULL) OR "
-            "(photo_type = 'individual' AND sex IS NOT NULL AND life_stage IS NOT NULL)",
-            name="photo_subject_fields",
-        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    species_id: Mapped[int] = mapped_column(
-        ForeignKey("species.id", ondelete="CASCADE"), index=True
-    )
-    subspecies_id: Mapped[int | None] = mapped_column(
-        ForeignKey("subspecies.id", ondelete="RESTRICT"), nullable=True, index=True
-    )
-    photo_asset_id: Mapped[int] = mapped_column(
-        ForeignKey("media_assets.id", ondelete="RESTRICT"), index=True
-    )
-    photo_type: Mapped[PhotoType] = mapped_column(enum_type(PhotoType, "photo_type"))
     observed_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     latitude: Mapped[float] = mapped_column(Float)
     longitude: Mapped[float] = mapped_column(Float)
@@ -225,15 +207,8 @@ class Observation(TimestampMixin, Base):
     locality: Mapped[str] = mapped_column(String(240))
     season: Mapped[Season] = mapped_column(enum_type(Season, "season"), index=True)
     season_note: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    sex: Mapped[Sex | None] = mapped_column(enum_type(Sex, "sex"), nullable=True)
-    life_stage: Mapped[LifeStage | None] = mapped_column(
-        enum_type(LifeStage, "life_stage"), nullable=True
-    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    species: Mapped[Species] = relationship(back_populates="observations")
-    subspecies: Mapped[Subspecies | None] = relationship(back_populates="observations")
-    photo_asset: Mapped[MediaAsset] = relationship(foreign_keys=[photo_asset_id])
     audio_links: Mapped[list[ObservationAudio]] = relationship(
         back_populates="observation", cascade="all, delete-orphan"
     )
@@ -252,6 +227,59 @@ class Observation(TimestampMixin, Base):
         order_by="ObservationPhoto.position",
     )
 
+    def _primary_entry_or_raise(self) -> ObservationSpecies:
+        entry = self.primary_entry
+        if entry is None:
+            raise RuntimeError(f"观察记录 {self.id} 缺少主物种条目")
+        return entry
+
+    @property
+    def primary_entry(self) -> ObservationSpecies | None:
+        return next((entry for entry in self.species_entries if entry.is_primary), None)
+
+    @property
+    def cover_photo(self) -> ObservationPhoto | None:
+        return next((photo for photo in self.photos if photo.is_cover), None)
+
+    @property
+    def species(self) -> Species:
+        return self._primary_entry_or_raise().species
+
+    @property
+    def species_id(self) -> int:
+        return self._primary_entry_or_raise().species_id
+
+    @property
+    def subspecies(self) -> Subspecies | None:
+        return self._primary_entry_or_raise().subspecies
+
+    @property
+    def subspecies_id(self) -> int | None:
+        return self._primary_entry_or_raise().subspecies_id
+
+    @property
+    def photo_type(self) -> PhotoType:
+        return self._primary_entry_or_raise().photo_type
+
+    @property
+    def sex(self) -> Sex | None:
+        return self._primary_entry_or_raise().sex
+
+    @property
+    def life_stage(self) -> LifeStage | None:
+        return self._primary_entry_or_raise().life_stage
+
+    @property
+    def photo_asset(self) -> MediaAsset:
+        photo = self.cover_photo
+        if photo is None:
+            raise RuntimeError(f"观察记录 {self.id} 缺少封面照片")
+        return photo.asset
+
+    @property
+    def photo_asset_id(self) -> int:
+        return self.photo_asset.id
+
 
 class ObservationSpecies(TimestampMixin, Base):
     __tablename__ = "observation_species"
@@ -262,6 +290,12 @@ class ObservationSpecies(TimestampMixin, Base):
             "AND subspecies_id IS NULL) OR "
             "(photo_type = 'individual' AND sex IS NOT NULL AND life_stage IS NOT NULL)",
             name="subject_fields",
+        ),
+        Index(
+            "uq_observation_species_primary",
+            "observation_id",
+            unique=True,
+            sqlite_where=text("is_primary = 1"),
         ),
     )
 
@@ -299,6 +333,12 @@ class ObservationPhoto(TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("observation_id", "asset_id"),
         CheckConstraint("position >= 0", name="observation_photo_position"),
+        Index(
+            "uq_observation_photos_cover",
+            "observation_id",
+            unique=True,
+            sqlite_where=text("is_cover = 1"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

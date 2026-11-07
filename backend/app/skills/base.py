@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 
@@ -24,6 +25,7 @@ class SkillContext:
     locality: str | None = None
     country: str | None = None
     admin1: str | None = None
+    observed_at: datetime | None = None
 
     @property
     def has_coordinates(self) -> bool:

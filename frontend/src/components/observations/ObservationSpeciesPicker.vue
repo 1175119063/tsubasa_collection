@@ -47,7 +47,7 @@ function select(value: string): void {
     </template>
     <label>{{ selectLabel }}<select ref="choice" :value="modelValue" :required="allowNew" @change="select(($event.target as HTMLSelectElement).value)">
       <option value="" :disabled="allowNew">{{ allowNew ? '请选择物种' : '选择物种' }}</option>
-      <option v-if="allowNew" value="new">＋ 登记新物种</option>
+      <option v-if="modelValue === 'new'" value="new" disabled>正在登记新物种</option>
       <option v-for="item in options" :key="item.id" :value="String(item.id)">{{ item.catalog_number }} · {{ item.chinese_name }} · {{ item.scientific_name }}</option>
     </select></label>
   </div>

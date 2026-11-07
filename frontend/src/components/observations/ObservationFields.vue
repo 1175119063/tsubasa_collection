@@ -8,8 +8,11 @@ import OnlineSpeciesLookup from "../OnlineSpeciesLookup.vue";
 import type { OnlineTaxonName, OnlineTaxonomyDraft } from "@/api/online-species";
 import BehaviorPicker from "./BehaviorPicker.vue";
 import ObservationSpeciesPicker from "./ObservationSpeciesPicker.vue";
+import ObservationLocationPicker from "./ObservationLocationPicker.vue";
+import SubspeciesAssistant from "./SubspeciesAssistant.vue";
 
 const props = defineProps<{ draft: ObservationDraft; species: SpeciesSummary[]; locations: EntryLocation[]; taxonomy: TaxonomyOrder[]; fixedPhoto?: boolean }>();
+const emit = defineEmits<{ locate: [] }>();
 const { speciesId, orderId, familyId, genusId, photo, audio, photoStatus, additional } = toRefs(props.draft);
 const form = props.draft.form;
 const newSpecies = props.draft.newSpecies;
@@ -65,6 +68,12 @@ async function loadSubspecies(): Promise<void> {
     const detail = await api<{ subspecies: Subspecies[] }>(`/api/species/${id}`);
     if (id === speciesId.value) primarySubspecies.value = detail.subspecies;
   } catch (caught) { status.value = errorMessage(caught); }
+}
+function startNewSpecies(): void { speciesId.value = "new"; }
+function cancelNewSpecies(): void { speciesId.value = ""; }
+function locationChanged(value: string): void {
+  form.location_id = value;
+  selectLocation();
 }
 function selectLocation(): void {
   const location = props.locations.find((item) => String(item.id) === form.location_id);
@@ -138,12 +147,14 @@ onMounted(loadSubspecies);
 
 <template>
 
-    <ObservationSpeciesAssistant v-if="speciesId === 'new'" :online-apply-message="onlineApplyStatus" :latitude="form.latitude" :longitude="form.longitude" :locality="form.locality" @apply="applyAssistant" @apply-online="applyOnline" />
+    <ObservationSpeciesAssistant v-if="speciesId === 'new'" :online-apply-message="onlineApplyStatus" :latitude="form.latitude" :longitude="form.longitude" :locality="form.locality" :observed-at="form.observed_at" @apply="applyAssistant" @apply-online="applyOnline" />
     <fieldset tabindex="-1">
 <legend>
 <span>01</span> 目标物种</legend>
 <div class="form-grid">
 <ObservationSpeciesPicker v-model="speciesId" :species="availablePrimary" search-label="搜索已有图鉴物种" select-label="选择图鉴物种" allow-new />
+<button v-if="speciesId !== 'new'" class="secondary-button full-field" type="button" data-new-species @click="startNewSpecies">＋ 登记新物种</button>
+<button v-else class="secondary-button full-field" type="button" @click="cancelNewSpecies">取消登记新物种，改选已有物种</button>
 <template v-if="speciesId === 'new'">
 <label>目<select v-model="orderId">
 <option value="new">新增目</option>
@@ -199,7 +210,44 @@ onMounted(loadSubspecies);
 </fieldset>
     <fieldset tabindex="-1">
 <legend>
-<span>02</span> 个体与行为</legend>
+<span>02</span> 时间与地点</legend>
+<div class="form-grid">
+<ObservationLocationPicker class="full-field" :model-value="form.location_id" :locations="locations" allow-create @update:model-value="locationChanged" @create="emit('locate')" />
+<label>拍摄时间<input v-model="form.observed_at" type="datetime-local" step="60" required />
+</label>
+<label>季节<select v-model="form.season" aria-label="季节" required>
+<option value="" disabled>请选择季节</option>
+<option value="spring">春</option>
+<option value="summer">夏</option>
+<option value="autumn">秋</option>
+<option value="winter">冬</option>
+<option value="other">其他</option>
+</select>
+</label>
+<label>纬度<input v-model.number="form.latitude" type="number" min="-90" max="90" step="any" required />
+</label>
+<label>经度<input v-model.number="form.longitude" type="number" min="-180" max="180" step="any" required />
+</label>
+<button type="button" class="secondary-button full-field" @click="useLocation">使用当前设备位置</button>
+<label>国家代码<input v-model="form.country_code" required />
+</label>
+<label>国家名称<input v-model="form.country_name" required />
+</label>
+<label>一级行政区代码<input v-model="form.admin1_code" required />
+</label>
+<label>一级行政区名称<input v-model="form.admin1_name" required />
+</label>
+<label class="full-field">具体地点<input v-model="form.locality" required />
+</label>
+<label class="full-field">备注<textarea v-model="form.notes" rows="3">
+</textarea>
+</label>
+</div>
+</fieldset>
+
+    <fieldset tabindex="-1">
+<legend>
+<span>03</span> 个体与行为</legend>
 <div class="form-grid">
 <label class="full-field file-field observation-photo-input"><span v-if="!fixedPhoto">JPEG/JPG 照片（每张不超过 10 MB）</span><img v-if="photoPreview && !draft.photoError" class="observation-photo-preview" :src="photoPreview" alt="当前选择的观察照片" /><input v-if="!fixedPhoto" type="file" accept="image/jpeg,.jpg,.jpeg" multiple :required="!photo" @change="photoChanged" />
 <span class="field-hint" role="status">{{ photoStatus }}</span>
@@ -237,6 +285,17 @@ onMounted(loadSubspecies);
 <option v-for="item in primarySubspecies" :key="item.id" :value="item.id">{{ item.chinese_name || item.scientific_name }}</option>
 </select>
 </label>
+<SubspeciesAssistant
+  v-if="speciesId !== 'new'"
+  :scientific-name="selectedSpecies?.scientific_name || ''"
+  :latitude="form.latitude"
+  :longitude="form.longitude"
+  :locality="form.locality"
+  :observed-at="form.observed_at"
+  :subspecies="primarySubspecies"
+  :model-value="form.subspecies_id"
+  @update:model-value="form.subspecies_id = $event"
+/>
 </template>
 <BehaviorPicker v-if="speciesId" v-model="form.behavior_labels" :species-id="Number(speciesId) || null" />
 <details v-if="speciesId !== 'new'" class="full-field online-species-reference" @toggle="onlineToggled">
@@ -258,7 +317,7 @@ onMounted(loadSubspecies);
 </fieldset>
     <fieldset tabindex="-1">
 <legend>
-<span>03</span> 照片中的其他物种</legend>
+<span>04</span> 其他物种</legend>
 <div class="form-grid">
 <ObservationSpeciesPicker v-model="additionalId" :species="availableAdditional" search-label="搜索照片中的其他物种" select-label="选择已有图鉴物种" />
 <button class="secondary-button full-field" type="button" @click="addAdditional">＋ 添加到这笔观察</button>
@@ -303,46 +362,6 @@ onMounted(loadSubspecies);
 </label>
 </div>
 </article>
-</div>
-</fieldset>
-    <fieldset tabindex="-1">
-<legend>
-<span>04</span> 时间、地点与环境</legend>
-<div class="form-grid">
-<label class="full-field">地点资料库<select v-model="form.location_id" @change="selectLocation">
-<option value="">暂不关联地点</option>
-<option v-for="item in locations" :key="item.id" :value="String(item.id)">{{ item.name }} · {{ item.admin1_name }}</option>
-</select>
-</label>
-<label>拍摄时间<input v-model="form.observed_at" type="datetime-local" step="60" required />
-</label>
-<label>季节<select v-model="form.season" aria-label="季节" required>
-<option value="" disabled>请选择季节</option>
-<option value="spring">春</option>
-<option value="summer">夏</option>
-<option value="autumn">秋</option>
-<option value="winter">冬</option>
-<option value="other">其他</option>
-</select>
-</label>
-<label>纬度<input v-model.number="form.latitude" type="number" min="-90" max="90" step="any" required />
-</label>
-<label>经度<input v-model.number="form.longitude" type="number" min="-180" max="180" step="any" required />
-</label>
-<button type="button" class="secondary-button full-field" @click="useLocation">使用当前设备位置</button>
-<label>国家代码<input v-model="form.country_code" required />
-</label>
-<label>国家名称<input v-model="form.country_name" required />
-</label>
-<label>一级行政区代码<input v-model="form.admin1_code" required />
-</label>
-<label>一级行政区名称<input v-model="form.admin1_name" required />
-</label>
-<label class="full-field">具体地点<input v-model="form.locality" required />
-</label>
-<label class="full-field">备注<textarea v-model="form.notes" rows="3">
-</textarea>
-</label>
 </div>
 </fieldset>
 

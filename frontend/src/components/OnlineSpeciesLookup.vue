@@ -10,6 +10,7 @@ const props = defineProps<{
   latitude?: number | null;
   longitude?: number | null;
   locality?: string | null;
+  observedAt?: string | null;
   applyHint?: string;
 }>();
 const emit = defineEmits<{ apply: [draft: OnlineTaxonomyDraft] }>();
@@ -66,6 +67,7 @@ async function search(): Promise<void> {
       body.longitude = props.longitude;
     }
     if (props.locality?.trim()) body.locality = props.locality.trim();
+    if (props.observedAt?.trim()) body.observed_at = props.observedAt.trim();
     result.value = await api<OnlineSpeciesResult>("/api/assistant/online-species/search", jsonRequest("POST", body));
     selected.value = result.value.taxon;
     message.value = selected.value

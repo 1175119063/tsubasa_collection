@@ -110,7 +110,7 @@ def test_online_entry_preview_preserves_existing_fields(browser_app, tmp_path, j
     photo = tmp_path / "online.jpg"
     photo.write_bytes(jpeg_bytes())
     dialog.get_by_label("批量选择照片", exact=True).set_input_files(str(photo))
-    dialog.locator("fieldset").first.locator("select").first.select_option("new")
+    dialog.locator("[data-new-species]").click()
     dialog.get_by_role("button", name="联网查物种", exact=True).click()
     dialog.get_by_label("该物种存在亚种", exact=True).check()
     dialog.get_by_label("完整亚种名单", exact=True).fill("Chlidonias hybrida hybrida | 指名亚种")
@@ -153,7 +153,7 @@ def test_online_species_shows_subspecies_ai_and_prefills_only_after_apply(
     photo = tmp_path / "online-rich.jpg"
     photo.write_bytes(jpeg_bytes())
     dialog.get_by_label("批量选择照片", exact=True).set_input_files(str(photo))
-    dialog.locator("fieldset").first.locator("select").first.select_option("new")
+    dialog.locator("[data-new-species]").click()
     dialog.get_by_role("button", name="联网查物种", exact=True).click()
     subspecies = dialog.get_by_label("该物种存在亚种", exact=True)
     expect(subspecies).not_to_be_checked()
@@ -192,7 +192,7 @@ def test_online_prefill_creates_new_species_with_subspecies(browser_app, tmp_pat
     photo = tmp_path / "online-save.jpg"
     photo.write_bytes(jpeg_bytes())
     dialog.get_by_label("批量选择照片", exact=True).set_input_files(str(photo))
-    dialog.locator("fieldset").first.locator("select").first.select_option("new")
+    dialog.locator("[data-new-species]").click()
     dialog.get_by_role("button", name="联网查物种", exact=True).click()
     dialog.locator("[data-online-query]").fill("须浮鸥")
     dialog.locator("[data-online-search]").click()
@@ -201,14 +201,14 @@ def test_online_prefill_creates_new_species_with_subspecies(browser_app, tmp_pat
     expect(dialog.get_by_label("该物种存在亚种", exact=True)).to_be_checked()
 
     form = dialog.locator("form")
-    location_fields = form.locator("fieldset").nth(3).locator("input")
-    location_fields.nth(0).fill("2026-08-26T07:15")
-    location_fields.nth(1).fill("31.230")
-    location_fields.nth(2).fill("121.470")
-    location_fields.nth(5).fill("CN-SH")
-    location_fields.nth(6).fill("Shanghai")
-    location_fields.nth(7).fill("Century Park")
-    form.locator("fieldset").nth(3).locator("select").nth(1).select_option("summer")
+    location = form.locator("fieldset").nth(1)
+    location.get_by_label("拍摄时间", exact=True).fill("2026-08-26T07:15")
+    location.get_by_label("纬度", exact=True).fill("31.230")
+    location.get_by_label("经度", exact=True).fill("121.470")
+    location.get_by_label("一级行政区代码", exact=True).fill("CN-SH")
+    location.get_by_label("一级行政区名称", exact=True).fill("Shanghai")
+    location.get_by_label("具体地点", exact=True).fill("Century Park")
+    location.get_by_label("季节", exact=True).select_option("summer")
 
     with page.expect_response(
         lambda response: (

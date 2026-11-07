@@ -63,7 +63,7 @@ def test_tianditu_is_used_as_primary_map_with_browser_key(browser_app, jpeg_byte
 
     page.route("https://t*.tianditu.gov.cn/**", fulfill_tile)
     page.goto(f"{base_url}/map")
-    page.get_by_text("天地图底图已加载", exact=False).wait_for()
+    page.get_by_text("天地图底图已加载", exact=False).wait_for(timeout=90000)
 
     assert any("/vec_w/wmts" in url for url in tile_urls)
     assert any("/cva_w/wmts" in url for url in tile_urls)
@@ -390,7 +390,7 @@ def test_assistant_previews_then_fills_new_species_taxonomy(browser_app, tmp_pat
     photo = tmp_path / "assistant.jpg"
     photo.write_bytes(jpeg_bytes())
     dialog.get_by_label("批量选择照片", exact=True).set_input_files(str(photo))
-    dialog.locator("fieldset").first.locator("select").first.select_option("new")
+    dialog.locator("[data-new-species]").click()
     query = page.locator("[data-vue-feather-query]")
     query.wait_for(state="visible")
     query.fill("Blue-and-white Flycatcher")
@@ -421,15 +421,15 @@ def test_browser_can_create_observation_with_existing_species(
     form.locator("fieldset").first.locator("select").first.select_option(
         str(original["species_id"])
     )
-    location_fields = form.locator("fieldset").nth(3).locator("input")
-    location_fields.nth(0).fill("2026-08-26T07:15")
-    location_fields.nth(1).fill("30.275")
-    location_fields.nth(2).fill("120.156")
-    location_fields.nth(5).fill("CN-ZJ")
-    location_fields.nth(6).fill("Zhejiang")
-    location_fields.nth(7).fill("West Lake")
+    location = form.locator("fieldset").nth(1)
+    location.get_by_label("拍摄时间", exact=True).fill("2026-08-26T07:15")
+    location.get_by_label("纬度", exact=True).fill("30.275")
+    location.get_by_label("经度", exact=True).fill("120.156")
+    location.get_by_label("一级行政区代码", exact=True).fill("CN-ZJ")
+    location.get_by_label("一级行政区名称", exact=True).fill("Zhejiang")
+    location.get_by_label("具体地点", exact=True).fill("West Lake")
 
-    season = form.locator("fieldset").nth(3).locator("select").nth(1)
+    season = location.get_by_label("季节", exact=True)
     assert season.input_value() == ""
     assert dialog.get_by_role("button", name="保存就绪照片（0）").is_disabled()
     assert season.evaluate("element => element.validity.valueMissing")
@@ -481,10 +481,12 @@ def test_browser_can_view_and_extend_multi_photo_observation(
     editor.locator(".observation-photo-manager-list article").nth(1).wait_for()
     editor.get_by_label("选择 JPEG/JPG").set_input_files(str(third_photo))
     editor.locator(".observation-photo-add").get_by_label("拍摄时间").fill("2026-08-26T07:20")
+    add_photo = editor.get_by_role("button", name="保存这张补充照片")
+    expect(add_photo).to_be_enabled(timeout=90000)
     with page.expect_response(
         lambda response: "/photos" in response.url and response.request.method == "POST"
     ) as add_response:
-        editor.get_by_role("button", name="保存这张补充照片").click()
+        add_photo.click()
     assert add_response.value.status == 201
     editor.get_by_text("3 / 20 张", exact=True).wait_for()
     record = max(

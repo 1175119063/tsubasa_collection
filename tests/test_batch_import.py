@@ -1,4 +1,5 @@
 import io
+import json
 
 import httpx
 import pytest
@@ -25,11 +26,15 @@ def open_batch(page, base_url, paths):
     return dialog
 
 
-def fill_common(dialog, species_id, location_id):
+def fill_common(dialog, species_id, location_name):
     form = dialog.locator("form.batch-entry-form")
-    form.locator("fieldset").nth(0).locator("select").first.select_option(str(species_id))
-    location_fields = form.locator("fieldset").nth(3)
-    location_fields.locator("select").first.select_option(str(location_id))
+    if species_id == "new":
+        dialog.locator("[data-new-species]").click()
+    else:
+        form.locator("fieldset").nth(0).locator("select").first.select_option(str(species_id))
+    location = form.locator("fieldset").nth(1)
+    location.locator("[data-observation-location-search]").fill(location_name)
+    form.get_by_role("list", name="地点检索结果").get_by_role("button").first.click()
     form.get_by_label("季节", exact=True).select_option("summer")
 
 
@@ -87,7 +92,7 @@ def test_species_search_selects_primary_and_other_species(
         dialog.locator('input[type="file"][accept*="image/jpeg"]').set_input_files(str(first))
     form = dialog.locator("form")
     primary = form.locator("fieldset").nth(0)
-    others = form.locator("fieldset").nth(2)
+    others = form.locator("fieldset").nth(3)
     query = primary.get_by_label("搜索已有图鉴物种", exact=True)
     choice = primary.get_by_role("combobox", name="选择图鉴物种", exact=True)
     for term in ["喜鹊", "  PICA   SERICA  ", "鸦科", "corvidae", "鹊属", magpie["catalog_number"]]:
@@ -114,7 +119,7 @@ def test_species_search_selects_primary_and_other_species(
     expect(primary.get_by_role("status")).to_contain_text("没有找到")
     expect(choice).to_have_value(str(magpie["species_id"]))
     query.fill("")
-    expect(choice.locator("option")).to_have_count(4)
+    expect(choice.locator("option")).to_have_count(3)
 
     other_query = others.get_by_label("搜索照片中的其他物种", exact=True)
     other_query.fill("喜鹊")
@@ -135,7 +140,9 @@ def test_species_search_selects_primary_and_other_species(
     others.get_by_role("button", name="＋ 添加到这笔观察", exact=True).click()
     expect(others.locator(".additional-species-entry")).to_have_count(1)
     form.locator(".observation-photo-species").get_by_label("白腰文鸟", exact=True).check()
-    form.locator("fieldset").nth(3).locator("select").first.select_option(str(location["id"]))
+    location_field = form.locator("fieldset").nth(1)
+    location_field.locator("[data-observation-location-search]").fill(location["name"])
+    form.get_by_role("list", name="地点检索结果").get_by_role("button").first.click()
     form.get_by_label("季节", exact=True).select_option("summer")
     if multiple:
         dialog.locator(".batch-photo-button").nth(1).click()
@@ -204,11 +211,11 @@ def test_batch_reuses_fields_preserves_exif_and_keeps_invalid_files_separate(
     assert form.locator("fieldset").first.locator("select").first.input_value() == ""
     assert form.get_by_label("季节", exact=True).input_value() == ""
     expect(dialog.get_by_role("button", name="保存就绪照片（0）")).to_be_disabled()
-    fill_common(dialog, original["species_id"], location["id"])
+    fill_common(dialog, original["species_id"], location["name"])
     apply_common(dialog)
     dialog.locator(".batch-photo-button").nth(1).click()
     assert form.get_by_label("拍摄时间", exact=True).input_value() == "2026-08-25T08:20"
-    form.locator("fieldset").nth(1).locator("select").nth(1).select_option("female")
+    form.locator("fieldset").nth(2).locator("select").nth(1).select_option("female")
     form.get_by_label("备注", exact=True).fill("second photo note")
     dialog.locator(".batch-photo-button").nth(0).click()
     assert form.get_by_label("拍摄时间", exact=True).input_value() == "2026-08-25T07:10"
@@ -246,11 +253,13 @@ def test_batch_new_species_is_created_once_and_failed_photo_can_retry(
     second = photo_file(tmp_path, "new-second.jpg", "2026:08:25 08:20:00")
     dialog = open_batch(page, base_url, [first, second])
     form = dialog.locator("form.batch-entry-form")
-    fill_common(dialog, "new", location["id"])
+    fill_common(dialog, "new", location["name"])
     taxonomy = httpx.get(f"{base_url}/api/taxonomy/tree").json()
     species_fields = form.locator("fieldset").first
     species_fields.locator("select").nth(1).select_option(str(taxonomy[0]["id"]))
-    species_fields.locator("select").nth(2).select_option(str(taxonomy[0]["families"][0]["id"]))
+    species_fields.locator("select").nth(2).select_option(
+        str(taxonomy[0]["families"][0]["id"])
+    )
     species_fields.locator("select").nth(3).select_option(
         str(taxonomy[0]["families"][0]["genera"][0]["id"])
     )
@@ -300,7 +309,7 @@ def test_batch_unknown_save_result_stops_queue_and_cannot_resubmit(
     first = photo_file(tmp_path, "uncertain.jpg", "2026:08:25 07:10:00")
     second = photo_file(tmp_path, "waiting.jpg", "2026:08:25 08:20:00")
     dialog = open_batch(page, base_url, [first, second])
-    fill_common(dialog, original["species_id"], location["id"])
+    fill_common(dialog, original["species_id"], location["name"])
     apply_common(dialog)
     page.evaluate("""() => {
         const originalFetch = window.fetch.bind(window);
@@ -347,7 +356,7 @@ def test_batch_trip_retry_preserves_existing_members_without_resaving_photos(
     assert response.status_code == 200, response.text
     photo = photo_file(tmp_path, "trip-photo.jpg", "2026:08:25 07:10:00")
     dialog = open_batch(page, base_url, [photo])
-    fill_common(dialog, original["species_id"], location["id"])
+    fill_common(dialog, original["species_id"], location["name"])
     dialog.get_by_role("button", name="保存就绪照片（1）").click()
     expect(dialog.locator('.batch-item[data-state="saved"]')).to_have_count(1)
     trip_box = dialog.locator(".batch-trip")
@@ -381,7 +390,7 @@ def test_batch_pause_finishes_current_photo_and_resumes_remaining_queue(
     first = photo_file(tmp_path, "pause-first.jpg", "2026:08:25 07:10:00")
     second = photo_file(tmp_path, "pause-second.jpg", "2026:08:25 08:20:00")
     dialog = open_batch(page, base_url, [first, second])
-    fill_common(dialog, original["species_id"], location["id"])
+    fill_common(dialog, original["species_id"], location["name"])
     apply_common(dialog)
     page.evaluate("""() => {
         const originalFetch = window.fetch.bind(window);
@@ -405,3 +414,120 @@ def test_batch_pause_finishes_current_photo_and_resumes_remaining_queue(
     dialog.get_by_role("button", name="保存就绪照片（1）").click()
     expect(dialog.locator('.batch-item[data-state="saved"]')).to_have_count(2)
     assert len(httpx.get(f"{base_url}/api/observations").json()) == 3
+
+
+def test_batch_ai_subspecies_suggests_but_requires_manual_selection(
+    browser_app, tmp_path, observation_payload, post_location, post_observation
+):
+    page, base_url, _ = browser_app
+    payload = observation_payload()
+    payload["new_species"].update(
+        {
+            "has_subspecies": True,
+            "subspecies": [
+                {"scientific_name": "Lonchura striata striata", "chinese_name": "指名亚种"},
+                {"scientific_name": "Lonchura striata domestica", "chinese_name": "家养亚种"},
+            ],
+        }
+    )
+    created = post_observation(base_url, payload)
+    species = httpx.get(f"{base_url}/api/species/{created['species_id']}").json()
+    local = {item["scientific_name"]: item["id"] for item in species["subspecies"]}
+    location = post_location(base_url)
+    dialog = open_batch(
+        page,
+        base_url,
+        [photo_file(tmp_path, "subspecies.jpg", "2026:08:15 08:30:00")],
+    )
+    fill_common(dialog, created["species_id"], location["name"])
+    form = dialog.locator("form.batch-entry-form")
+    form.get_by_label("拍摄时间", exact=True).fill("2026-08-15T08:30")
+    form.get_by_label("纬度", exact=True).fill("30.2741")
+    form.get_by_label("经度", exact=True).fill("120.1551")
+    captured: dict = {}
+
+    def respond(route):
+        captured.update(json.loads(route.request.post_data))
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps(
+                {
+                    "query": "Lonchura striata",
+                    "resolved": True,
+                    "via": "inat",
+                    "wikidata": None,
+                    "taxon": {"id": 9000, "name": "Lonchura striata", "children": []},
+                    "candidates": [],
+                    "warnings": [],
+                    "ai": {
+                        "available": True,
+                        "message": "已按地点记录排序。",
+                        "subspecies": [
+                            {
+                                "id": 9001,
+                                "name": "Lonchura striata striata",
+                                "common_name": "指名亚种",
+                                "confidence": "high",
+                                "reason": "杭州附近记录全部为该亚种。",
+                            }
+                        ],
+                    },
+                }
+            ),
+        )
+
+    page.route("**/api/assistant/online-species/search", respond)
+    select = form.get_by_role("combobox", name="亚种", exact=True)
+    expect(select).not_to_have_value(str(local["Lonchura striata striata"]))
+    dialog.locator("[data-subspecies-ai]").click()
+    panel = dialog.locator("[data-subspecies-ai-panel]")
+    expect(panel).to_contain_text("高置信")
+    expect(panel).to_contain_text("杭州附近记录全部为该亚种")
+    expect(select).not_to_have_value(str(local["Lonchura striata striata"]))
+    panel.get_by_role("button", name="选为亚种", exact=True).click()
+    expect(select).to_have_value(str(local["Lonchura striata striata"]))
+    expect(panel).to_contain_text("已填入所选亚种")
+    assert captured["latitude"] == 30.2741
+    assert captured["observed_at"].startswith("2026-08-15T08:30")
+    assert len(httpx.get(f"{base_url}/api/observations").json()) == 1
+
+
+def test_batch_sections_and_fieldsets_share_observation_order(browser_app, tmp_path):
+    page, base_url, _ = browser_app
+    dialog = open_batch(page, base_url, [photo_file(tmp_path, "order.jpg", "2026:08:15 08:30:00")])
+    nav = dialog.locator("nav.batch-section-nav button")
+    expect(nav).to_have_count(4)
+    expect(nav.nth(0)).to_contain_text("目标物种")
+    expect(nav.nth(1)).to_contain_text("时间与地点")
+    expect(nav.nth(2)).to_contain_text("个体与行为")
+    expect(nav.nth(3)).to_contain_text("其他物种")
+    fieldsets = dialog.locator("form.batch-entry-form fieldset")
+    expect(fieldsets.nth(1).locator("legend")).to_contain_text("时间与地点")
+    expect(fieldsets.nth(2).locator("legend")).to_contain_text("个体与行为")
+
+
+def test_batch_keeps_draft_while_creating_a_location(
+    browser_app, tmp_path, post_observation
+):
+    page, base_url, _ = browser_app
+    original = post_observation(base_url)
+    dialog = open_batch(page, base_url, [photo_file(tmp_path, "cache.jpg", "2026:08:15 08:30:00")])
+    form = dialog.locator("form.batch-entry-form")
+    form.locator("fieldset").first.locator("select").first.select_option(
+        str(original["species_id"])
+    )
+    dialog.locator("[data-location-create]").click()
+    page.wait_for_url("**/locations?**")
+    location_form = page.locator("dialog.record-dialog[open] form")
+    location_form.get_by_label("地点名称", exact=True).fill("Cache New Park")
+    location_form.get_by_label("一级行政区代码", exact=True).fill("CN-ZJ")
+    location_form.get_by_label("一级行政区名称", exact=True).fill("Zhejiang")
+    location_form.get_by_label("中心纬度", exact=True).fill("30.2741")
+    location_form.get_by_label("中心经度", exact=True).fill("120.1551")
+    location_form.get_by_role("button", name="保存地点", exact=True).click()
+    page.wait_for_url("**/observations?**resume=1**")
+    expect(page.locator("dialog.batch-dialog[open]")).to_be_visible()
+    expect(page.locator(".batch-item")).to_have_count(1)
+    expect(page.locator(".batch-item")).to_contain_text("cache.jpg")
+    expect(page.locator(".location-picker-selected")).to_contain_text("Cache New Park")

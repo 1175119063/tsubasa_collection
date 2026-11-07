@@ -74,10 +74,6 @@ class BirdService(
                 photo_imports.append(photo_import)
 
             observation = Observation(
-                species=species,
-                subspecies=subspecies,
-                photo_asset=photo_imports[0].asset,
-                photo_type=payload.photo_type,
                 observed_at=payload.observed_at,
                 latitude=payload.latitude,
                 longitude=payload.longitude,
@@ -88,8 +84,6 @@ class BirdService(
                 locality=payload.locality,
                 season=payload.season,
                 season_note=payload.season_note,
-                sex=payload.sex,
-                life_stage=payload.life_stage,
                 notes=payload.notes,
             )
             self.session.add(observation)
@@ -168,8 +162,7 @@ class BirdService(
                 ]
                 observation.photos.append(observation_photo)
                 created_photos.append(observation_photo)
-            selected_cover = next(item for item in created_photos if item.is_cover)
-            observation.photo_asset = selected_cover.asset
+            next(item for item in created_photos if item.is_cover)
 
             location = self._resolve_observation_location(payload)
             if location is not None:

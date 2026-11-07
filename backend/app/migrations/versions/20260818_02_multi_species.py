@@ -46,14 +46,18 @@ def upgrade() -> None:
             op.create_index(
                 f"ix_observation_species_{column}", "observation_species", [column]
             )
-    op.execute(
-        "INSERT INTO observation_species "
-        "(observation_id, species_id, subspecies_id, photo_type, sex, life_stage, notes, "
-        "is_primary, created_at, updated_at) "
-        "SELECT id, species_id, subspecies_id, photo_type, sex, life_stage, NULL, 1, "
-        "created_at, updated_at FROM observations "
-        "WHERE NOT EXISTS (SELECT 1 FROM observation_species)"
-    )
+    observation_columns = {
+        column["name"] for column in inspect(connection).get_columns("observations")
+    }
+    if "species_id" in observation_columns:
+        op.execute(
+            "INSERT INTO observation_species "
+            "(observation_id, species_id, subspecies_id, photo_type, sex, life_stage, notes, "
+            "is_primary, created_at, updated_at) "
+            "SELECT id, species_id, subspecies_id, photo_type, sex, life_stage, NULL, 1, "
+            "created_at, updated_at FROM observations "
+            "WHERE NOT EXISTS (SELECT 1 FROM observation_species)"
+        )
 
 
 def downgrade() -> None:

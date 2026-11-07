@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import UploadFile
 from sqlalchemy import delete, func, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import object_session, selectinload
 
 from .enums import EvidenceDimension, PhotoType
 from .models import (
@@ -39,9 +39,13 @@ class ObservationServiceMixin:
         observations = self.session.scalars(
             select(Observation)
             .options(
-                selectinload(Observation.species),
-                selectinload(Observation.subspecies),
-                selectinload(Observation.photo_asset),
+                selectinload(Observation.species_entries).selectinload(
+                    ObservationSpecies.species
+                ),
+                selectinload(Observation.species_entries).selectinload(
+                    ObservationSpecies.subspecies
+                ),
+                selectinload(Observation.photos).selectinload(ObservationPhoto.asset),
                 selectinload(Observation.audio_links).selectinload(ObservationAudio.asset),
                 selectinload(Observation.location_link).selectinload(
                     ObservationLocationLink.location
@@ -95,9 +99,13 @@ class ObservationServiceMixin:
     @staticmethod
     def _homepage_observation_query():
         return select(Observation).options(
-            selectinload(Observation.species),
-            selectinload(Observation.subspecies),
-            selectinload(Observation.photo_asset),
+            selectinload(Observation.species_entries).selectinload(
+                ObservationSpecies.species
+            ),
+            selectinload(Observation.species_entries).selectinload(
+                ObservationSpecies.subspecies
+            ),
+            selectinload(Observation.photos).selectinload(ObservationPhoto.asset),
             selectinload(Observation.audio_links).selectinload(ObservationAudio.asset),
             selectinload(Observation.location_link).selectinload(
                 ObservationLocationLink.location
@@ -114,9 +122,13 @@ class ObservationServiceMixin:
             select(Observation)
             .where(Observation.id == observation_id)
             .options(
-                selectinload(Observation.species),
-                selectinload(Observation.subspecies),
-                selectinload(Observation.photo_asset),
+                selectinload(Observation.species_entries).selectinload(
+                    ObservationSpecies.species
+                ),
+                selectinload(Observation.species_entries).selectinload(
+                    ObservationSpecies.subspecies
+                ),
+                selectinload(Observation.photos).selectinload(ObservationPhoto.asset),
                 selectinload(Observation.audio_links).selectinload(ObservationAudio.asset),
                 selectinload(Observation.location_link).selectinload(
                     ObservationLocationLink.location
@@ -129,9 +141,11 @@ class ObservationServiceMixin:
         if observation is None:
             raise DomainError("观察记录不存在", 404)
 
-        entry = next((item for item in observation.species_entries if item.is_primary), None)
+        entry = observation.primary_entry
+        if entry is None:
+            raise DomainError("观察记录缺少主物种条目", 500)
 
-        if observation.photo_type is PhotoType.GROUP:
+        if entry.photo_type is PhotoType.GROUP:
             if any(
                 value is not None
                 for value in (payload.sex, payload.life_stage, payload.subspecies_id)
@@ -145,18 +159,14 @@ class ObservationServiceMixin:
                 selected_subspecies = self.session.get(Subspecies, payload.subspecies_id)
                 if (
                     selected_subspecies is None
-                    or selected_subspecies.species_id != observation.species_id
+                    or selected_subspecies.species_id != entry.species_id
                 ):
                     raise DomainError("所选亚种不属于该观察记录的物种", 422)
-            observation.sex = payload.sex
-            observation.life_stage = payload.life_stage
-            observation.subspecies = selected_subspecies
-            if entry is not None:
-                entry.sex = payload.sex
-                entry.life_stage = payload.life_stage
-                entry.subspecies = selected_subspecies
+            entry.sex = payload.sex
+            entry.life_stage = payload.life_stage
+            entry.subspecies = selected_subspecies
 
-        if entry is not None and "behavior_labels" in payload.model_fields_set:
+        if "behavior_labels" in payload.model_fields_set:
             self._set_entry_behaviors(entry, payload.behavior_labels)
         observation.notes = payload.notes or None
         self.session.commit()
@@ -199,10 +209,6 @@ class ObservationServiceMixin:
         if "behavior_labels" in payload.model_fields_set:
             self._set_entry_behaviors(entry, payload.behavior_labels)
         entry.notes = payload.notes or None
-        if entry.is_primary:
-            entry.observation.sex = entry.sex
-            entry.observation.life_stage = entry.life_stage
-            entry.observation.subspecies = entry.subspecies
         self.session.commit()
         return self._observation_dict(entry.observation)
 
@@ -290,7 +296,6 @@ class ObservationServiceMixin:
             select(Observation)
             .where(Observation.id == observation_id)
             .options(
-                selectinload(Observation.photo_asset),
                 selectinload(Observation.photos).selectinload(ObservationPhoto.asset),
                 selectinload(Observation.photos)
                 .selectinload(ObservationPhoto.species_links)
@@ -327,10 +332,16 @@ class ObservationServiceMixin:
 
     @staticmethod
     def _set_cover_photo(observation: Observation, selected: ObservationPhoto) -> None:
+        changed = False
         for item in observation.photos:
-            item.is_cover = item is selected
+            if item is not selected and item.is_cover:
+                item.is_cover = False
+                changed = True
+        if changed:
+            session = object_session(observation)
+            if session is not None:
+                session.flush()
         selected.is_cover = True
-        observation.photo_asset = selected.asset
 
     def add_observation_species(
         self, observation_id: int, payload: ObservationSpeciesInput
@@ -408,12 +419,9 @@ class ObservationServiceMixin:
             replacement = next(
                 item for item in observation.species_entries if item.id != entry.id
             )
+            entry.is_primary = False
+            self.session.flush()
             replacement.is_primary = True
-            observation.species = replacement.species
-            observation.photo_type = replacement.photo_type
-            observation.sex = replacement.sex
-            observation.life_stage = replacement.life_stage
-            observation.subspecies = replacement.subspecies
         species = entry.species
         self.session.delete(entry)
         self.session.flush()
@@ -443,18 +451,7 @@ class ObservationServiceMixin:
     def _observation_dict(self, item: Observation, species_id: int | None = None) -> dict:
         entries = sorted(item.species_entries, key=lambda value: (not value.is_primary, value.id))
         if not entries:
-            entries = [
-                ObservationSpecies(
-                    id=0,
-                    observation_id=item.id,
-                    species=item.species,
-                    subspecies=item.subspecies,
-                    photo_type=item.photo_type,
-                    sex=item.sex,
-                    life_stage=item.life_stage,
-                    is_primary=True,
-                )
-            ]
+            raise DomainError("观察记录缺少物种条目", 500)
         focused_entry = next(
             (entry for entry in entries if (entry.species_id or entry.species.id) == species_id),
             entries[0],
@@ -678,8 +675,7 @@ class ObservationServiceMixin:
         if observation is None:
             raise DomainError("观察记录不存在", 404)
 
-        asset_ids = {observation.photo_asset_id}
-        asset_ids.update(photo.asset_id for photo in observation.photos)
+        asset_ids = {photo.asset_id for photo in observation.photos}
         asset_ids.update(link.asset_id for link in observation.audio_links)
         species_to_remove = []
         for entry in observation.species_entries:
@@ -735,11 +731,6 @@ class ObservationServiceMixin:
             references = sum(
                 int(value or 0)
                 for value in (
-                    self.session.scalar(
-                        select(func.count(Observation.id)).where(
-                            Observation.photo_asset_id == asset_id
-                        )
-                    ),
                     self.session.scalar(
                         select(func.count(ObservationPhoto.id)).where(
                             ObservationPhoto.asset_id == asset_id

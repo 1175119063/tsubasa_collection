@@ -1,6 +1,7 @@
 """Read-only online species lookup backed by shared sources and one skill."""
 
 import threading
+from datetime import datetime
 from pathlib import Path
 
 from .inat_mcp import inat_api
@@ -73,11 +74,13 @@ class OnlineSpeciesService:
         latitude: float | None = None,
         longitude: float | None = None,
         locality: str | None = None,
+        observed_at: datetime | None = None,
     ) -> dict:
         context = SkillContext(
             latitude=latitude,
             longitude=longitude,
             locality=locality,
+            observed_at=observed_at,
         )
         return self._run(lambda: self.skill.search(query, context))
 

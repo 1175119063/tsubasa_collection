@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -52,6 +53,7 @@ class OnlineSpeciesSearchInput(BaseModel):
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     locality: str | None = Field(default=None, max_length=240)
+    observed_at: datetime | None = None
 
     @model_validator(mode="after")
     def coordinates_must_be_a_pair(self) -> "OnlineSpeciesSearchInput":

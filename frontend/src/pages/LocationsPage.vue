@@ -22,8 +22,25 @@ async function open(id: number): Promise<void> { detailLoading.value = true; det
 function close(): void { dialog.value?.close(); detail.value = null; const next = { ...route.query }; delete next.location; void router.replace({ query: next }); }
 async function openForm(location: LocationDetailType | null = null): Promise<void> { editing.value = location; formOpen.value = true; await nextTick(); formDialog.value?.showModal(); }
 function hideForm(): void { formDialog.value?.close(); formOpen.value = false; editing.value = null; }
-function closeForm(): void { hideForm(); if (route.query.new) { const query = { ...route.query }; delete query.new; void router.replace({ query }); } }
-async function formSaved(saved: LocationDetailType): Promise<void> { hideForm(); await load(); await open(saved.id); }
+function returnPath(): string | null {
+  const value = route.query.return;
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : null;
+}
+function closeForm(): void {
+  hideForm();
+  const target = returnPath();
+  if (target) { void router.push({ path: target, query: { new: "1", resume: "1" } }); return; }
+  if (route.query.new) { const query = { ...route.query }; delete query.new; void router.replace({ query }); }
+}
+async function formSaved(saved: LocationDetailType): Promise<void> {
+  hideForm();
+  const target = returnPath();
+  if (target) {
+    await router.push({ path: target, query: { new: "1", resume: "1", location: String(saved.id) } });
+    return;
+  }
+  await load(); await open(saved.id);
+}
 async function openLink(): Promise<void> { if (!detail.value) return; linkStatus.value = "正在读取观察记录…"; linkOpen.value = true; await nextTick(); linkDialog.value?.showModal(); try { observations.value = await api<ObservationRecord[]>("/api/observations"); linkedIds.value = observations.value.filter((item) => item.location?.id === detail.value?.id).map((item) => item.id); linkStatus.value = ""; } catch (caught) { linkStatus.value = errorMessage(caught); } }
 function closeLink(): void { linkDialog.value?.close(); linkOpen.value = false; }
 async function saveLinks(): Promise<void> { if (!detail.value) return; linkStatus.value = "正在保存关联…"; try { await api(`/api/locations/${detail.value.id}/observations`, jsonRequest("PUT", { observation_ids: linkedIds.value })); closeLink(); await load(); await open(detail.value.id); } catch (caught) { linkStatus.value = errorMessage(caught); } }

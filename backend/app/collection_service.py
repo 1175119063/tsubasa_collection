@@ -13,6 +13,7 @@ from .models import (
     Family,
     Genus,
     Observation,
+    ObservationPhoto,
     ObservationSpecies,
     Species,
 )
@@ -388,7 +389,8 @@ class CollectionServiceMixin:
                 selectinload(CollectionPlan.logo_asset),
                 selectinload(CollectionPlan.logo_observation_species)
                 .selectinload(ObservationSpecies.observation)
-                .selectinload(Observation.photo_asset),
+                .selectinload(Observation.photos)
+                .selectinload(ObservationPhoto.asset),
                 selectinload(CollectionPlan.memberships)
                 .selectinload(CollectionPlanSpecies.species)
                 .selectinload(Species.genus)
@@ -401,7 +403,8 @@ class CollectionServiceMixin:
                 .selectinload(CollectionPlanSpecies.slots)
                 .selectinload(CollectionPlanSlot.observation_species)
                 .selectinload(ObservationSpecies.observation)
-                .selectinload(Observation.photo_asset),
+                .selectinload(Observation.photos)
+                .selectinload(ObservationPhoto.asset),
             )
             .order_by(CollectionPlan.updated_at.desc(), CollectionPlan.id.desc())
         )

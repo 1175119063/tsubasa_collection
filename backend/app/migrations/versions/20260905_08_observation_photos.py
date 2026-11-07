@@ -35,11 +35,16 @@ def upgrade() -> None:
         )
         op.create_index("ix_observation_photos_asset_id", "observation_photos", ["asset_id"])
         op.create_index("ix_observation_photos_is_cover", "observation_photos", ["is_cover"])
-        op.execute(
-            "INSERT INTO observation_photos "
-            "(observation_id, asset_id, observed_at, position, is_cover, created_at, updated_at) "
-            "SELECT id, photo_asset_id, observed_at, 0, 1, created_at, updated_at FROM observations"
-        )
+        columns = {
+            column["name"] for column in inspect(op.get_bind()).get_columns("observations")
+        }
+        if "photo_asset_id" in columns:
+            op.execute(
+                "INSERT INTO observation_photos (observation_id, asset_id, "
+                "observed_at, position, is_cover, created_at, updated_at) "
+                "SELECT id, photo_asset_id, observed_at, 0, 1, created_at, "
+                "updated_at FROM observations"
+            )
 
     tables = set(inspect(op.get_bind()).get_table_names())
     if "observation_photo_species" not in tables:
