@@ -92,6 +92,93 @@ def test_tianditu_tile_failure_falls_back_to_openstreetmap(browser_app, jpeg_byt
     assert osm_urls
 
 
+def _post_location_at(base_url: str, name: str, latitude: float, longitude: float) -> dict:
+    response = httpx.post(
+        f"{base_url}/api/locations",
+        json={
+            "name": name,
+            "location_type": "urban_park",
+            "country_code": "CN",
+            "country_name": "China",
+            "admin1_code": "CN-ZJ",
+            "admin1_name": "Zhejiang",
+            "city": "Hangzhou",
+            "district": None,
+            "center_latitude": latitude,
+            "center_longitude": longitude,
+            "coordinate_system": "wgs84",
+            "radius_meters": 3000,
+            "notes": None,
+            "link_matching_records": False,
+        },
+        timeout=20,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def test_map_fits_every_location_on_first_load(browser_app, jpeg_bytes):
+    page, base_url, _data_dir = browser_app
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _post_location_at(base_url, "北京奥林匹克森林公园", 40.0184, 116.3831)
+    _post_location_at(base_url, "济南大明湖", 36.6777, 117.0390)
+    tile_zooms: list[int] = []
+
+    def fulfill_tile(route) -> None:
+        tile_zooms.append(int(route.request.url.rsplit("/", 3)[1]))
+        route.fulfill(body=jpeg_bytes(), content_type="image/jpeg")
+
+    page.route("https://tile.openstreetmap.org/**", fulfill_tile)
+    page.goto(f"{base_url}/map")
+    page.locator(".leaflet-marker-icon, .marker-cluster").first.wait_for(timeout=30000)
+    page.wait_for_timeout(600)
+
+    assert tile_zooms, "地图没有请求任何底图瓦片"
+    assert min(tile_zooms) >= 7, (
+        "地图先在未自适应的缩放下渲染了底图，说明首屏用的是占位视图而不是自适应结果："
+        f"{sorted(set(tile_zooms))}"
+    )
+
+
+def test_map_markers_render_real_pin_images(browser_app, jpeg_bytes):
+    page, base_url, _data_dir = browser_app
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _post_location_at(base_url, "杭州西湖", 30.2741, 120.1551)
+    _post_location_at(base_url, "哈尔滨太阳岛", 45.7500, 126.6500)
+    not_found: list[str] = []
+    page.on(
+        "response",
+        lambda response: not_found.append(response.url) if response.status == 404 else None,
+    )
+    page.route(
+        "https://tile.openstreetmap.org/**",
+        lambda route: route.fulfill(body=jpeg_bytes(), content_type="image/jpeg"),
+    )
+    page.goto(f"{base_url}/map")
+    page.locator(".leaflet-marker-icon").first.wait_for(timeout=30000)
+    page.wait_for_timeout(800)
+
+    broken = page.evaluate(
+        """() => Array.from(document.querySelectorAll('.leaflet-marker-icon')).map((element) => {
+            if (element.tagName === 'IMG') {
+                return element.complete && element.naturalWidth > 0 ? null : 'img-broken';
+            }
+            const background = getComputedStyle(element).backgroundImage;
+            return background && background !== 'none' ? null : 'no-background';
+        }).filter(Boolean)"""
+    )
+    assert broken == [], f"地图标记没有加载出真实图标：{broken}"
+    assert not [url for url in not_found if "marker" in url], f"标记图标请求 404：{not_found}"
+
+
+def test_openstreetmap_tile_failure_is_reported_to_the_reader(browser_app):
+    page, base_url, _data_dir = browser_app
+    page.route("https://tile.openstreetmap.org/**", lambda route: route.abort())
+    page.goto(f"{base_url}/map")
+
+    page.get_by_text("OpenStreetMap 底图瓦片加载失败", exact=False).wait_for(timeout=30000)
+
+
 def test_personal_taxonomy_navigation_url_and_species_actions(browser_app, post_observation):
     page, base_url, _data_dir = browser_app
     created = post_observation(base_url)

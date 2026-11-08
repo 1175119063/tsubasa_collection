@@ -30,10 +30,29 @@ export function addBaseMap(
 ): BaseMapHandle {
   const osm = openStreetMapLayer();
   const key = config?.tianditu_key?.trim();
+  // 瓦片不通时不能假装一切正常：用户看到的是一片空白，必须说清原因。
+  let osmLoadedTiles = 0;
+  let osmFailedTiles = 0;
+  const onOsmTileLoad = (): void => {
+    osmLoadedTiles += 1;
+  };
+  const onOsmTileError = (): void => {
+    osmFailedTiles += 1;
+    if (osmLoadedTiles > 0 || osmFailedTiles < 4) return;
+    onStatus(
+      "OpenStreetMap 底图瓦片加载失败，当前网络可能无法访问瓦片服务；可在 API 管理中配置天地图 Key 改用国内底图。",
+    );
+  };
+  osm.on("tileload", onOsmTileLoad);
+  osm.on("tileerror", onOsmTileError);
+  const detachOsm = (): void => {
+    osm.off("tileload", onOsmTileLoad);
+    osm.off("tileerror", onOsmTileError);
+  };
   if (!key) {
     osm.addTo(map);
     onStatus("使用 OpenStreetMap 底图；配置天地图 Key 后将优先使用国内底图。");
-    return { destroy: () => undefined };
+    return { destroy: detachOsm };
   }
 
   const vector = L.tileLayer(tiandituTileUrl("vec", key), {
@@ -86,6 +105,7 @@ export function addBaseMap(
   return {
     destroy: () => {
       window.clearTimeout(timeout);
+      detachOsm();
       vector.off("tileload", onTileLoad);
       vector.off("tileerror", onTileError);
       map.off("baselayerchange", onBaseLayerChange);
