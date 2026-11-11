@@ -36,6 +36,15 @@ def jpeg_bytes(color=(73, 105, 82)) -> bytes:
     return buffer.getvalue()
 
 
+def large_jpeg_bytes() -> bytes:
+    """4000×3000 noise JPEG (about 11 MB): above the old 10 MB cap, below today's."""
+    buffer = io.BytesIO()
+    width, height = 4000, 3000
+    pixels = Image.frombytes("RGB", (width, height), os.urandom(width * height * 3))
+    pixels.save(buffer, format="JPEG", quality=92)
+    return buffer.getvalue()
+
+
 def observation_payload() -> dict:
     return {
         "species_id": None,
@@ -113,6 +122,11 @@ def post_location(base_url: str, name: str = "Test Wetland") -> dict:
 @pytest.fixture(name="jpeg_bytes")
 def jpeg_bytes_factory():
     return jpeg_bytes
+
+
+@pytest.fixture(name="large_jpeg_bytes")
+def large_jpeg_bytes_factory():
+    return large_jpeg_bytes
 
 
 @pytest.fixture(name="observation_payload")

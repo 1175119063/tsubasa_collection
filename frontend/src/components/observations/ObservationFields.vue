@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, toRefs, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, toRef, toRefs, watch } from "vue";
 import { api, errorMessage } from "@/api/client";
 import type { SpeciesSummary, TaxonomyGenus, TaxonomyOrder } from "@/api/types";
-import { applyObservationLocation, readAdditionalPhoto, readObservationPhoto, type AdditionalPhotoDraft, type ObservationDraft, type EntryLocation, type Subspecies } from "./observation-entry";
+import { applyObservationLocation, PHOTO_LIMIT_LABEL, readAdditionalPhoto, readObservationPhoto, type AdditionalPhotoDraft, type ObservationDraft, type EntryLocation, type Subspecies } from "./observation-entry";
+import { photoPreviewUrl, photoThumbUrl, releasePreviewUrl } from "./photo-preview";
 import ObservationSpeciesAssistant, { type AssistantTaxon, type SpeciesExtraction } from "./ObservationSpeciesAssistant.vue";
 import OnlineSpeciesLookup from "../OnlineSpeciesLookup.vue";
 import type { OnlineTaxonName, OnlineTaxonomyDraft } from "@/api/online-species";
@@ -24,22 +25,35 @@ const additionalId = ref("");
 const status = ref("");
 const onlineApplyStatus = ref("");
 const photoPreview = ref("");
-const additionalPreviews = new Map<string, string>();
-watch(photo, (file) => {
-  if (photoPreview.value) URL.revokeObjectURL(photoPreview.value);
-  photoPreview.value = file && !props.fixedPhoto ? URL.createObjectURL(file) : "";
-}, { immediate: true });
+let previewToken = 0;
+watch(photo, (file) => { void refreshPhotoPreview(file); }, { immediate: true });
+async function refreshPhotoPreview(file: File | null): Promise<void> {
+  const token = ++previewToken;
+  releasePreviewUrl(photoPreview.value);
+  photoPreview.value = "";
+  if (!file || props.fixedPhoto) return;
+  const url = await photoPreviewUrl(file);
+  if (token !== previewToken) { releasePreviewUrl(url); return; }
+  photoPreview.value = url;
+}
+const additionalPreviews = reactive(new Map<string, string>());
 function additionalPreview(item: AdditionalPhotoDraft): string {
-  let url = additionalPreviews.get(item.id);
-  if (!url) { url = URL.createObjectURL(item.file); additionalPreviews.set(item.id, url); }
-  return url;
+  const cached = additionalPreviews.get(item.id);
+  if (cached !== undefined) return cached;
+  // 先占位，避免同一张图在多次渲染里重复解码；解码完成后回填。
+  additionalPreviews.set(item.id, "");
+  void photoThumbUrl(item.file).then((url) => {
+    if (!additionalPreviews.has(item.id)) { releasePreviewUrl(url); return; }
+    additionalPreviews.set(item.id, url);
+  });
+  return "";
 }
 function removeAdditionalPhoto(item: AdditionalPhotoDraft): void {
-  const url = additionalPreviews.get(item.id); if (url) URL.revokeObjectURL(url);
+  releasePreviewUrl(additionalPreviews.get(item.id) || "");
   additionalPreviews.delete(item.id); props.draft.additionalPhotos = props.draft.additionalPhotos.filter((value) => value.id !== item.id);
   if (props.draft.coverPhotoId === item.id) props.draft.coverPhotoId = "primary";
 }
-onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview.value); additionalPreviews.forEach((url) => URL.revokeObjectURL(url)); });
+onBeforeUnmount(() => { releasePreviewUrl(photoPreview.value); additionalPreviews.forEach((url) => releasePreviewUrl(url)); });
 const availablePrimary = computed(() => props.species.filter((item) => !additional.value.some((entry) => entry.species.id === item.id)));
 const selectedOrder = computed(() => taxonomy.value.find((item) => String(item.id) === orderId.value));
 const families = computed(() => selectedOrder.value?.families || []);
@@ -249,7 +263,7 @@ onMounted(loadSubspecies);
 <legend>
 <span>03</span> 个体与行为</legend>
 <div class="form-grid">
-<label class="full-field file-field observation-photo-input"><span v-if="!fixedPhoto">JPEG/JPG 照片（每张不超过 10 MB）</span><img v-if="photoPreview && !draft.photoError" class="observation-photo-preview" :src="photoPreview" alt="当前选择的观察照片" /><input v-if="!fixedPhoto" type="file" accept="image/jpeg,.jpg,.jpeg" multiple :required="!photo" @change="photoChanged" />
+<label class="full-field file-field observation-photo-input"><span v-if="!fixedPhoto">JPEG/JPG 照片（每张不超过 {{ PHOTO_LIMIT_LABEL }}）</span><img v-if="photoPreview && !draft.photoError" class="observation-photo-preview" :src="photoPreview" alt="当前选择的观察照片" /><input v-if="!fixedPhoto" type="file" accept="image/jpeg,.jpg,.jpeg" multiple :required="!photo" @change="photoChanged" />
 <span class="field-hint" role="status">{{ photoStatus }}</span>
 <button v-if="fixedPhoto && photo" type="button" :disabled="draft.readingPhoto" @click="readObservationPhoto(draft, photo)">重新读取照片时间</button>
 </label>
@@ -258,7 +272,7 @@ onMounted(loadSubspecies);
 <div class="observation-photo-species"><label><input v-model="draft.primaryPhotoIncludesPrimary" type="checkbox" />{{ speciesId === 'new' ? (newSpecies.chinese_name || '目标物种') : (species.find(item => String(item.id) === speciesId)?.chinese_name || '目标物种') }}</label><label v-for="item in additional" :key="item.species.id"><input v-model="draft.primaryPhotoSpeciesIds" type="checkbox" :value="item.species.id" />{{ item.species.chinese_name }}</label></div>
 </section>
 <article v-for="item in draft.additionalPhotos" :key="item.id" class="observation-additional-photo full-field">
-<img :src="additionalPreview(item)" alt="附加观察照片" /><div><header><strong :title="item.file.name">{{ item.file.name }}</strong><button type="button" @click="removeAdditionalPhoto(item)">移除</button></header><label>照片拍摄时间<input v-model="item.observed_at" type="datetime-local" step="60" required /></label><span class="field-hint" :class="{ 'is-error': item.error }">{{ item.status }}</span><label><input v-model="draft.coverPhotoId" type="radio" :value="item.id" />设为封面</label><div class="observation-photo-species"><label><input v-model="item.includesPrimary" type="checkbox" />{{ speciesId === 'new' ? (newSpecies.chinese_name || '目标物种') : (species.find(value => String(value.id) === speciesId)?.chinese_name || '目标物种') }}</label><label v-for="entry in additional" :key="entry.species.id"><input v-model="item.speciesIds" type="checkbox" :value="entry.species.id" />{{ entry.species.chinese_name }}</label></div></div>
+<img v-if="additionalPreview(item)" :src="additionalPreview(item)" alt="附加观察照片" /><div><header><strong :title="item.file.name">{{ item.file.name }}</strong><button type="button" @click="removeAdditionalPhoto(item)">移除</button></header><label>照片拍摄时间<input v-model="item.observed_at" type="datetime-local" step="60" required /></label><span class="field-hint" :class="{ 'is-error': item.error }">{{ item.status }}</span><label><input v-model="draft.coverPhotoId" type="radio" :value="item.id" />设为封面</label><div class="observation-photo-species"><label><input v-model="item.includesPrimary" type="checkbox" />{{ speciesId === 'new' ? (newSpecies.chinese_name || '目标物种') : (species.find(value => String(value.id) === speciesId)?.chinese_name || '目标物种') }}</label><label v-for="entry in additional" :key="entry.species.id"><input v-model="item.speciesIds" type="checkbox" :value="entry.species.id" />{{ entry.species.chinese_name }}</label></div></div>
 </article>
 <label>照片类型<select v-model="form.photo_type">
 <option value="individual">个体照片</option>

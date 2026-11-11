@@ -123,6 +123,7 @@ def test_integration_management_routes_do_not_return_plaintext_keys(tmp_path) ->
     with TestClient(app) as client:
         app.state.integration_store = store
         summary = client.get("/api/integrations")
+        map_config_without_key = client.get("/api/map/config")
         missing_tianditu = client.post("/api/integrations/tianditu/test")
         updated = client.put(
             "/api/integrations/amap",
@@ -151,6 +152,9 @@ def test_integration_management_routes_do_not_return_plaintext_keys(tmp_path) ->
     assert updated.json()["local_model"]["model"] == "feiyu-jingling"
     assert updated.json()["amap"]["key_hint"] == "••••••••4321"
     assert "managed-key" not in updated.text
+    # 没配天地图 Key 时默认底图是高德（浏览器端据此选择瓦片源与坐标系）。
+    assert map_config_without_key.json()["map_provider"] == "amap"
+    assert map_config_without_key.json()["tianditu_key"] is None
     assert tianditu.status_code == 200
     assert tianditu.json()["local_model"]["model"] == "feiyu-jingling"
     assert tianditu.json()["tianditu"]["key_hint"] == "••••••••8765"

@@ -275,10 +275,27 @@ def test_non_jpeg_upload_is_rejected_without_empty_species(tmp_path):
         assert client.get("/api/species").json() == []
 
 
-def test_photo_larger_than_10_mb_is_rejected_and_temp_file_is_removed(tmp_path):
+def test_photo_between_10_and_40_mb_is_accepted(tmp_path, large_jpeg_bytes):
     data_dir = tmp_path / "library"
     app = create_app(Settings(data_dir=data_dir))
-    oversized_photo = b"\xff\xd8" + b"0" * (10 * 1024 * 1024)
+    large_photo = large_jpeg_bytes()
+    assert len(large_photo) > 10 * 1024 * 1024
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/observations",
+            data={"payload": json.dumps(observation_payload(), ensure_ascii=False)},
+            files={"photo": ("bird.jpg", large_photo, "image/jpeg")},
+        )
+        assert response.status_code == 201, response.text
+        stored = list((data_dir / "photos").rglob("*.jpg"))
+        assert [file.stat().st_size for file in stored] == [len(large_photo)]
+
+
+def test_photo_larger_than_40_mb_is_rejected_and_temp_file_is_removed(tmp_path):
+    data_dir = tmp_path / "library"
+    app = create_app(Settings(data_dir=data_dir))
+    oversized_photo = b"\xff\xd8" + b"0" * (40 * 1024 * 1024)
 
     with TestClient(app) as client:
         response = client.post(
@@ -287,7 +304,7 @@ def test_photo_larger_than_10_mb_is_rejected_and_temp_file_is_removed(tmp_path):
             files={"photo": ("bird.jpg", oversized_photo, "image/jpeg")},
         )
         assert response.status_code == 422
-        assert "照片大小不能超过 10 MB" in response.text
+        assert "照片大小不能超过 40 MB" in response.text
         assert client.get("/api/species").json() == []
 
     assert list((data_dir / ".tmp").iterdir()) == []

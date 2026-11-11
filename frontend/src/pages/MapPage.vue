@@ -12,6 +12,7 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { api, errorMessage } from "@/api/client";
 import type { LocationSummary } from "@/api/types";
 import type { BaseMapHandle, MapServiceConfig } from "@/maps/base-map";
+import { toDisplay, type CoordinateSystem } from "@/maps/coords";
 
 const router = useRouter();
 const mapElement = ref<HTMLElement>();
@@ -23,6 +24,8 @@ const baseMapStatus = ref("正在加载底图……");
 let map: L.Map | null = null;
 let markers: L.MarkerClusterGroup | null = null;
 let baseMapHandle: BaseMapHandle | null = null;
+// 资料库存的是 WGS-84；首选的高德瓦片是 GCJ-02，图钉要跟着底图换算。
+const mapSystem = ref<CoordinateSystem>("gcj02");
 
 const DEFAULT_CENTER: L.LatLngExpression = [35, 105];
 const DEFAULT_ZOOM = 4;
@@ -67,10 +70,12 @@ function popupFor(item: LocationSummary): HTMLElement {
   return content;
 }
 
+function displayPoint(item: LocationSummary): L.LatLngTuple {
+  return toDisplay(item.center_latitude, item.center_longitude, mapSystem.value);
+}
+
 function boundsOf(items: LocationSummary[]): L.LatLngBounds {
-  return L.latLngBounds(
-    items.map((item) => [item.center_latitude, item.center_longitude] as L.LatLngTuple),
-  );
+  return L.latLngBounds(items.map(displayPoint));
 }
 
 // 首屏视野必须同步落地：Leaflet 的动画缩放要等 transitionend 才提交，
@@ -88,7 +93,7 @@ function renderMarkers(fit = false): void {
   if (!map || !markers) return;
   markers.clearLayers();
   for (const item of filtered.value) {
-    const marker = L.marker([item.center_latitude, item.center_longitude], { icon: locationIcon });
+    const marker = L.marker(displayPoint(item), { icon: locationIcon });
     marker.bindPopup(popupFor(item));
     markers.addLayer(marker);
   }
@@ -99,7 +104,7 @@ function renderMarkers(fit = false): void {
 }
 
 function focusLocation(item: LocationSummary): void {
-  map?.setView([item.center_latitude, item.center_longitude], 13);
+  map?.setView(displayPoint(item), 13);
 }
 
 function reset(): void {
@@ -130,7 +135,18 @@ async function initialize(): Promise<void> {
   // 先落定视野，再挂底图：这样瓦片从一开始就按最终的缩放层级请求。
   fitToLocations();
   const { addBaseMap } = await import("@/maps/base-map");
-  baseMapHandle = addBaseMap(map, config, (message) => { baseMapStatus.value = message; });
+  baseMapHandle = addBaseMap(
+    map,
+    config,
+    (message) => { baseMapStatus.value = message; },
+    (_id, system) => {
+      if (system === mapSystem.value) return;
+      // 底图坐标系变了，图钉与视野都得按新坐标系重算，否则整体偏三四百米。
+      mapSystem.value = system;
+      renderMarkers();
+      fitToLocations();
+    },
+  );
   markers = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 55 });
   map.addLayer(markers);
   if (dataLoaded) renderMarkers();
@@ -168,6 +184,6 @@ onBeforeUnmount(() => {
       </div>
       <button class="v2-filter-reset" type="button" @click="router.push('/locations')">返回区域档案</button>
     </aside>
-    <section class="v2-map-stage"><div ref="mapElement" aria-label="区域档案地图"></div><p>{{ status }} · {{ baseMapStatus }}</p></section>
+    <section class="v2-map-stage"><div ref="mapElement" :data-base-map-system="mapSystem" aria-label="区域档案地图"></div><p>{{ status }} · {{ baseMapStatus }}</p></section>
   </main>
 </template>

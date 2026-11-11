@@ -439,7 +439,7 @@ def map_config(request: Request) -> dict:
         raise integration_error(exc) from exc
     return {
         "provider": "amap",
-        "map_provider": "tianditu" if tianditu_key else "openstreetmap",
+        "map_provider": "tianditu" if tianditu_key else "amap",
         "enabled": bool(amap_key),
         "tianditu_key": tianditu_key,
     }

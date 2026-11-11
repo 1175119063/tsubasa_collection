@@ -6,9 +6,10 @@ import type { SpeciesSummary, TaxonomyOrder, TripDetail, TripSummary } from "@/a
 import ObservationFields from "./ObservationFields.vue";
 import { copyBatchFields, newSpeciesIdentity, type BatchItem } from "./batch-entry";
 import { clearBatch, peekBatch, stageBatch } from "./batch-draft-cache";
+import { photoPreviewUrls, releasePhotoPreview } from "./photo-preview";
 import {
   applyObservationLocation, createObservationDraft, readObservationPhoto, observationIssues,
-  saveObservationDraft, isUncertainSave, type EntryLocation,
+  PHOTO_LIMIT_LABEL, saveObservationDraft, isUncertainSave, type EntryLocation,
 } from "./observation-entry";
 
 const props = defineProps<{ species: SpeciesSummary[]; locations: EntryLocation[] }>();
@@ -96,16 +97,24 @@ async function addFiles(files: File[]): Promise<void> {
   if (busy.value || !files.length) return;
   adding.value = true;
   message.value = "正在逐张读取照片；可先查看并填写已读入的照片。";
+  const added: BatchItem[] = [];
   try {
+    // 先把整批放进队列，界面立刻有反馈；解码原图较慢，放在后面逐张处理。
     for (const file of files) {
       if (disposed) break;
       const draft = createObservationDraft("", true);
       draft.photo = file;
       const item = reactive<BatchItem>({
-        draft, previewUrl: URL.createObjectURL(file), selected: true, state: "draft", message: "", observationId: null,
+        draft, previewUrl: "", thumbUrl: "", selected: true, state: "draft", message: "", observationId: null,
       });
       items.value.push(item);
+      added.push(item);
       if (!activeId.value) activeId.value = draft.id;
+    }
+    for (const item of added) {
+      if (disposed || !item.draft.photo) break;
+      const file = item.draft.photo;
+      Object.assign(item, await photoPreviewUrls(file));
       await readObservationPhoto(item.draft, file);
     }
     message.value = "照片已加入。请填写当前照片，或把物种、地点、季节应用到勾选的其他照片。";
@@ -123,7 +132,7 @@ function selectAll(value: boolean): void {
 }
 function removeItem(item: BatchItem): void {
   if (busy.value || !editable(item)) return;
-  URL.revokeObjectURL(item.previewUrl);
+  releasePhotoPreview(item);
   items.value = items.value.filter((entry) => entry !== item);
   if (activeId.value === item.draft.id) activeId.value = items.value[0]?.draft.id || "";
 }
@@ -200,7 +209,7 @@ async function linkTrip(): Promise<void> {
 
 function canClose(): boolean {
   if (preservedForLocation) return true;
-  if (busy.value) { message.value = "请等待当前操作完成；保存过程中可以先点击暂停。"; return false; }
+  if (saving.value || linking.value) { message.value = "请等待当前操作完成；保存过程中可以先点击暂停。"; return false; }
   if (items.value.some((item) => item.state !== "saved")) {
     return window.confirm("未保存照片的填写内容仅保留在本次窗口中，关闭后需要重新整理。已经保存的记录会保留。确定关闭吗？");
   }
@@ -213,7 +222,7 @@ function beforeUnload(event: BeforeUnloadEvent): void {
 onBeforeRouteLeave(() => preservedForLocation || canClose());
 onBeforeUnmount(() => {
   disposed = true;
-  if (!preservedForLocation) items.value.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+  if (!preservedForLocation) items.value.forEach((item) => releasePhotoPreview(item));
   window.removeEventListener("beforeunload", beforeUnload);
 });
 defineExpose({ requestClose });
@@ -231,11 +240,11 @@ defineExpose({ requestClose });
     <div class="batch-workspace">
       <aside class="batch-queue" aria-label="待保存照片队列">
         <label class="batch-drop" @dragover.prevent @drop.prevent="dropFiles">
-          <strong>＋ {{ items.length ? '继续添加照片' : '选择或拖入照片' }}</strong><span>JPEG / JPG · 每张不超过 10 MB</span>
+          <strong>＋ {{ items.length ? '继续添加照片' : '选择或拖入照片' }}</strong><span>JPEG / JPG · 每张不超过 {{ PHOTO_LIMIT_LABEL }}</span>
           <input type="file" multiple accept="image/jpeg,.jpg,.jpeg" :disabled="busy" aria-label="批量选择照片" @change="filesChanged" />
         </label>
         <figure v-if="active" class="batch-preview">
-          <div class="batch-preview-image"><img v-if="!active.draft.photoError" :src="active.previewUrl" alt="当前待校对照片" /><span v-else>无法预览此照片</span><span class="batch-preview-number">{{ String(activeNumber).padStart(2, '0') }} / {{ String(items.length).padStart(2, '0') }}</span></div>
+          <div class="batch-preview-image"><img v-if="active.previewUrl && !active.draft.photoError" :src="active.previewUrl" alt="当前待校对照片" /><span v-else-if="active.draft.photoError">无法预览此照片</span><span v-else class="batch-preview-loading">正在生成预览…</span><span class="batch-preview-number">{{ String(activeNumber).padStart(2, '0') }} / {{ String(items.length).padStart(2, '0') }}</span></div>
           <figcaption><strong :title="active.draft.photo?.name">{{ active.draft.photo?.name }}</strong><span>{{ active.draft.form.observed_at?.replace('T', ' ') || '拍摄时间待填写' }}</span></figcaption>
         </figure>
         <div class="batch-queue-tools"><span>照片队列 · {{ items.length }}</span><button type="button" :disabled="busy || !items.length" @click="selectAll(true)">全选</button><button type="button" :disabled="busy || !items.length" @click="selectAll(false)">全不选</button></div>
@@ -243,7 +252,7 @@ defineExpose({ requestClose });
           <li v-for="(item, index) in items" :key="item.draft.id" class="batch-item" :class="{ 'is-active': item === active, 'is-saved': item.state === 'saved' }" :data-state="item.state" :data-tone="itemTone(item)">
             <input v-model="item.selected" type="checkbox" :disabled="busy || !editable(item)" :aria-label="`勾选 ${item.draft.photo?.name}`" />
             <button class="batch-photo-button" type="button" :aria-pressed="item === active" @click="activeId = item.draft.id">
-              <img v-if="!item.draft.photoError" :src="item.previewUrl" alt="" loading="lazy" /><span v-else class="batch-invalid-photo">!</span>
+              <img v-if="item.thumbUrl && !item.draft.photoError" :src="item.thumbUrl" alt="" loading="lazy" /><span v-else-if="item.draft.photoError" class="batch-invalid-photo">!</span>
               <span><strong :title="item.draft.photo?.name">{{ index + 1 }}. {{ item.draft.photo?.name }}</strong><small><i aria-hidden="true"></i>{{ statusLabel(item) }}</small></span>
             </button>
             <button v-if="editable(item)" class="batch-remove" type="button" :disabled="busy" :aria-label="`移除 ${item.draft.photo?.name}`" @click="removeItem(item)">×</button>

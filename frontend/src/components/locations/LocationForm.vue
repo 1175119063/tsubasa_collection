@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { api, errorMessage, jsonRequest } from "@/api/client";
 import type { LocationDetail } from "@/api/types";
 import type { BaseMapHandle, MapServiceConfig } from "@/maps/base-map";
+import { toDisplay, toWgs84, type CoordinateSystem } from "@/maps/coords";
 
 const props = defineProps<{ location: LocationDetail | null }>();
 const emit = defineEmits<{ close: []; saved: [location: LocationDetail] }>();
@@ -16,9 +17,30 @@ interface MapResult { name: string; latitude: number; longitude: number; provinc
 const form = reactive({ name: props.location?.name || "", location_type: props.location?.location_type || "urban_park", radius_meters: props.location?.radius_meters ?? null as number | null, country_code: props.location?.country_code || "CN", country_name: props.location?.country_name || "中国", admin1_code: props.location?.admin1_code || "", admin1_name: props.location?.admin1_name || "", city: props.location?.city || "", district: props.location?.district || "", center_latitude: props.location?.center_latitude ?? null as number | null, center_longitude: props.location?.center_longitude ?? null as number | null, coordinate_system: props.location?.coordinate_system || "wgs84", notes: props.location?.notes || "", link_matching_records: !props.location });
 const mapElement = ref<HTMLElement>(); const search = ref(props.location?.name || ""); const mapStatus = ref("正在加载地图……"); const baseMapStatus = ref("正在加载底图……"); const status = ref(""); const results = ref<MapResult[]>([]);
 let map: L.Map | null = null; let marker: L.Marker | null = null; let searchEnabled = false; let baseMapHandle: BaseMapHandle | null = null;
+// 首选的高德瓦片是 GCJ-02；资料库与检索结果一律是 WGS-84，进出都要换算。
+const mapSystem = ref<CoordinateSystem>("gcj02");
+
+function displayOf(latitude: number, longitude: number): L.LatLngTuple { return toDisplay(latitude, longitude, mapSystem.value); }
+function placeMarker(latitude: number, longitude: number): void {
+  if (!map) return;
+  const point = displayOf(latitude, longitude);
+  if (!marker) {
+    marker = L.marker(point, { draggable: true }).addTo(map);
+    marker.on("dragend", () => { const dragged = marker?.getLatLng(); if (dragged) selectPointFromMap(dragged.lat, dragged.lng); });
+  } else { marker.setLatLng(point); }
+  map.setView(point, 15);
+}
+function refreshFromForm(): void {
+  if (form.center_latitude === null || form.center_longitude === null) return;
+  const [latitude, longitude] = toWgs84(form.center_latitude, form.center_longitude, form.coordinate_system as CoordinateSystem);
+  placeMarker(latitude, longitude);
+}
 
 function fillAddress(item: MapResult): void { if (item.province) { form.country_code = "CN"; form.country_name = "中国"; form.admin1_name = item.province; form.admin1_code = provinceCodes[item.province] || (item.adcode ? `CN-${item.adcode.slice(0, 2)}` : ""); } form.city = item.city || (/^(北京市|天津市|上海市|重庆市)$/.test(item.province || "") ? item.province || "" : form.city); form.district = item.district || form.district; }
-function showPoint(latitude: number, longitude: number): void { form.center_latitude = Number(latitude.toFixed(6)); form.center_longitude = Number(longitude.toFixed(6)); form.coordinate_system = "wgs84"; if (!map) return; if (!marker) { marker = L.marker([latitude, longitude], { draggable: true }).addTo(map); marker.on("dragend", () => { const point = marker?.getLatLng(); if (point) void selectPoint(point.lat, point.lng); }); } else marker.setLatLng([latitude, longitude]); map.setView([latitude, longitude], 15); }
+/** 只接受 WGS-84：资料库、检索结果、设备定位都在这套坐标里。 */
+function showPoint(latitude: number, longitude: number): void { form.center_latitude = Number(latitude.toFixed(6)); form.center_longitude = Number(longitude.toFixed(6)); form.coordinate_system = "wgs84"; placeMarker(latitude, longitude); }
+/** 地图上点出来的是当前底图的坐标（高德为 GCJ-02），先换回 WGS-84 再入库。 */
+function selectPointFromMap(latitude: number, longitude: number): void { const [wgsLatitude, wgsLongitude] = toWgs84(latitude, longitude, mapSystem.value); void selectPoint(wgsLatitude, wgsLongitude); }
 async function selectPoint(latitude: number, longitude: number, result?: MapResult): Promise<void> { showPoint(latitude, longitude); if (result) { form.name = result.name || form.name; fillAddress(result); mapStatus.value = `已选择：${result.name}（WGS-84）`; return; } if (!searchEnabled) { mapStatus.value = `已选择坐标 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}，请手动填写行政区。`; return; } try { const address = await api<MapResult & { formatted_address?: string }>(`/api/map/reverse?latitude=${latitude}&longitude=${longitude}`); fillAddress(address); mapStatus.value = `已选择：${address.formatted_address || `${latitude}, ${longitude}`}（WGS-84）`; } catch (caught) { mapStatus.value = `${errorMessage(caught)} 坐标已经写入，可以手动补充行政区。`; } }
 async function searchMap(): Promise<void> { const query = search.value.trim(); if (!query) { mapStatus.value = "请输入地点名称后再搜索。"; return; } if (!searchEnabled) { mapStatus.value = "尚未配置可用的高德 Web 服务 Key。"; return; } mapStatus.value = "正在通过高德搜索地点……"; try { const response = await api<{ items: MapResult[] }>(`/api/map/search?query=${encodeURIComponent(query)}${form.city ? `&city=${encodeURIComponent(form.city)}` : ""}`); results.value = response.items || []; mapStatus.value = results.value.length ? `找到 ${results.value.length} 个结果，请选择一个地点。` : "没有找到匹配地点，可以直接点击地图。"; } catch (caught) { mapStatus.value = errorMessage(caught); } }
 function useDeviceLocation(): void { navigator.geolocation.getCurrentPosition(({ coords }) => { void selectPoint(coords.latitude, coords.longitude); mapStatus.value = "已读取设备位置（WGS-84）。"; }, () => { status.value = "无法读取设备位置，请手动填写中心经纬度"; }); }
@@ -26,7 +48,7 @@ async function submit(): Promise<void> { status.value = "正在保存…"; try {
 async function initializeMap(): Promise<void> {
   if (!mapElement.value) return;
   map = L.map(mapElement.value).setView([36.6, 117.06], 11);
-  map.on("click", (event) => void selectPoint(event.latlng.lat, event.latlng.lng));
+  map.on("click", (event) => selectPointFromMap(event.latlng.lat, event.latlng.lng));
   let config: MapServiceConfig | null = null;
   try {
     config = await api<MapServiceConfig>("/api/map/config");
@@ -34,8 +56,12 @@ async function initializeMap(): Promise<void> {
     mapStatus.value = searchEnabled ? "可以搜索地点，也可以直接点击地图或拖动标记选择中心点。" : "地图可以正常选点，但尚未配置高德 Web 服务 Key。";
   } catch (caught) { mapStatus.value = errorMessage(caught); }
   const { addBaseMap } = await import("@/maps/base-map");
-  baseMapHandle = addBaseMap(map, config, (message) => { baseMapStatus.value = message; });
-  if (form.center_latitude !== null && form.center_longitude !== null) showPoint(form.center_latitude, form.center_longitude);
+  baseMapHandle = addBaseMap(map, config, (message) => { baseMapStatus.value = message; }, (_id, system) => {
+    if (system === mapSystem.value) return;
+    mapSystem.value = system;
+    refreshFromForm();
+  });
+  refreshFromForm();
   await nextTick();
   setTimeout(() => map?.invalidateSize(), 0);
 }

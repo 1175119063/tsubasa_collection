@@ -4,6 +4,7 @@ import { buildObservationPayload, type ObservationDraft } from "./observation-en
 export interface BatchItem {
   draft: ObservationDraft;
   previewUrl: string;
+  thumbUrl: string;
   selected: boolean;
   state: "draft" | "saving" | "saved" | "error" | "uncertain";
   message: string;

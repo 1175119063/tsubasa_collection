@@ -1,4 +1,5 @@
 import json
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 from playwright.sync_api import expect
@@ -40,6 +41,60 @@ def test_home_sections_fill_the_viewport(browser_app):
         assert abs(box["width"] - viewport_width) <= 1
 
 
+def fulfill_amap_tiles(page, jpeg_bytes, collected: list[str] | None = None):
+    """高德栅格瓦片：默认底图，必须就地满足，否则会触发回落把坐标系换掉。"""
+
+    def handler(route) -> None:
+        if collected is not None:
+            collected.append(route.request.url)
+        route.fulfill(body=jpeg_bytes(), content_type="image/jpeg")
+
+    page.route("https://webrd0*.is.autonavi.com/**", handler)
+    return handler
+
+
+def amap_zoom_of(url: str) -> int:
+    return int(parse_qs(urlsplit(url).query)["z"][0])
+
+
+def record_map_statuses(page) -> None:
+    """底图提示会被后一条消息顶掉，中途的文字可能一闪而过，所以在页面里逐条留档。"""
+
+    page.add_init_script(
+        """
+        window.__mapStatuses = [];
+        document.addEventListener('DOMContentLoaded', () => {
+          const node = () => document.querySelector('.v2-map-stage p');
+          new MutationObserver(() => {
+            const text = node()?.textContent || '';
+            if (text && window.__mapStatuses.at(-1) !== text) window.__mapStatuses.push(text);
+          }).observe(document.documentElement, {
+            subtree: true, childList: true, characterData: true,
+          });
+        });
+        """
+    )
+
+
+def map_statuses(page) -> list[str]:
+    return page.evaluate("window.__mapStatuses || []")
+
+
+def test_amap_tiles_are_the_default_base_map(browser_app, jpeg_bytes):
+    page, base_url, _data_dir = browser_app
+    amap_urls: list[str] = []
+    fulfill_amap_tiles(page, jpeg_bytes, amap_urls)
+    page.goto(f"{base_url}/map")
+    page.get_by_text("高德地图底图已加载", exact=False).wait_for(timeout=90000)
+
+    assert amap_urls, "没有配置天地图 Key 时，默认底图应当是高德"
+    assert all("is.autonavi.com" in url for url in amap_urls)
+    # 图钉按底图坐标系投影；高德瓦片是 GCJ-02，写错会让所有点位整体偏几百米。
+    expect(page.locator("[data-base-map-system]")).to_have_attribute(
+        "data-base-map-system", "gcj02"
+    )
+
+
 def test_tianditu_is_used_as_primary_map_with_browser_key(browser_app, jpeg_bytes):
     page, base_url, _data_dir = browser_app
     page.goto(f"{base_url}/")
@@ -69,27 +124,34 @@ def test_tianditu_is_used_as_primary_map_with_browser_key(browser_app, jpeg_byte
     assert any("/cva_w/wmts" in url for url in tile_urls)
     assert all("tk=browser-map-key" in url for url in tile_urls)
     assert page.locator(".leaflet-control-layers").count() == 1
+    # 天地图是 WGS-84：首层就要按它投影，不能沿用高德的 GCJ-02。
+    expect(page.locator("[data-base-map-system]")).to_have_attribute(
+        "data-base-map-system", "wgs84"
+    )
 
 
-def test_tianditu_tile_failure_falls_back_to_openstreetmap(browser_app, jpeg_bytes):
+def test_tianditu_tile_failure_falls_back_to_amap(browser_app, jpeg_bytes):
     page, base_url, _data_dir = browser_app
     response = httpx.put(
         f"{base_url}/api/integrations/tianditu",
         json={"api_key": "unavailable-map-key", "clear_api_key": False},
     )
     response.raise_for_status()
-    osm_urls: list[str] = []
+    amap_urls: list[str] = []
+    record_map_statuses(page)
     page.route("https://t*.tianditu.gov.cn/**", lambda route: route.abort())
-
-    def fulfill_osm(route) -> None:
-        osm_urls.append(route.request.url)
-        route.fulfill(body=jpeg_bytes(), content_type="image/jpeg")
-
-    page.route("https://tile.openstreetmap.org/**", fulfill_osm)
+    fulfill_amap_tiles(page, jpeg_bytes, amap_urls)
     page.goto(f"{base_url}/map")
-    page.get_by_text("已切换到 OpenStreetMap 备用底图", exact=False).wait_for()
+    # 先等稳定状态（高德瓦片真的加载了），再回看中途的提示：
+    # 回落提示一闪就被“高德地图底图已加载”顶掉，直接等它容易扑空。
+    page.get_by_text("高德地图底图已加载", exact=False).wait_for(timeout=90000)
 
-    assert osm_urls
+    assert amap_urls
+    fallback = [text for text in map_statuses(page) if "已切换到高德地图备用底图" in text]
+    assert fallback, map_statuses(page)
+    expect(page.locator("[data-base-map-system]")).to_have_attribute(
+        "data-base-map-system", "gcj02"
+    )
 
 
 def _post_location_at(base_url: str, name: str, latitude: float, longitude: float) -> dict:
@@ -125,10 +187,10 @@ def test_map_fits_every_location_on_first_load(browser_app, jpeg_bytes):
     tile_zooms: list[int] = []
 
     def fulfill_tile(route) -> None:
-        tile_zooms.append(int(route.request.url.rsplit("/", 3)[1]))
+        tile_zooms.append(amap_zoom_of(route.request.url))
         route.fulfill(body=jpeg_bytes(), content_type="image/jpeg")
 
-    page.route("https://tile.openstreetmap.org/**", fulfill_tile)
+    page.route("https://webrd0*.is.autonavi.com/**", fulfill_tile)
     page.goto(f"{base_url}/map")
     page.locator(".leaflet-marker-icon, .marker-cluster").first.wait_for(timeout=30000)
     page.wait_for_timeout(600)
@@ -151,7 +213,7 @@ def test_map_markers_render_real_pin_images(browser_app, jpeg_bytes):
         lambda response: not_found.append(response.url) if response.status == 404 else None,
     )
     page.route(
-        "https://tile.openstreetmap.org/**",
+        "https://webrd0*.is.autonavi.com/**",
         lambda route: route.fulfill(body=jpeg_bytes(), content_type="image/jpeg"),
     )
     page.goto(f"{base_url}/map")
@@ -171,12 +233,38 @@ def test_map_markers_render_real_pin_images(browser_app, jpeg_bytes):
     assert not [url for url in not_found if "marker" in url], f"标记图标请求 404：{not_found}"
 
 
-def test_openstreetmap_tile_failure_is_reported_to_the_reader(browser_app):
+def test_unreachable_tile_services_are_reported_to_the_reader(browser_app):
     page, base_url, _data_dir = browser_app
+    page.route("https://webrd0*.is.autonavi.com/**", lambda route: route.abort())
     page.route("https://tile.openstreetmap.org/**", lambda route: route.abort())
     page.goto(f"{base_url}/map")
 
-    page.get_by_text("OpenStreetMap 底图瓦片加载失败", exact=False).wait_for(timeout=30000)
+    page.get_by_text("当前网络无法访问任何地图瓦片服务", exact=False).wait_for(timeout=30000)
+
+
+def test_location_form_converts_map_click_back_to_wgs84(browser_app, jpeg_bytes):
+    page, base_url, _data_dir = browser_app
+    page.set_viewport_size({"width": 1440, "height": 900})
+    # 必须让高德瓦片成功加载，否则底图会回落到 OpenStreetMap（WGS-84），这条就验不到换算了。
+    fulfill_amap_tiles(page, jpeg_bytes)
+    page.goto(f"{base_url}/locations?new=1")
+    dialog = page.locator("dialog.location-form-dialog[open]")
+    dialog.wait_for(state="visible")
+    map_element = dialog.locator("#location-map")
+    map_element.scroll_into_view_if_needed()
+    page.wait_for_timeout(800)
+    box = map_element.bounding_box()
+    assert box is not None, "地点表单里的地图没有渲染出来"
+    page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.wait_for_timeout(200)
+
+    coordinates = dialog.locator('input[type="number"]')
+    latitude = float(coordinates.nth(1).input_value())
+    longitude = float(coordinates.nth(2).input_value())
+    # 表单初始视野是 [36.6, 117.06]，点在地图正中心得到的正是这个 GCJ-02 坐标。
+    # 写进表单的必须是换算后的 WGS-84；直接抄 GCJ-02 会整整偏 540 米。
+    assert abs(latitude - 36.599623) < 0.002, f"纬度没有换算回 WGS-84：{latitude}"
+    assert abs(longitude - 117.053940) < 0.002, f"经度没有换算回 WGS-84：{longitude}"
 
 
 def test_personal_taxonomy_navigation_url_and_species_actions(browser_app, post_observation):
@@ -490,6 +578,44 @@ def test_assistant_previews_then_fills_new_species_taxonomy(browser_app, tmp_pat
 
     page.locator("[data-vue-feather-apply]").click()
     assert species_scientific.input_value() == "Cyanoptila cyanomelana"
+
+
+def test_large_photo_preview_and_queue_thumbnail_are_downscaled(
+    browser_app, tmp_path, large_jpeg_bytes
+):
+    page, base_url, _data_dir = browser_app
+    photos = []
+    for index in range(2):
+        photo = tmp_path / f"large-bird-{index}.jpg"
+        photo.write_bytes(large_jpeg_bytes())
+        photos.append(str(photo))
+
+    page.goto(f"{base_url}/observations?new=1")
+    dialog = page.locator("dialog.batch-dialog[open]")
+    dialog.wait_for(state="visible")
+    dialog.get_by_label("批量选择照片", exact=True).set_input_files(photos)
+
+    preview = dialog.locator(".batch-preview-image img")
+    preview.wait_for(state="visible", timeout=60000)
+    assert dialog.get_by_text("无法预览此照片").count() == 0
+    # Previews are generated one photo at a time, so wait for both to finish.
+    thumbnails = dialog.locator(".batch-item img")
+    expect(thumbnails).to_have_count(2)
+    page.wait_for_function(
+        """() => {
+            const selector = '.batch-item img, .batch-preview-image img';
+            const images = [...document.querySelectorAll(selector)];
+            if (images.length !== 3) return false;
+            return images.every((image) => image.complete && image.naturalWidth > 0);
+        }""",
+        timeout=60000,
+    )
+    # The 4000×3000 original must never be decoded at full size for a preview box.
+    assert 0 < preview.evaluate("image => image.naturalWidth") <= 1600
+    widths = thumbnails.evaluate_all("images => images.map((image) => image.naturalWidth)")
+    assert all(0 < width <= 320 for width in widths)
+    # A large photo is a usable photo now: it must not be flagged as an invalid file.
+    assert dialog.locator('.batch-item[data-tone="error"]').count() == 0
 
 
 def test_browser_can_create_observation_with_existing_species(

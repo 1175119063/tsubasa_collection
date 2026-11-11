@@ -17,7 +17,7 @@ from .config import Settings
 from .enums import MediaKind
 from .models import MediaAsset
 
-PHOTO_MAX_BYTES = 10 * 1024 * 1024
+PHOTO_MAX_BYTES = 40 * 1024 * 1024
 
 
 class MediaValidationError(ValueError):
@@ -41,7 +41,7 @@ class MediaStore:
         try:
             upload.file.seek(0, os.SEEK_END)
             if upload.file.tell() > PHOTO_MAX_BYTES:
-                raise MediaValidationError("照片大小不能超过 10 MB")
+                raise MediaValidationError("照片大小不能超过 40 MB")
             upload.file.seek(0)
             with Image.open(upload.file) as image:
                 if image.format != "JPEG":
@@ -89,7 +89,7 @@ class MediaStore:
         temp_path, sha256, byte_size = await self._copy_to_temp(
             upload,
             max_bytes=PHOTO_MAX_BYTES,
-            too_large_message="照片大小不能超过 10 MB",
+            too_large_message="照片大小不能超过 40 MB",
         )
         created_files: list[Path] = []
         try:

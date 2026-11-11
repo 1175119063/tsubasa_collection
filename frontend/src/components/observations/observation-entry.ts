@@ -1,6 +1,10 @@
 import { api, ApiError, errorMessage } from "@/api/client";
 import type { LocationSummary, SpeciesSummary, TaxonomyOrder } from "@/api/types";
 
+// Must match `PHOTO_MAX_BYTES` in backend/app/media_store.py.
+export const PHOTO_MAX_BYTES = 40 * 1024 * 1024;
+export const PHOTO_LIMIT_LABEL = "40 MB";
+
 export interface Subspecies { id: number; chinese_name: string | null; scientific_name: string }
 export interface AdditionalSpecies {
   species: SpeciesSummary;
@@ -157,8 +161,8 @@ export async function readAdditionalPhoto(file: File): Promise<AdditionalPhotoDr
     id: crypto.randomUUID(), file, observed_at: "", includesPrimary: true,
     speciesIds: [], status: "正在读取 EXIF 拍摄时间…", error: "", reading: true,
   };
-  if (!/\.jpe?g$/i.test(file.name) || file.size > 10 * 1024 * 1024 || !file.size) {
-    item.error = "照片必须是非空 JPEG/JPG，且不超过 10 MB";
+  if (!/\.jpe?g$/i.test(file.name) || file.size > PHOTO_MAX_BYTES || !file.size) {
+    item.error = `照片必须是非空 JPEG/JPG，且不超过 ${PHOTO_LIMIT_LABEL}`;
     item.status = item.error; item.reading = false; return item;
   }
   const body = new FormData(); body.append("photo", file);
@@ -176,8 +180,8 @@ export async function readObservationPhoto(draft: ObservationDraft, file: File |
   draft.photoError = "";
   draft.readingPhoto = false;
   if (!file) { draft.photoStatus = "请选择 JPEG/JPG 照片。"; return; }
-  if (!/\.jpe?g$/i.test(file.name) || file.size > 10 * 1024 * 1024 || !file.size) {
-    draft.photoError = "照片必须是非空 JPEG/JPG，且不超过 10 MB";
+  if (!/\.jpe?g$/i.test(file.name) || file.size > PHOTO_MAX_BYTES || !file.size) {
+    draft.photoError = `照片必须是非空 JPEG/JPG，且不超过 ${PHOTO_LIMIT_LABEL}`;
     draft.photoStatus = draft.photoError;
     return;
   }
